@@ -1,0 +1,28 @@
+_base_: ../base/common.yaml
+
+experiment:
+  seed: 202
+
+benchmark:
+  name: mixed_oracle_routing
+  num_nodes: 6
+  obs_dim: 32
+  seq_len: 2
+
+model:
+  hidden_dim: 96
+  max_internal_steps: 6
+  adapter_rank: 8
+
+training:
+  batch_size: 256
+  val_batch_size: 512
+  train_steps: 150
+  val_every: 25
+  val_batches: 8
+  test_batches: 12
+
+method:
+  name: hard_st
+  temperature: 0.75
+  estimator: gumbel

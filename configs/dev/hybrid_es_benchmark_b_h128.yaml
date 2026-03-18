@@ -1,0 +1,16 @@
+_base_: ./hybrid_es_benchmark_b.yaml
+
+experiment:
+  seed: 217
+
+benchmark:
+  seq_len: 128
+
+warmstart:
+  train_steps: 80
+
+training:
+  truncate_bptt_steps: 16
+
+es:
+  generations: 40

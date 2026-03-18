@@ -1,0 +1,59 @@
+{
+  "benchmark": "mixed_oracle_routing",
+  "config_path": "configs/smoke/hybrid_es.yaml",
+  "method": "hybrid_es",
+  "results_dir": "results/smoke_hybrid_es_test",
+  "summary": {
+    "best_val_accuracy": 0.6614583134651184,
+    "parameter_names": [
+      "core.router_mlp.0.weight",
+      "core.router_mlp.0.bias",
+      "core.router_mlp.1.weight",
+      "core.router_mlp.1.bias",
+      "core.router_out.weight",
+      "core.router_out.bias"
+    ],
+    "test": {
+      "accuracy": 0.61328125,
+      "compute": 1.0,
+      "delays": 0.0,
+      "early_exit_rate": 1.0,
+      "examples_per_sec": 78858.82961222091,
+      "exit_time": 0.0,
+      "generation": 8,
+      "hops": 0.0,
+      "loss": 0.6699714660644531,
+      "peak_memory_mb": 68.55615234375,
+      "phase": "hybrid_es",
+      "route_loss": 0.0,
+      "route_match": 0.208984375,
+      "split": "test",
+      "task_loss": 0.6699714660644531,
+      "ttl_fail": 0.0,
+      "wall_time_sec": 0.00649261474609375
+    },
+    "warmstart": {
+      "best_val_accuracy": 0.6536458134651184,
+      "checkpoint": "results/smoke_hybrid_es_test/warmstart_best.pt",
+      "test": {
+        "accuracy": 0.61328125,
+        "compute": 1.2202274799346924,
+        "delays": 0.08874001353979111,
+        "early_exit_rate": 0.9139690399169922,
+        "examples_per_sec": 21721.81349948919,
+        "exit_time": 0.0,
+        "hops": 0.13148745894432068,
+        "loss": 0.6760373711585999,
+        "peak_memory_mb": 70.1416015625,
+        "phase": "warmstart",
+        "route_loss": 0.005081792827695608,
+        "route_match": 0.208984375,
+        "split": "test",
+        "step": 8,
+        "task_loss": 0.6709556579589844,
+        "ttl_fail": 0.002708974527195096,
+        "wall_time_sec": 0.023570775985717773
+      }
+    }
+  }
+}

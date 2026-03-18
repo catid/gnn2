@@ -1,0 +1,291 @@
+{
+  "benchmark": "mixed_oracle_routing",
+  "config_path": "configs/dev/hybrid_es_benchmark_a_rank1.yaml",
+  "method": "hybrid_es",
+  "results_dir": "results/dev_suite/hybrid_es_benchmark_a_rank1",
+  "summary": {
+    "best_val_accuracy": 0.74951171875,
+    "best_val_metrics": {
+      "accuracy": 0.74951171875,
+      "compute": 1.7587890625,
+      "delays": 0.7587890625,
+      "early_exit_rate": 0.2412109375,
+      "examples_per_sec": 100249.57072083374,
+      "examples_seen": 4096,
+      "exit_time": 0.7587890625,
+      "generation": 19,
+      "hops": 0.0,
+      "loss": 0.40816181898117065,
+      "peak_memory_mb": 100.7431640625,
+      "per_mode": {
+        "delay_1": {
+          "accuracy": 1.0,
+          "compute": 2.0,
+          "count": 1029,
+          "delays": 1.0,
+          "early_exit_rate": 0.0,
+          "exit_time": 1.0,
+          "hops": 0.0,
+          "route_match": 1.0,
+          "ttl_fail": 0.0
+        },
+        "delay_1_then_spatial_k": {
+          "accuracy": 0.5137701802104288,
+          "compute": 1.9999999731694191,
+          "count": 1053,
+          "delays": 0.9999999865847096,
+          "early_exit_rate": 0.0,
+          "exit_time": 0.9999999865847096,
+          "hops": 0.0,
+          "route_match": 0.0,
+          "ttl_fail": 0.0
+        },
+        "easy_exit": {
+          "accuracy": 0.9999999926399122,
+          "compute": 0.9999999926399122,
+          "count": 988,
+          "delays": 0.0,
+          "early_exit_rate": 0.9999999926399122,
+          "exit_time": 0.0,
+          "hops": 0.0,
+          "route_match": 0.9999999926399122,
+          "ttl_fail": 0.0
+        },
+        "spatial_k": {
+          "accuracy": 0.49902534554576317,
+          "compute": 1.9999999857088278,
+          "count": 1026,
+          "delays": 0.9999999928544139,
+          "early_exit_rate": 0.0,
+          "exit_time": 0.9999999928544139,
+          "hops": 0.0,
+          "route_match": 0.0,
+          "ttl_fail": 0.0
+        }
+      },
+      "phase": "hybrid_es",
+      "route_loss": 0.015175782144069672,
+      "route_match": 0.492431640625,
+      "split": "val",
+      "task_loss": 0.3929860293865204,
+      "ttl_fail": 0.0,
+      "wall_time_sec": 0.04085803031921387
+    },
+    "es_wall_time_sec": 2.5733482837677,
+    "parameter_count": 38019,
+    "parameter_names": [
+      "core.router_mlp.0.weight",
+      "core.router_mlp.0.bias",
+      "core.router_mlp.1.weight",
+      "core.router_mlp.1.bias",
+      "core.router_out.weight",
+      "core.router_out.bias"
+    ],
+    "peak_train_memory_mb": 100.7431640625,
+    "test": {
+      "accuracy": 0.7526041865348816,
+      "compute": 1.7548828125,
+      "delays": 0.7548828125,
+      "early_exit_rate": 0.2451171875,
+      "examples_per_sec": 117195.13468674962,
+      "examples_seen": 6144,
+      "exit_time": 0.7548828125,
+      "generation": 40,
+      "hops": 0.0,
+      "loss": 0.4048633277416229,
+      "peak_memory_mb": 100.8291015625,
+      "per_mode": {
+        "delay_1": {
+          "accuracy": 0.9999999906070501,
+          "compute": 1.9999999812141003,
+          "count": 1542,
+          "delays": 0.9999999906070501,
+          "early_exit_rate": 0.0,
+          "exit_time": 0.9999999906070501,
+          "hops": 0.0,
+          "route_match": 0.9999999906070501,
+          "ttl_fail": 0.0
+        },
+        "delay_1_then_spatial_k": {
+          "accuracy": 0.5079893543026578,
+          "compute": 1.999999980634443,
+          "count": 1502,
+          "delays": 0.9999999903172215,
+          "early_exit_rate": 0.0,
+          "exit_time": 0.9999999903172215,
+          "hops": 0.0,
+          "route_match": 0.0,
+          "ttl_fail": 0.0
+        },
+        "easy_exit": {
+          "accuracy": 0.999999990897033,
+          "compute": 0.999999990897033,
+          "count": 1506,
+          "delays": 0.0,
+          "early_exit_rate": 0.999999990897033,
+          "exit_time": 0.0,
+          "hops": 0.0,
+          "route_match": 0.999999990897033,
+          "ttl_fail": 0.0
+        },
+        "spatial_k": {
+          "accuracy": 0.5100376425939641,
+          "compute": 1.9999999909508632,
+          "count": 1594,
+          "delays": 0.9999999954754316,
+          "early_exit_rate": 0.0,
+          "exit_time": 0.9999999954754316,
+          "hops": 0.0,
+          "route_match": 0.0,
+          "ttl_fail": 0.0
+        }
+      },
+      "phase": "hybrid_es",
+      "route_loss": 0.015097658149898052,
+      "route_match": 0.49609375,
+      "split": "test",
+      "task_loss": 0.3897656202316284,
+      "ttl_fail": 0.0,
+      "wall_time_sec": 0.052425384521484375
+    },
+    "total_wall_time_sec": 5.07120156288147,
+    "warmstart": {
+      "best_val_accuracy": 0.748779296875,
+      "best_val_metrics": {
+        "accuracy": 0.748779296875,
+        "compute": 1.6551952362060547,
+        "delays": 0.6188802719116211,
+        "early_exit_rate": 0.4760846793651581,
+        "examples_per_sec": 48440.80106694638,
+        "examples_seen": 4096,
+        "exit_time": 0.0,
+        "hops": 0.03631504997611046,
+        "loss": 0.4534549415111542,
+        "peak_memory_mb": 102.91650390625,
+        "per_mode": {
+          "delay_1": {
+            "accuracy": 1.0,
+            "compute": 1.708205516414809,
+            "count": 1029,
+            "delays": 0.6741484381019548,
+            "early_exit_rate": 0.3862156988754217,
+            "exit_time": 0.0,
+            "hops": 0.034057077798771554,
+            "route_match": 0.0,
+            "ttl_fail": 0.06036413649949666
+          },
+          "delay_1_then_spatial_k": {
+            "accuracy": 0.5023741645407699,
+            "compute": 1.639149140655032,
+            "count": 1053,
+            "delays": 0.6041601801190282,
+            "early_exit_rate": 0.46064097294893475,
+            "exit_time": 0.0,
+            "hops": 0.034988951585401495,
+            "route_match": 0.0,
+            "ttl_fail": 0.0648012061418518
+          },
+          "easy_exit": {
+            "accuracy": 0.9999999926399122,
+            "compute": 1.631971891833703,
+            "count": 988,
+            "delays": 0.5934437596001606,
+            "early_exit_rate": 0.6145924568658898,
+            "exit_time": 0.0,
+            "hops": 0.03852812833480748,
+            "route_match": 0.0010121457522870739,
+            "ttl_fail": 0.20803623899877796
+          },
+          "spatial_k": {
+            "accuracy": 0.5077972772002918,
+            "compute": 1.6408619769135413,
+            "count": 1026,
+            "delays": 0.6030524391644647,
+            "early_exit_rate": 0.4486886221646798,
+            "exit_time": 0.0,
+            "hops": 0.03780950828442681,
+            "route_match": 0.0,
+            "ttl_fail": 0.0517410669533888
+          }
+        },
+        "phase": "warmstart",
+        "route_loss": 0.03684514760971069,
+        "route_match": 0.000244140625,
+        "split": "val",
+        "step": 74,
+        "task_loss": 0.4166097640991211,
+        "ttl_fail": 0.09496496617794037,
+        "wall_time_sec": 0.08455681800842285
+      },
+      "checkpoint": "results/dev_suite/hybrid_es_benchmark_a_rank1/warmstart_best.pt",
+      "peak_train_memory_mb": 306.6103515625,
+      "phase_wall_time_sec": 2.4978532791137695,
+      "test": {
+        "accuracy": 0.76171875,
+        "compute": 1.6558490991592407,
+        "delays": 0.6194738745689392,
+        "early_exit_rate": 0.4764379560947418,
+        "examples_per_sec": 48550.91059744263,
+        "examples_seen": 6144,
+        "exit_time": 0.0,
+        "hops": 0.036375369876623154,
+        "loss": 0.45016804337501526,
+        "peak_memory_mb": 103.00244140625,
+        "per_mode": {
+          "delay_1": {
+            "accuracy": 0.9999999906070501,
+            "compute": 1.7083715592376916,
+            "count": 1542,
+            "delays": 0.6743401392192692,
+            "early_exit_rate": 0.3865950434588273,
+            "exit_time": 0.0,
+            "hops": 0.034031450871653594,
+            "route_match": 0.0,
+            "ttl_fail": 0.060935170332938625
+          },
+          "delay_1_then_spatial_k": {
+            "accuracy": 0.5219707133250928,
+            "compute": 1.6396911394262759,
+            "count": 1502,
+            "delays": 0.6046931382898643,
+            "early_exit_rate": 0.4606456892111013,
+            "exit_time": 0.0,
+            "hops": 0.03499797723949273,
+            "route_match": 0.0,
+            "ttl_fail": 0.06533883625118139
+          },
+          "easy_exit": {
+            "accuracy": 0.999999990897033,
+            "compute": 1.6334417312743654,
+            "count": 1506,
+            "delays": 0.5948497664485162,
+            "early_exit_rate": 0.6138310445890642,
+            "exit_time": 0.0,
+            "hops": 0.03859196353708685,
+            "route_match": 0.0,
+            "ttl_fail": 0.20868083855426645
+          },
+          "spatial_k": {
+            "accuracy": 0.53199497988936,
+            "compute": 1.6414362340978577,
+            "count": 1594,
+            "delays": 0.603589685416431,
+            "early_exit_rate": 0.44842281997428185,
+            "exit_time": 0.0,
+            "hops": 0.03784651356694316,
+            "route_match": 0.0,
+            "ttl_fail": 0.052012554866494316
+          }
+        },
+        "phase": "warmstart",
+        "route_loss": 0.03709494695067406,
+        "route_match": 0.0,
+        "split": "test",
+        "step": 75,
+        "task_loss": 0.41307318210601807,
+        "ttl_fail": 0.09591183811426163,
+        "wall_time_sec": 0.12654757499694824
+      }
+    }
+  }
+}

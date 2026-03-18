@@ -1,0 +1,29 @@
+{
+  "benchmark": "mixed_oracle_routing",
+  "config_path": "configs/smoke/hard_st.yaml",
+  "method": "hard_st",
+  "results_dir": "results/smoke_hard_st_test",
+  "summary": {
+    "best_val_accuracy": 0.5208333134651184,
+    "checkpoint": "results/smoke_hard_st_test/hard_st_best.pt",
+    "test": {
+      "accuracy": 0.498046875,
+      "compute": 1.37890625,
+      "delays": 0.08203125,
+      "early_exit_rate": 0.921875,
+      "examples_per_sec": 25958.679125315797,
+      "exit_time": 0.078125,
+      "hops": 0.296875,
+      "loss": 0.7147961854934692,
+      "peak_memory_mb": 70.1416015625,
+      "phase": "hard_st",
+      "route_loss": 0.008554688654839993,
+      "route_match": 0.185546875,
+      "split": "test",
+      "step": 12,
+      "task_loss": 0.7062416076660156,
+      "ttl_fail": 0.00390625,
+      "wall_time_sec": 0.01972365379333496
+    }
+  }
+}

@@ -1,0 +1,51 @@
+_base_: ../base/common.yaml
+
+experiment:
+  seed: 304
+
+benchmark:
+  name: long_horizon_memory
+  num_nodes: 4
+  obs_dim: 24
+  num_classes: 4
+  seq_len: 128
+
+model:
+  hidden_dim: 128
+  max_internal_steps: 4
+  adapter_rank: 8
+
+objective:
+  lambda_hops: 0.01
+  lambda_delay: 0.0025
+  lambda_ttl: 0.5
+
+method:
+  name: hybrid_es
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 120
+  batch_size: 256
+  val_every: 40
+
+training:
+  batch_size: 256
+  val_batch_size: 512
+  truncate_bptt_steps: 32
+  val_batches: 12
+  test_batches: 16
+
+es:
+  generations: 96
+  population: 64
+  batch_size: 256
+  eval_batch_size: 512
+  sigma: 0.03
+  rank: 4
+  lr: 0.008
+  val_every: 16
+  val_batches: 12
+  test_batches: 16
+  evolve_adapters: false

@@ -1,0 +1,50 @@
+{
+  "benchmark": "long_horizon_memory",
+  "config_path": "configs/dev/hard_st_benchmark_b_h128.yaml",
+  "method": "hard_st",
+  "results_dir": "results/dev_suite/hard_st_benchmark_b_h128",
+  "summary": {
+    "best_val_accuracy": 0.2571614682674408,
+    "best_val_metrics": {
+      "accuracy": 0.2571614682674408,
+      "compute": 1.0,
+      "delays": 0.0,
+      "early_exit_rate": 1.0,
+      "examples_per_sec": 11962.475409196832,
+      "examples_seen": 1536,
+      "exit_time": 0.0,
+      "hops": 0.0,
+      "loss": 1.3873952627182007,
+      "peak_memory_mb": 98.5654296875,
+      "phase": "hard_st",
+      "route_loss": 0.0,
+      "split": "val",
+      "step": 119,
+      "task_loss": 1.3873952627182007,
+      "ttl_fail": 0.0,
+      "wall_time_sec": 0.128401517868042
+    },
+    "checkpoint": "results/dev_suite/hard_st_benchmark_b_h128/hard_st_best.pt",
+    "peak_train_memory_mb": 189.5615234375,
+    "phase_wall_time_sec": 4.266820430755615,
+    "test": {
+      "accuracy": 0.2705078125,
+      "compute": 1.0,
+      "delays": 0.0,
+      "early_exit_rate": 1.0,
+      "examples_per_sec": 11727.273411379228,
+      "examples_seen": 2048,
+      "exit_time": 0.0,
+      "hops": 0.0,
+      "loss": 1.3842201232910156,
+      "peak_memory_mb": 98.5849609375,
+      "phase": "hard_st",
+      "route_loss": 0.0,
+      "split": "test",
+      "step": 140,
+      "task_loss": 1.3842201232910156,
+      "ttl_fail": 0.0,
+      "wall_time_sec": 0.174635648727417
+    }
+  }
+}

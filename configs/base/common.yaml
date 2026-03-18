@@ -1,0 +1,72 @@
+experiment:
+  seed: 123
+  results_root: results
+
+system:
+  cpu_threads: 16
+  amp: true
+  amp_dtype: bf16
+
+benchmark:
+  name: mixed_oracle_routing
+  num_nodes: 6
+  obs_dim: 32
+  num_classes: 2
+  seq_len: 2
+  noise_std: 0.05
+  train_seed: 11
+  val_seed: 101
+  test_seed: 1001
+
+model:
+  hidden_dim: 96
+  max_internal_steps: 6
+  adapter_rank: 8
+
+objective:
+  task_score: neg_ce
+  lambda_hops: 0.02
+  lambda_delay: 0.02
+  lambda_ttl: 0.25
+
+training:
+  batch_size: 128
+  val_batch_size: 256
+  train_steps: 100
+  val_every: 25
+  lr: 0.001
+  weight_decay: 0.0001
+  grad_clip: 1.0
+  truncate_bptt_steps: 0
+  val_batches: 8
+  test_batches: 16
+
+method:
+  name: soft
+  temperature: 1.0
+  estimator: straight_through
+
+warmstart:
+  enabled: false
+  route_mode: soft
+  temperature: 1.0
+  estimator: straight_through
+  train_steps: 50
+  batch_size: 128
+  val_every: 25
+
+es:
+  generations: 100
+  population: 64
+  batch_size: 128
+  eval_batch_size: 256
+  sigma: 0.05
+  rank: 4
+  lr: 0.01
+  weight_decay: 0.0
+  optimizer: adam
+  noise_reuse: 0
+  val_every: 10
+  val_batches: 8
+  test_batches: 16
+  evolve_adapters: false

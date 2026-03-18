@@ -1,0 +1,29 @@
+{
+  "benchmark": "mixed_oracle_routing",
+  "config_path": "configs/dev/soft_benchmark_a.yaml",
+  "method": "soft",
+  "results_dir": "results/probe_soft_a",
+  "summary": {
+    "best_val_accuracy": 1.0,
+    "checkpoint": "results/probe_soft_a/soft_best.pt",
+    "test": {
+      "accuracy": 1.0,
+      "compute": 3.003674268722534,
+      "delays": 0.3834874629974365,
+      "early_exit_rate": 0.6221525073051453,
+      "examples_per_sec": 49447.57936425701,
+      "exit_time": 0.0,
+      "hops": 1.620186448097229,
+      "loss": 0.04558853805065155,
+      "peak_memory_mb": 103.00244140625,
+      "phase": "soft",
+      "route_loss": 0.04148346558213234,
+      "route_match": 0.29931640625,
+      "split": "test",
+      "step": 150,
+      "task_loss": 0.004105066414922476,
+      "ttl_fail": 0.005639961455017328,
+      "wall_time_sec": 0.1242527961730957
+    }
+  }
+}

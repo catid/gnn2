@@ -1,0 +1,7 @@
+_base_: ./hybrid_es_benchmark_a.yaml
+
+experiment:
+  seed: 211
+
+es:
+  evolve_adapters: true

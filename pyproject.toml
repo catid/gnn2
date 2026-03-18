@@ -5,8 +5,14 @@ description = "Bootstrap environment for gnn2"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "matplotlib>=3.10.1",
+    "numpy>=2.3.0",
+    "psutil>=7.1.0",
+    "pytest>=8.4.2",
+    "pyyaml>=6.0.2",
     "torch>=2.12.0.dev20260317",
     "torchaudio>=2.11.0.dev20260317",
+    "tqdm>=4.67.1",
     "torchvision>=0.26.0.dev20260317",
     "triton>=3.6.0",
 ]
@@ -30,3 +36,6 @@ explicit = true
 name = "pytorch-nightly"
 url = "https://download.pytorch.org/whl/nightly"
 explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

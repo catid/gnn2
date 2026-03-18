@@ -1,0 +1,29 @@
+{
+  "benchmark": "mixed_oracle_routing",
+  "config_path": "configs/smoke/soft.yaml",
+  "method": "soft",
+  "results_dir": "results/smoke_soft_test",
+  "summary": {
+    "best_val_accuracy": 0.6197916865348816,
+    "checkpoint": "results/smoke_soft_test/soft_best.pt",
+    "test": {
+      "accuracy": 0.5859375,
+      "compute": 1.0502537488937378,
+      "delays": 0.01507194060832262,
+      "early_exit_rate": 0.985024094581604,
+      "examples_per_sec": 21630.57663174859,
+      "exit_time": 0.0,
+      "hops": 0.03518182411789894,
+      "loss": 0.6377364993095398,
+      "peak_memory_mb": 70.1416015625,
+      "phase": "soft",
+      "route_loss": 0.0010290896752849221,
+      "route_match": 0.208984375,
+      "split": "test",
+      "step": 12,
+      "task_loss": 0.6367073059082031,
+      "ttl_fail": 9.605792001821101e-05,
+      "wall_time_sec": 0.023670196533203125
+    }
+  }
+}

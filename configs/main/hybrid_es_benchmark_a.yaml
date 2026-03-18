@@ -1,0 +1,44 @@
+_base_: ../base/common.yaml
+
+experiment:
+  seed: 303
+
+benchmark:
+  name: mixed_oracle_routing
+  num_nodes: 8
+  obs_dim: 40
+  seq_len: 2
+
+model:
+  hidden_dim: 128
+  max_internal_steps: 8
+  adapter_rank: 8
+
+method:
+  name: hybrid_es
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 150
+  batch_size: 512
+  val_every: 50
+
+training:
+  batch_size: 512
+  val_batch_size: 1024
+  val_batches: 16
+  test_batches: 24
+
+es:
+  generations: 120
+  population: 64
+  batch_size: 512
+  eval_batch_size: 1024
+  sigma: 0.04
+  rank: 4
+  lr: 0.01
+  val_every: 20
+  val_batches: 16
+  test_batches: 24
+  evolve_adapters: false

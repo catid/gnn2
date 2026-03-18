@@ -1,0 +1,11 @@
+_base_: ./soft_benchmark_b.yaml
+
+experiment:
+  seed: 215
+
+benchmark:
+  seq_len: 128
+
+training:
+  train_steps: 140
+  truncate_bptt_steps: 16

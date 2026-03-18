@@ -1,0 +1,27 @@
+_base_: ../base/common.yaml
+
+experiment:
+  seed: 123
+
+benchmark:
+  name: mixed_oracle_routing
+  num_nodes: 4
+  obs_dim: 24
+  seq_len: 2
+
+model:
+  hidden_dim: 64
+  max_internal_steps: 4
+  adapter_rank: 4
+
+training:
+  batch_size: 64
+  val_batch_size: 128
+  train_steps: 12
+  val_every: 6
+  val_batches: 3
+  test_batches: 4
+
+method:
+  name: soft
+  temperature: 1.0

@@ -47,6 +47,32 @@ bd sync               # Sync with git
   `MAX_JOBS=16`, `CMAKE_BUILD_PARALLEL_LEVEL=16`, and `MAKEFLAGS=-j16`.
 - Track substantive work in `bd` instead of ad hoc notes.
 
+## EGGROLL Reference Discipline
+
+When implementing, discussing, or evaluating any EGGROLL-style method in this repo, always consult the
+local paper and the cloned reference code first:
+
+- `references/eggroll_paper.pdf`
+- `references/eggroll_paper.md`
+- `references/HyperscaleES/README.org`
+- `references/HyperscaleES/eggroll.ipynb`
+- `references/HyperscaleES/src/hyperscalees/noiser/eggroll.py`
+- `references/HyperscaleES/src/hyperscalees/noiser/eggroll_baseline_subtraction.py`
+- `references/HyperscaleES/llm_experiments/general_do_evolution_multi_gpu.py`
+- `references/HyperscaleES/tests/end_to_end_test.py`
+- `docs/eggroll_reference_alignment.md`
+
+Rules:
+
+- Treat our PyTorch implementation as `EGGROLL-inspired` unless a behavior is directly verified against the
+  paper and reference repo.
+- Preserve the core transferable ideas: low-rank perturbations, forward-only population evaluation,
+  antithetic sampling, deterministic seed-based perturbation reconstruction, multi-GPU population execution,
+  and direct objective optimization with compute-aware penalties.
+- Do not claim exact fidelity to the paper's systems tricks, kernels, shared-activation implementation, vLLM
+  stack, RWKV setup, or full experiment suite unless we actually implement and validate those pieces.
+- Explicitly document deviations from the original paper and the HyperscaleES code whenever we make them.
+
 ## Aline OneContext
 
 When the user asks about existing code, features, past decisions, debugging context,
