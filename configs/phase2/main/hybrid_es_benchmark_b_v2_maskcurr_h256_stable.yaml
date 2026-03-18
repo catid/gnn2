@@ -1,0 +1,21 @@
+_base_: ../main/hybrid_es_benchmark_b_v2_maskcurr_h256.yaml
+
+experiment:
+  seed: 513
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 140
+  batch_size: 96
+  val_every: 40
+  routing:
+    exit_mask_final_query_only: true
+    exit_mask_trigger_exit_until_trigger: true
+    oracle_route_weight: 0.2
+  objective_schedule:
+    delay_penalty_start: 0.0
+    delay_penalty_warmup_steps: 120
+
+es:
+  generations: 56

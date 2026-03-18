@@ -11,6 +11,16 @@
   - `early_exit_rate ~= 1.0`
   - `delays ~= 0.0`
 
+## Revision After Audit
+
+- Benchmark B v1 was preserved as `long_horizon_memory_v1`.
+  - It is a real delayed-memory task, but not a good adaptive-routing benchmark because every sample shares the same oracle delay-until-final route.
+- Benchmark B v2 was added as `long_horizon_memory_v2`.
+  - It mixes `easy_exit`, `delay_to_trigger_exit`, and `delay_to_final_query` cases so adaptive routing is genuinely necessary.
+- The phase-2 success condition was narrowed accordingly:
+  - any headline accuracy gain must be checked against delayed-mode behavior rather than counted as a win automatically
+  - the main question is whether delayed retrieval survives validation/test, not merely whether raw accuracy rises through better handling of `easy_exit`
+
 ## Main Question
 
 Can the current EGGROLL-inspired hybrid low-rank ES method be made materially better on the
@@ -112,52 +122,98 @@ Strong-negative-result exit:
 - After a benchmark audit, deep diagnostics, and at least 3 intervention families with promoted reruns,
   Benchmark B still fails, but the bottleneck is clearly demonstrated and documented.
 
-## Planned Commands
+## Executed / Promoted Commands
 
 Benchmark audit and analysis:
 
 ```bash
-uv run python -m src.train.run --config configs/phase2/dev/soft_benchmark_b_audit.yaml --results-dir results/phase2_audit/soft_b_v1
-uv run python -m src.utils.report --results-dir results/phase2_audit --out docs/phase2_report.md
+uv run python -m src.utils.benchmark_audit \
+  --config configs/phase2/audit/benchmark_b_v1.yaml \
+  --out results/phase2_audit/benchmark_b_v1/audit.json
+
+uv run python -m src.utils.benchmark_audit \
+  --config configs/phase2/audit/benchmark_b_v2.yaml \
+  --out results/phase2_audit/benchmark_b_v2/audit.json
 ```
 
 Family A memory pilots:
 
 ```bash
-uv run python -m src.train.run --config configs/phase2/dev/hard_st_benchmark_b_multislot.yaml --results-dir results/phase2_dev/hard_st_b_multislot
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/dev/hybrid_es_benchmark_b_multislot.yaml --results-dir results/phase2_dev/hybrid_es_b_multislot
+uv run python -m src.train.run \
+  --config configs/phase2/dev/hard_st_benchmark_b_v1_gru_oraclewarm.yaml \
+  --results-dir results/phase2_dev/hard_st_b_v1_gru_oraclewarm
+
+uv run python -m src.train.run \
+  --config configs/phase2/dev/hard_st_benchmark_b_v1_gatedblend_oraclewarm.yaml \
+  --results-dir results/phase2_dev/hard_st_b_v1_gatedblend_oraclewarm
+
+uv run python -m src.train.run \
+  --config configs/phase2/dev/hard_st_benchmark_b_v2_gatedblend.yaml \
+  --results-dir results/phase2_dev/hard_st_b_v2_gatedblend
 ```
 
 Family B objective/curriculum pilots:
 
 ```bash
-uv run python -m src.train.run --config configs/phase2/dev/hard_st_benchmark_b_curriculum.yaml --results-dir results/phase2_dev/hard_st_b_curriculum
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/dev/hybrid_es_benchmark_b_oraclewarm.yaml --results-dir results/phase2_dev/hybrid_es_b_oraclewarm
+uv run python -m src.train.run \
+  --config configs/phase2/dev/hard_st_benchmark_b_v2_gatedblend_maskcurr.yaml \
+  --results-dir results/phase2_dev/hard_st_b_v2_gatedblend_maskcurr
+
+uv run python -m src.train.run \
+  --config configs/phase2/dev/hard_st_benchmark_b_v2_gatedblend_writeaux_maskcurr.yaml \
+  --results-dir results/phase2_dev/hard_st_b_v2_gatedblend_writeaux_maskcurr
 ```
 
 Family C ES/search pilots:
 
 ```bash
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/dev/hybrid_es_benchmark_b_altopt.yaml --results-dir results/phase2_dev/hybrid_es_b_altopt
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/dev/hybrid_es_benchmark_b_pop64.yaml --results-dir results/phase2_dev/hybrid_es_b_pop64
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase2/dev/hybrid_es_benchmark_b_v2_gatedblend_writeaux_maskcurr_pop64.yaml \
+  --results-dir results/phase2_dev/hybrid_es_b_v2_gatedblend_writeaux_maskcurr_pop64
+
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase2/main/hybrid_es_benchmark_b_v2_maskcurr_h256_stable.yaml \
+  --results-dir results/phase2_main/hybrid_es_b_v2_maskcurr_h256_stable
 ```
 
 Promoted main runs:
 
 ```bash
-uv run python -m src.train.run --config configs/phase2/main/hard_st_benchmark_b_best.yaml --results-dir results/phase2_main/hard_st_b_best
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/main/hybrid_es_benchmark_b_best.yaml --results-dir results/phase2_main/hybrid_es_b_best
+uv run python -m src.train.run \
+  --config configs/phase2/main/hard_st_benchmark_b_v2_maskcurr_h256.yaml \
+  --results-dir results/phase2_main/hard_st_b_v2_maskcurr_h256
+
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase2/main/hybrid_es_benchmark_b_v2_maskcurr_h256.yaml \
+  --results-dir results/phase2_main/hybrid_es_b_v2_maskcurr_h256
 ```
 
 Final seed comparison:
 
 ```bash
-uv run python -m src.train.run --config configs/phase2/final/hard_st_benchmark_b_best_seed1.yaml --results-dir results/phase2_final/hard_st_seed1
-uv run python -m src.train.run --config configs/phase2/final/hard_st_benchmark_b_best_seed2.yaml --results-dir results/phase2_final/hard_st_seed2
-uv run python -m src.train.run --config configs/phase2/final/hard_st_benchmark_b_best_seed3.yaml --results-dir results/phase2_final/hard_st_seed3
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/final/hybrid_es_benchmark_b_best_seed1.yaml --results-dir results/phase2_final/hybrid_es_seed1
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/final/hybrid_es_benchmark_b_best_seed2.yaml --results-dir results/phase2_final/hybrid_es_seed2
-uv run torchrun --standalone --nproc_per_node=2 -m src.train.run --config configs/phase2/final/hybrid_es_benchmark_b_best_seed3.yaml --results-dir results/phase2_final/hybrid_es_seed3
+uv run python -m src.train.run \
+  --config configs/phase2/final/hard_st_benchmark_b_v2_gatedblend_seed601.yaml \
+  --results-dir results/phase2_final/hard_st_b_v2_gatedblend_seed601
+
+uv run python -m src.train.run \
+  --config configs/phase2/final/hard_st_benchmark_b_v2_maskcurr_seed611.yaml \
+  --results-dir results/phase2_final/hard_st_b_v2_maskcurr_seed611
+
+uv run python -m src.train.run \
+  --config configs/phase2/final/hard_st_benchmark_b_v2_gatedblend_seed602.yaml \
+  --results-dir results/phase2_final/hard_st_b_v2_gatedblend_seed602
+
+uv run python -m src.train.run \
+  --config configs/phase2/final/hard_st_benchmark_b_v2_maskcurr_seed612.yaml \
+  --results-dir results/phase2_final/hard_st_b_v2_maskcurr_seed612
+
+uv run python -m src.train.run \
+  --config configs/phase2/final/hard_st_benchmark_b_v2_gatedblend_seed603.yaml \
+  --results-dir results/phase2_final/hard_st_b_v2_gatedblend_seed603
+
+uv run python -m src.train.run \
+  --config configs/phase2/final/hard_st_benchmark_b_v2_maskcurr_seed613.yaml \
+  --results-dir results/phase2_final/hard_st_b_v2_maskcurr_seed613
 ```
 
 Report generation:

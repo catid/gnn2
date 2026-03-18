@@ -1,0 +1,4 @@
+_base_: ../dev/hard_st_benchmark_b_v2_gatedblend_maskcurr.yaml
+
+experiment:
+  seed: 612

@@ -130,6 +130,49 @@ Current headline outcome from the dev suite:
 - Benchmark B: all methods collapse to early exit and near-chance accuracy, and
   the current hybrid setup does not rescue long-horizon delay-memory behavior
 
+## Phase 2 Commands
+
+Phase 2 adds a benchmark audit, a revised adaptive Benchmark B v2, deeper route
+diagnostics, and promoted long-horizon reruns. The main entrypoints are:
+
+```bash
+uv run python -m src.utils.benchmark_audit \
+  --config configs/phase2/audit/benchmark_b_v1.yaml \
+  --out results/phase2_audit/benchmark_b_v1/audit.json
+
+uv run python -m src.utils.benchmark_audit \
+  --config configs/phase2/audit/benchmark_b_v2.yaml \
+  --out results/phase2_audit/benchmark_b_v2/audit.json
+
+uv run python -m src.train.run \
+  --config configs/phase2/dev/hard_st_benchmark_b_v2_gatedblend_maskcurr.yaml \
+  --results-dir results/phase2_dev/hard_st_b_v2_gatedblend_maskcurr
+
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase2/dev/hybrid_es_benchmark_b_v2_gatedblend_writeaux_maskcurr_pop64.yaml \
+  --results-dir results/phase2_dev/hybrid_es_b_v2_gatedblend_writeaux_maskcurr_pop64
+
+uv run python -m src.train.run \
+  --config configs/phase2/main/hard_st_benchmark_b_v2_maskcurr_h256.yaml \
+  --results-dir results/phase2_main/hard_st_b_v2_maskcurr_h256
+
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase2/main/hybrid_es_benchmark_b_v2_maskcurr_h256_stable.yaml \
+  --results-dir results/phase2_main/hybrid_es_b_v2_maskcurr_h256_stable
+
+./scripts/run_phase2_seed_compare.sh results/phase2_final
+
+uv run python -m src.utils.phase2_report \
+  --results-dir results/phase2_audit \
+  --results-dir results/phase2_dev \
+  --results-dir results/phase2_main \
+  --results-dir results/phase2_final \
+  --out docs/phase2_report.md
+```
+
+The seed-sweep configs for the final hard-ST comparison live under
+`configs/phase2/final/`.
+
 ## References
 
 The original paper and reference code used to keep the implementation honest are

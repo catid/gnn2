@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
+import statistics
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -112,6 +114,10 @@ class RunRecord:
             if es_cfg.get("evolve_adapters"):
                 parts.append("adapters")
         return ", ".join(parts) if parts else "baseline"
+
+    @property
+    def run_family_name(self) -> str:
+        return re.sub(r"_seed\d+$", "", self.run_name)
 
 
 @dataclass
@@ -331,6 +337,66 @@ def write_es_diagnostics_plot(runs: list[RunRecord], out_path: Path) -> None:
     plt.close(fig)
 
 
+def write_horizon_scaling_plot(runs: list[RunRecord], out_path: Path) -> None:
+    benchmark_runs = [run for run in runs if run.benchmark in {"long_horizon_memory_v1", "long_horizon_memory_v2"}]
+    if not benchmark_runs:
+        return
+
+    best_by_method_horizon: dict[tuple[str, str, int], RunRecord] = {}
+    for run in benchmark_runs:
+        key = (run.benchmark, run.method, run.seq_len)
+        current = best_by_method_horizon.get(key)
+        if current is None or run.accuracy > current.accuracy:
+            best_by_method_horizon[key] = run
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), squeeze=False)
+    for benchmark in sorted({run.benchmark for run in benchmark_runs}):
+        for method in sorted({run.method for run in benchmark_runs if run.benchmark == benchmark}):
+            selected = sorted(
+                [run for key, run in best_by_method_horizon.items() if key[0] == benchmark and key[1] == method],
+                key=lambda item: item.seq_len,
+            )
+            if not selected:
+                continue
+            xs = [run.seq_len for run in selected]
+            axes[0, 0].plot(xs, [run.accuracy for run in selected], marker="o", label=f"{BENCHMARK_LABELS.get(benchmark, benchmark)} {METHOD_LABELS.get(method, method)}")
+            axes[0, 1].plot(xs, [run.peak_train_memory_mb for run in selected], marker="o", label=f"{BENCHMARK_LABELS.get(benchmark, benchmark)} {METHOD_LABELS.get(method, method)}")
+
+    axes[0, 0].set_title("Accuracy vs Horizon")
+    axes[0, 0].set_xlabel("Sequence Length")
+    axes[0, 0].set_ylabel("Test Accuracy")
+    axes[0, 0].grid(alpha=0.25)
+    axes[0, 1].set_title("Peak Memory vs Horizon")
+    axes[0, 1].set_xlabel("Sequence Length")
+    axes[0, 1].set_ylabel("Peak Train Memory (MB)")
+    axes[0, 1].grid(alpha=0.25)
+    axes[0, 1].legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def write_wall_time_plot(runs: list[RunRecord], out_path: Path) -> None:
+    best = best_runs_by_group(runs)
+    ordered = [run for _, run in sorted(best.items()) if not math.isnan(run.wall_time_sec)]
+    if not ordered:
+        return
+
+    labels = [f"{run.benchmark_label}\n{run.method_label}" for run in ordered]
+    values = [run.wall_time_sec for run in ordered]
+    colors = [METHOD_COLORS.get(run.method, "#666666") for run in ordered]
+
+    fig, axis = plt.subplots(figsize=(max(8, len(ordered) * 1.2), 4.5))
+    axis.bar(range(len(ordered)), values, color=colors)
+    axis.set_xticks(range(len(ordered)), labels, rotation=20, ha="right")
+    axis.set_ylabel("Wall Time (s)")
+    axis.set_title("Best-Run Wall Time by Benchmark / Method")
+    axis.grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def run_table_rows(runs: list[RunRecord]) -> list[list[str]]:
     rows: list[list[str]] = []
     for run in sorted(runs, key=lambda item: (item.benchmark, item.method, item.run_name)):
@@ -395,6 +461,36 @@ def per_mode_rows(runs: list[RunRecord], benchmark: str) -> list[list[str]]:
     return rows
 
 
+def seed_aggregate_rows(runs: list[RunRecord]) -> list[list[str]]:
+    grouped: dict[str, list[RunRecord]] = {}
+    for run in runs:
+        if run.run_family_name == run.run_name:
+            continue
+        grouped.setdefault(run.run_family_name, []).append(run)
+
+    rows: list[list[str]] = []
+    for family_name, family_runs in sorted(grouped.items()):
+        if len(family_runs) < 2:
+            continue
+        accuracies = [run.accuracy for run in family_runs]
+        delay_rates = [run.delay_rate for run in family_runs]
+        route_matches = [run.route_match for run in family_runs]
+        computes = [run.compute for run in family_runs]
+        rows.append(
+            [
+                family_name,
+                family_runs[0].benchmark_label,
+                family_runs[0].method_label,
+                str(len(family_runs)),
+                f"{statistics.mean(accuracies):.3f} +/- {statistics.pstdev(accuracies):.3f}",
+                f"{statistics.mean(delay_rates):.3f} +/- {statistics.pstdev(delay_rates):.3f}",
+                f"{statistics.mean(route_matches):.3f} +/- {statistics.pstdev(route_matches):.3f}",
+                f"{statistics.mean(computes):.3f} +/- {statistics.pstdev(computes):.3f}",
+            ]
+        )
+    return rows
+
+
 def write_report(
     runs: list[RunRecord],
     audits: list[AuditRecord],
@@ -408,12 +504,16 @@ def write_report(
     v2_plot = asset_dir / "benchmark_b_v2_route_behavior.png"
     curves_plot = asset_dir / "training_curves.png"
     es_plot = asset_dir / "es_diagnostics.png"
+    horizon_plot = asset_dir / "horizon_scaling.png"
+    wall_time_plot = asset_dir / "wall_time.png"
 
     write_accuracy_compute_plot(runs, accuracy_plot)
     write_route_behavior_plot(runs, "long_horizon_memory_v1", v1_plot)
     write_route_behavior_plot(runs, "long_horizon_memory_v2", v2_plot)
     write_training_curves(runs, curves_plot)
     write_es_diagnostics_plot(runs, es_plot)
+    write_horizon_scaling_plot(runs, horizon_plot)
+    write_wall_time_plot(runs, wall_time_plot)
 
     best = best_runs_by_group(runs)
     best_v1_hard = best.get(("long_horizon_memory_v1", "hard_st"))
@@ -451,6 +551,10 @@ def write_report(
         f"![Benchmark B v2 Behavior]({v2_plot.relative_to(out_path.parent)})",
         "",
         f"![Training Curves]({curves_plot.relative_to(out_path.parent)})",
+        "",
+        f"![Horizon Scaling]({horizon_plot.relative_to(out_path.parent)})",
+        "",
+        f"![Wall Time]({wall_time_plot.relative_to(out_path.parent)})",
         "",
     ]
 
@@ -523,6 +627,13 @@ def write_report(
             markdown_table(
                 ["Method", "Mode", "Accuracy", "Delay Rate", "Route Match", "Early Exit", "Compute"],
                 per_mode_rows(runs, "long_horizon_memory_v2"),
+            ),
+            "",
+            "## Seed Aggregates",
+            "",
+            markdown_table(
+                ["Family", "Benchmark", "Method", "Seeds", "Accuracy", "Delay Rate", "Route Match", "Compute"],
+                seed_aggregate_rows(runs),
             ),
             "",
             "## Preliminary Phase 2 Read",
