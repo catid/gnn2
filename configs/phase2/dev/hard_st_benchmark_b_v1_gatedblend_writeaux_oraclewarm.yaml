@@ -1,0 +1,9 @@
+_base_: ../dev/hard_st_benchmark_b_v1_gatedblend_oraclewarm.yaml
+
+experiment:
+  seed: 414
+
+routing:
+  force_oracle_actions: true
+  oracle_route_weight: 0.5
+  delay_write_weight: 0.25

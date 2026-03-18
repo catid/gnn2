@@ -1,0 +1,12 @@
+_base_: ../base/benchmark_b_v1_common.yaml
+
+experiment:
+  seed: 403
+
+model:
+  packet_update: gru
+
+method:
+  name: hard_st
+  temperature: 0.75
+  estimator: gumbel

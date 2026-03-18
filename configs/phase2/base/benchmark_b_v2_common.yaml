@@ -1,0 +1,59 @@
+_base_: ../../base/common.yaml
+
+experiment:
+  seed: 320
+
+benchmark:
+  name: long_horizon_memory_v2
+  num_nodes: 4
+  obs_dim: 24
+  num_classes: 4
+  seq_len: 128
+  mode_probs: [0.25, 0.25, 0.5]
+
+model:
+  hidden_dim: 128
+  max_internal_steps: 4
+  adapter_rank: 8
+  packet_update: residual
+
+objective:
+  lambda_hops: 0.0
+  lambda_delay: 0.003
+  lambda_ttl: 0.5
+
+objective_schedule: {}
+
+routing: {}
+
+training:
+  batch_size: 128
+  val_batch_size: 256
+  train_steps: 180
+  val_every: 30
+  truncate_bptt_steps: 32
+  val_batches: 8
+  test_batches: 12
+  lr: 0.001
+  weight_decay: 0.0001
+  grad_clip: 1.0
+
+warmstart:
+  enabled: false
+
+es:
+  generations: 48
+  population: 32
+  batch_size: 128
+  eval_batch_size: 256
+  sigma: 0.04
+  rank: 4
+  lr: 0.01
+  weight_decay: 0.0
+  optimizer: adam
+  noise_reuse: 0
+  val_every: 12
+  val_batches: 8
+  test_batches: 12
+  evolve_adapters: false
+  fitness_mode: standardize

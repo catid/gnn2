@@ -1,0 +1,7 @@
+_base_: ../dev/hybrid_es_benchmark_b_v1_gru_oraclewarm.yaml
+
+experiment:
+  seed: 407
+
+es:
+  fitness_mode: centered_rank

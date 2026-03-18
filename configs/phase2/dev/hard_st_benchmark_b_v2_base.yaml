@@ -1,0 +1,9 @@
+_base_: ../base/benchmark_b_v2_common.yaml
+
+experiment:
+  seed: 421
+
+method:
+  name: hard_st
+  temperature: 0.75
+  estimator: gumbel

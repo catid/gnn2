@@ -1,0 +1,37 @@
+{
+  "batch_size": 512,
+  "batches": 8,
+  "benchmark_name": "long_horizon_memory_v2",
+  "break_even_ce_for_delay_vs_immediate_exit": 1.1762364997917656,
+  "chance_cross_entropy": 1.3862943611198906,
+  "delay_is_objectively_plausible": true,
+  "early_only_accuracy": 0.440185546875,
+  "final_only_accuracy": 0.24072265625,
+  "heuristic_full_decode_accuracy": 1.0,
+  "label_histogram": {
+    "0": 1017,
+    "1": 1024,
+    "2": 985,
+    "3": 1070
+  },
+  "lambda_delay": 0.003,
+  "max_unique_oracle_route_patterns_per_batch": 61,
+  "mean_delay_penalty": 0.210057861328125,
+  "mean_oracle_delays": 70.019287109375,
+  "mean_oracle_exit_time": 70.019287109375,
+  "mean_retrieval_distance": 46.21826171875,
+  "mean_trigger_time": 32.051513671875,
+  "mode_histogram": {
+    "delay_to_final_query": 1983,
+    "delay_to_trigger_exit": 1063,
+    "easy_exit": 1050
+  },
+  "mode_names": {
+    "0": "easy_exit",
+    "1": "delay_to_trigger_exit",
+    "2": "delay_to_final_query"
+  },
+  "num_classes": 4,
+  "reward_margin_if_perfect_delay_policy": 1.1762364997917656,
+  "seq_len": 128
+}

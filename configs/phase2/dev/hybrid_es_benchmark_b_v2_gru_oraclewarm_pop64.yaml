@@ -1,0 +1,9 @@
+_base_: ../dev/hybrid_es_benchmark_b_v2_gru_oraclewarm.yaml
+
+experiment:
+  seed: 424
+
+es:
+  population: 64
+  sigma: 0.03
+  fitness_mode: centered_rank

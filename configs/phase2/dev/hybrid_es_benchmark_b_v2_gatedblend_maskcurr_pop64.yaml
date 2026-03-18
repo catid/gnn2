@@ -1,0 +1,45 @@
+_base_: ../base/benchmark_b_v2_common.yaml
+
+experiment:
+  seed: 431
+
+model:
+  packet_update: gated_gru
+  delay_state_mode: adaptive_blend
+  delay_gate_bias: 2.5
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_trigger_exit_until_trigger: true
+  oracle_route_weight: 0.2
+
+objective_schedule:
+  delay_penalty_start: 0.0
+  delay_penalty_warmup_steps: 140
+
+method:
+  name: hybrid_es
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 180
+  batch_size: 128
+  val_every: 30
+  routing:
+    exit_mask_final_query_only: true
+    exit_mask_trigger_exit_until_trigger: true
+    oracle_route_weight: 0.2
+  objective_schedule:
+    delay_penalty_start: 0.0
+    delay_penalty_warmup_steps: 120
+
+training:
+  truncate_bptt_steps: 0
+
+es:
+  generations: 56
+  population: 64
+  sigma: 0.03
+  rank: 4
+  fitness_mode: centered_rank

@@ -107,3 +107,53 @@ def test_delay_mailbox_reappears_next_external_step() -> None:
     assert output.stats["ttl_fail"].tolist() == [0.0]
     assert output.stats["exit_time"].tolist() == [1.0]
     assert output.stats["early_exit_mass"].tolist() == [0.0]
+
+
+def test_delay_hold_mode_preserves_packet_state() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "delay_state_mode": "hold",
+        }
+    )
+    current = torch.full((1, 2, 4), 2.0)
+    updated = torch.full((1, 2, 4), -3.0)
+
+    delayed = model._delay_packet_state(current_state=current, updated_state=updated, delay_retain=None)
+
+    assert torch.equal(delayed, current)
+
+
+def test_delay_adaptive_blend_interpolates_packet_state() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "delay_state_mode": "adaptive_blend",
+        }
+    )
+    current = torch.full((1, 2, 4), 2.0)
+    updated = torch.full((1, 2, 4), -2.0)
+    delay_retain = torch.tensor([[[0.75], [0.25]]])
+
+    delayed = model._delay_packet_state(
+        current_state=current,
+        updated_state=updated,
+        delay_retain=delay_retain,
+    )
+
+    expected = torch.tensor(
+        [[[1.0, 1.0, 1.0, 1.0], [-1.0, -1.0, -1.0, -1.0]]],
+    )
+    assert torch.allclose(delayed, expected)

@@ -1,0 +1,76 @@
+_base_: ../base/benchmark_b_v2_common.yaml
+
+experiment:
+  seed: 502
+
+benchmark:
+  seq_len: 256
+  num_nodes: 4
+  obs_dim: 24
+  num_classes: 4
+  mode_probs: [0.25, 0.25, 0.5]
+
+model:
+  hidden_dim: 128
+  packet_update: gated_gru
+  delay_state_mode: adaptive_blend
+  delay_gate_bias: 2.5
+  adapter_rank: 8
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_trigger_exit_until_trigger: true
+  oracle_route_weight: 0.2
+  delay_write_weight: 0.25
+
+objective:
+  lambda_hops: 0.0
+  lambda_delay: 0.003
+  lambda_ttl: 0.5
+
+objective_schedule:
+  delay_penalty_start: 0.0
+  delay_penalty_warmup_steps: 180
+
+training:
+  batch_size: 96
+  val_batch_size: 192
+  train_steps: 320
+  truncate_bptt_steps: 0
+  val_batches: 10
+  test_batches: 16
+
+method:
+  name: hybrid_es
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 220
+  batch_size: 96
+  val_every: 40
+  routing:
+    exit_mask_final_query_only: true
+    exit_mask_trigger_exit_until_trigger: true
+    oracle_route_weight: 0.2
+    delay_write_weight: 0.25
+  objective_schedule:
+    delay_penalty_start: 0.0
+    delay_penalty_warmup_steps: 160
+
+es:
+  generations: 72
+  population: 64
+  batch_size: 96
+  eval_batch_size: 192
+  sigma: 0.03
+  rank: 4
+  lr: 0.01
+  weight_decay: 0.0
+  optimizer: adam
+  noise_reuse: 0
+  val_every: 12
+  val_batches: 10
+  test_batches: 16
+  evolve_adapters: true
+  fitness_mode: centered_rank

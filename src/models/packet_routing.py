@@ -12,6 +12,12 @@ ACTION_FORWARD = 0
 ACTION_EXIT = 1
 ACTION_DELAY = 2
 
+ACTION_NAMES = {
+    ACTION_FORWARD: "forward",
+    ACTION_EXIT: "exit",
+    ACTION_DELAY: "delay",
+}
+
 
 @dataclass
 class RoutingForwardOutput:
@@ -42,9 +48,14 @@ class NodeCore(nn.Module):
         hidden_dim: int,
         num_nodes: int,
         adapter_rank: int = 0,
+        packet_update: str = "residual",
+        delay_state_mode: str = "updated",
+        delay_gate_bias: float = 2.0,
     ):
         super().__init__()
         self.hidden_dim = hidden_dim
+        self.packet_update = packet_update
+        self.delay_state_mode = delay_state_mode
         self.obs_proj = nn.Linear(obs_dim, hidden_dim)
         self.meta_proj = nn.Linear(4, hidden_dim)
         self.node_embed = nn.Embedding(num_nodes, hidden_dim)
@@ -61,6 +72,13 @@ class NodeCore(nn.Module):
             nn.GELU(),
             nn.Linear(hidden_dim * 2, hidden_dim),
         )
+        self.packet_cell = nn.GRUCell(hidden_dim, hidden_dim)
+        self.packet_gate = nn.Sequential(
+            nn.LayerNorm(hidden_dim * 4),
+            nn.Linear(hidden_dim * 4, hidden_dim),
+            nn.Sigmoid(),
+        )
+        nn.init.constant_(self.packet_gate[1].bias, 1.5)
         self.packet_adapter = (
             LowRankAdapter(hidden_dim, adapter_rank) if adapter_rank > 0 else None
         )
@@ -70,6 +88,14 @@ class NodeCore(nn.Module):
             nn.GELU(),
         )
         self.router_out = nn.Linear(hidden_dim, 3)
+        self.delay_gate = nn.Sequential(
+            nn.LayerNorm(hidden_dim * 4),
+            nn.Linear(hidden_dim * 4, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid(),
+        )
+        nn.init.constant_(self.delay_gate[3].bias, delay_gate_bias)
 
     def forward(
         self,
@@ -80,7 +106,7 @@ class NodeCore(nn.Module):
         age_fraction: torch.Tensor,
         time_fraction: torch.Tensor,
         remaining_fraction: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
         obs_features = self.obs_proj(observations)
         node_features = self.node_embed(node_index)
         meta = torch.stack(
@@ -105,14 +131,30 @@ class NodeCore(nn.Module):
         packet_features = torch.cat(
             [packet_state, node_state_next, obs_features, node_features], dim=-1
         )
-        packet_delta = self.packet_mlp(packet_features)
+        packet_proposal = self.packet_mlp(packet_features)
         if self.packet_adapter is not None:
-            packet_delta = packet_delta + self.packet_adapter(packet_delta)
-        packet_next = packet_state + packet_delta
+            packet_proposal = packet_proposal + self.packet_adapter(packet_proposal)
+        if self.packet_update == "gru":
+            packet_next = self.packet_cell(
+                packet_proposal.reshape(-1, self.hidden_dim),
+                packet_state.reshape(-1, self.hidden_dim),
+            ).reshape(*batch_shape, self.hidden_dim)
+        elif self.packet_update == "gated_gru":
+            packet_candidate = self.packet_cell(
+                packet_proposal.reshape(-1, self.hidden_dim),
+                packet_state.reshape(-1, self.hidden_dim),
+            ).reshape(*batch_shape, self.hidden_dim)
+            retain = self.packet_gate(packet_features)
+            packet_next = retain * packet_state + (1.0 - retain) * packet_candidate
+        else:
+            packet_next = packet_state + packet_proposal
 
         router_hidden = self.router_mlp(packet_features)
         logits = self.router_out(router_hidden)
-        return node_state_next, packet_next, logits
+        delay_retain = None
+        if self.delay_state_mode == "adaptive_blend":
+            delay_retain = self.delay_gate(packet_features)
+        return node_state_next, packet_next, logits, delay_retain
 
 
 class PacketRoutingModel(nn.Module):
@@ -126,11 +168,17 @@ class PacketRoutingModel(nn.Module):
         self.max_internal_steps = int(config.get("max_internal_steps", self.num_nodes))
         self.max_total_steps = int(config.get("max_total_steps", 4096))
         self.adapter_rank = int(config.get("adapter_rank", 0))
+        self.packet_update = str(config.get("packet_update", "residual"))
+        self.delay_state_mode = str(config.get("delay_state_mode", "updated"))
+        self.delay_gate_bias = float(config.get("delay_gate_bias", 2.0))
         self.core = NodeCore(
             obs_dim=self.obs_dim,
             hidden_dim=self.hidden_dim,
             num_nodes=self.num_nodes,
             adapter_rank=self.adapter_rank,
+            packet_update=self.packet_update,
+            delay_state_mode=self.delay_state_mode,
+            delay_gate_bias=self.delay_gate_bias,
         )
         self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.readout = nn.Sequential(
@@ -162,6 +210,14 @@ class PacketRoutingModel(nn.Module):
         temperature: float = 1.0,
         estimator: str = "straight_through",
         truncate_bptt_steps: int = 0,
+        forced_actions: torch.Tensor | None = None,
+        action_masks: torch.Tensor | None = None,
+        oracle_actions: torch.Tensor | None = None,
+        oracle_action_mask: torch.Tensor | None = None,
+        oracle_route_weight: float = 0.0,
+        delay_write_targets: torch.Tensor | None = None,
+        delay_write_mask: torch.Tensor | None = None,
+        delay_write_weight: float = 0.0,
     ) -> RoutingForwardOutput:
         batch_size, seq_len, num_nodes, _ = observations.shape
         if num_nodes != self.num_nodes:
@@ -189,6 +245,31 @@ class PacketRoutingModel(nn.Module):
         exit_mass_so_far = torch.zeros(batch_size, device=device, dtype=dtype)
         early_exit_mass = torch.zeros(batch_size, device=device, dtype=dtype)
 
+        action_totals = torch.zeros(batch_size, 3, device=device, dtype=dtype)
+        decision_mass_total = torch.zeros(batch_size, device=device, dtype=dtype)
+        route_entropy_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        route_conf_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        route_weight_total = torch.zeros(batch_size, device=device, dtype=dtype)
+        transition_totals = torch.zeros(batch_size, 3, 3, device=device, dtype=dtype)
+        prev_action_summary = torch.zeros(batch_size, 3, device=device, dtype=dtype)
+        prev_has_action = torch.zeros(batch_size, device=device, dtype=torch.bool)
+
+        mailbox_mass_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        mailbox_peak = torch.zeros(batch_size, device=device, dtype=dtype)
+        mailbox_steps = torch.zeros(batch_size, device=device, dtype=dtype)
+        age_mass_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        age_weight_total = torch.zeros(batch_size, device=device, dtype=dtype)
+        max_age = torch.zeros(batch_size, device=device, dtype=dtype)
+        exit_age_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        exit_age_mass = torch.zeros(batch_size, device=device, dtype=dtype)
+        delay_retain_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        delay_retain_weight = torch.zeros(batch_size, device=device, dtype=dtype)
+
+        oracle_route_loss = torch.zeros((), device=device, dtype=dtype)
+        oracle_weight_total = torch.zeros((), device=device, dtype=dtype)
+        delay_write_loss = torch.zeros((), device=device, dtype=dtype)
+        delay_write_total = torch.zeros((), device=device, dtype=dtype)
+
         for time_index in range(seq_len):
             obs_t = observations[:, time_index]
             carry_mass = torch.zeros_like(packet_masses)
@@ -207,7 +288,7 @@ class PacketRoutingModel(nn.Module):
                 )
                 remaining_fraction = (1.0 - age_fraction).clamp_(0.0, 1.0)
 
-                node_state_next, packet_next, logits = self.core(
+                core_output = self.core(
                     packet_state=packet_states,
                     node_state=node_states,
                     observations=obs_t,
@@ -216,13 +297,93 @@ class PacketRoutingModel(nn.Module):
                     time_fraction=time_fraction,
                     remaining_fraction=remaining_fraction,
                 )
+                if len(core_output) == 3:
+                    node_state_next, packet_next, logits = core_output
+                    delay_retain = None
+                else:
+                    node_state_next, packet_next, logits, delay_retain = core_output
+
+                masked_logits = logits
+                if action_masks is not None:
+                    masked_logits = self._apply_action_mask(masked_logits, action_masks[:, time_index])
+
+                router_probs = F.softmax(masked_logits / max(temperature, 1e-6), dim=-1)
+                router_entropy = -(router_probs * torch.log(router_probs.clamp_min(1e-8))).sum(dim=-1)
+                router_conf = router_probs.max(dim=-1).values
+                active_mass = mass.sum(dim=1)
+                route_entropy_sum = route_entropy_sum + (router_entropy * mass).sum(dim=1)
+                route_conf_sum = route_conf_sum + (router_conf * mass).sum(dim=1)
+                route_weight_total = route_weight_total + active_mass
+
+                age_values = packet_ages.squeeze(-1)
+                age_mass_sum = age_mass_sum + (age_values * mass).sum(dim=1)
+                age_weight_total = age_weight_total + active_mass
+                max_age = torch.maximum(max_age, age_values.max(dim=1).values)
+
+                if oracle_actions is not None and oracle_action_mask is not None and oracle_route_weight > 0.0:
+                    target = oracle_actions[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                    step_mask = oracle_action_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                    per_node_ce = F.cross_entropy(
+                        masked_logits.reshape(-1, 3),
+                        target.reshape(-1),
+                        reduction="none",
+                    ).reshape(batch_size, self.num_nodes)
+                    weight = step_mask * mass
+                    oracle_route_loss = oracle_route_loss + (per_node_ce * weight).sum()
+                    oracle_weight_total = oracle_weight_total + weight.sum()
+                if (
+                    delay_retain is not None
+                    and delay_write_targets is not None
+                    and delay_write_mask is not None
+                    and delay_write_weight > 0.0
+                ):
+                    write_target = delay_write_targets[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                    write_mask = delay_write_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                    write_prob = (1.0 - delay_retain.squeeze(-1).float()).clamp(1e-4, 1.0 - 1e-4)
+                    write_logits = torch.logit(write_prob)
+                    per_node_bce = F.binary_cross_entropy_with_logits(
+                        write_logits,
+                        write_target.float(),
+                        reduction="none",
+                    ).to(dtype)
+                    weight = (write_mask * mass).float()
+                    delay_write_loss = delay_write_loss + (per_node_bce * weight).sum()
+                    delay_write_total = delay_write_total + weight.sum()
 
                 actions = self._route_actions(
-                    logits=logits,
+                    logits=masked_logits,
                     route_mode=route_mode,
                     temperature=temperature,
                     estimator=estimator,
                 )
+                if forced_actions is not None:
+                    forced_step = forced_actions[:, time_index]
+                    valid = forced_step >= 0
+                    if valid.any():
+                        forced = F.one_hot(forced_step.clamp_min(0), num_classes=3).to(dtype)
+                        actions = torch.where(
+                            valid.view(batch_size, 1, 1),
+                            forced.view(batch_size, 1, 3).expand(-1, self.num_nodes, -1),
+                            actions,
+                        )
+
+                action_summary = (mass.unsqueeze(-1) * actions).sum(dim=1)
+                action_totals = action_totals + action_summary
+                decision_mass_total = decision_mass_total + action_summary.sum(dim=-1)
+                action_norm = action_summary / action_summary.sum(dim=-1, keepdim=True).clamp_min(float(eps))
+                update_transition = prev_has_action & (action_summary.sum(dim=-1) > 0.0)
+                if update_transition.any():
+                    transition_totals[update_transition] = transition_totals[update_transition] + torch.einsum(
+                        "bi,bj->bij",
+                        prev_action_summary[update_transition],
+                        action_norm[update_transition],
+                    )
+                prev_action_summary = torch.where(
+                    (action_summary.sum(dim=-1) > 0.0).view(batch_size, 1),
+                    action_norm,
+                    prev_action_summary,
+                )
+                prev_has_action = prev_has_action | (action_summary.sum(dim=-1) > 0.0)
 
                 node_states = node_states + mass.unsqueeze(-1) * (node_state_next - node_states)
 
@@ -239,6 +400,8 @@ class PacketRoutingModel(nn.Module):
                 exit_contrib = (exit_mass.unsqueeze(-1) * exit_features).sum(dim=1)
                 sink_state = sink_state + exit_contrib
                 exit_added = exit_mass.sum(dim=1)
+                exit_age_sum = exit_age_sum + (exit_mass * age_values).sum(dim=1)
+                exit_age_mass = exit_age_mass + exit_added
                 newly_exited = (exit_mass_so_far <= 0.0) & (exit_added > 0.0)
                 first_exit_time = torch.where(
                     newly_exited,
@@ -251,8 +414,16 @@ class PacketRoutingModel(nn.Module):
                 exits = exits + exit_added
 
                 carry_mass = carry_mass + delay_mass
-                carry_state_sum = carry_state_sum + delay_mass.unsqueeze(-1) * packet_next
+                delayed_packet = self._delay_packet_state(
+                    current_state=packet_states,
+                    updated_state=packet_next,
+                    delay_retain=delay_retain,
+                )
+                carry_state_sum = carry_state_sum + delay_mass.unsqueeze(-1) * delayed_packet
                 carry_age_sum = carry_age_sum + delay_mass.unsqueeze(-1) * next_age
+                if delay_retain is not None:
+                    delay_retain_sum = delay_retain_sum + (delay_retain.squeeze(-1) * delay_mass).sum(dim=1)
+                    delay_retain_weight = delay_retain_weight + delay_mass.sum(dim=1)
 
                 next_mass = torch.zeros_like(packet_masses)
                 next_state_sum = torch.zeros_like(packet_states)
@@ -264,6 +435,8 @@ class PacketRoutingModel(nn.Module):
 
                 terminal_forward_mass = forward_mass[:, -1]
                 sink_state = sink_state + terminal_forward_mass.unsqueeze(-1) * exit_features[:, -1, :]
+                exit_age_sum = exit_age_sum + terminal_forward_mass * age_values[:, -1]
+                exit_age_mass = exit_age_mass + terminal_forward_mass
                 newly_terminal = (exit_mass_so_far <= 0.0) & (terminal_forward_mass > 0.0)
                 first_exit_time = torch.where(
                     newly_terminal,
@@ -289,6 +462,10 @@ class PacketRoutingModel(nn.Module):
             packet_masses = carry_mass
             packet_states = self._normalize_state(carry_state_sum, carry_mass, eps)
             packet_ages = self._normalize_state(carry_age_sum, carry_mass, eps)
+            mailbox_load = carry_mass.sum(dim=1)
+            mailbox_mass_sum = mailbox_mass_sum + mailbox_load
+            mailbox_peak = torch.maximum(mailbox_peak, mailbox_load)
+            mailbox_steps = mailbox_steps + (mailbox_load >= 0.0).float()
 
             if truncate_bptt_steps > 0 and (time_index + 1) % truncate_bptt_steps == 0:
                 node_states = node_states.detach()
@@ -302,6 +479,8 @@ class PacketRoutingModel(nn.Module):
             sink_state = sink_state + (packet_masses.unsqueeze(-1) * self.sink_proj(packet_states)).sum(dim=1)
             ttl_fail = ttl_fail + residual_mass
             exits = exits + residual_mass
+            exit_age_sum = exit_age_sum + (packet_ages.squeeze(-1) * packet_masses).sum(dim=1)
+            exit_age_mass = exit_age_mass + residual_mass
             newly_exited = (exit_mass_so_far <= 0.0) & (residual_mass > 0.0)
             first_exit_time = torch.where(
                 newly_exited,
@@ -312,13 +491,17 @@ class PacketRoutingModel(nn.Module):
 
         logits = self.readout(sink_state)
         task_loss = F.cross_entropy(logits, labels)
-        penalties = compute_penalties or {}
-        route_loss = (
-            float(penalties.get("hops", 0.0)) * hops.mean()
-            + float(penalties.get("delays", 0.0)) * delays.mean()
-            + float(penalties.get("ttl_fail", 0.0)) * ttl_fail.mean()
-        )
-        total_loss = task_loss + route_loss
+        penalty_hops = float(compute_penalties.get("hops", 0.0)) * hops.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
+        penalty_delays = float(compute_penalties.get("delays", 0.0)) * delays.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
+        penalty_ttl = float(compute_penalties.get("ttl_fail", 0.0)) * ttl_fail.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
+        route_penalty = penalty_hops + penalty_delays + penalty_ttl
+        oracle_route_term = torch.zeros((), device=device, dtype=dtype)
+        if oracle_route_weight > 0.0 and float(oracle_weight_total.detach().cpu()) > 0.0:
+            oracle_route_term = oracle_route_weight * (oracle_route_loss / oracle_weight_total.clamp_min(float(eps)))
+        delay_write_term = torch.zeros((), device=device, dtype=dtype)
+        if delay_write_weight > 0.0 and float(delay_write_total.detach().cpu()) > 0.0:
+            delay_write_term = delay_write_weight * (delay_write_loss / delay_write_total.clamp_min(float(eps)))
+        total_loss = task_loss + route_penalty + oracle_route_term + delay_write_term
 
         predictions = logits.argmax(dim=-1)
         accuracy = (predictions == labels).float()
@@ -327,6 +510,11 @@ class PacketRoutingModel(nn.Module):
             first_exit_time,
             torch.full_like(first_exit_time, float(seq_len - 1)),
         )
+
+        decision_denom = decision_mass_total.clamp_min(float(eps)).unsqueeze(-1)
+        action_rates = action_totals / decision_denom
+        transition_total = transition_totals.sum(dim=(1, 2), keepdim=True).clamp_min(float(eps))
+        transition_norm = transition_totals / transition_total
 
         stats = {
             "accuracy": accuracy,
@@ -337,12 +525,34 @@ class PacketRoutingModel(nn.Module):
             "exit_time": exit_time,
             "early_exit_mass": early_exit_mass,
             "compute": hops + delays + exits,
+            "forward_rate": action_rates[:, ACTION_FORWARD],
+            "exit_rate": action_rates[:, ACTION_EXIT],
+            "delay_rate": action_rates[:, ACTION_DELAY],
+            "route_entropy": route_entropy_sum / route_weight_total.clamp_min(float(eps)),
+            "router_confidence": route_conf_sum / route_weight_total.clamp_min(float(eps)),
+            "mailbox_occupancy": mailbox_mass_sum / mailbox_steps.clamp_min(1.0),
+            "mailbox_peak": mailbox_peak,
+            "packet_age_mean": age_mass_sum / age_weight_total.clamp_min(float(eps)),
+            "packet_age_max": max_age,
+            "exit_age_mean": exit_age_sum / exit_age_mass.clamp_min(float(eps)),
+            "decision_count": decision_mass_total,
+            "delay_retain_mean": delay_retain_sum / delay_retain_weight.clamp_min(float(eps)),
+            "delay_write_mean": 1.0 - (delay_retain_sum / delay_retain_weight.clamp_min(float(eps))),
+            "penalty_hops": torch.full_like(accuracy, float(penalty_hops.detach().item())),
+            "penalty_delays": torch.full_like(accuracy, float(penalty_delays.detach().item())),
+            "penalty_ttl": torch.full_like(accuracy, float(penalty_ttl.detach().item())),
+            "oracle_route_loss": torch.full_like(accuracy, float(oracle_route_term.detach().item())),
+            "delay_write_loss": torch.full_like(accuracy, float(delay_write_term.detach().item())),
         }
+        for src_index, src_name in ACTION_NAMES.items():
+            for dst_index, dst_name in ACTION_NAMES.items():
+                stats[f"transition_{src_name}_to_{dst_name}"] = transition_norm[:, src_index, dst_index]
+
         return RoutingForwardOutput(
             logits=logits,
             sink_state=sink_state,
             loss=total_loss,
-            route_loss=route_loss,
+            route_loss=route_penalty + oracle_route_term + delay_write_term,
             task_loss=task_loss,
             stats=stats,
         )
@@ -356,6 +566,23 @@ class PacketRoutingModel(nn.Module):
         denom = mass.unsqueeze(-1).clamp_min(float(eps))
         normalized = weighted_state / denom
         return torch.where(mass.unsqueeze(-1) > 0.0, normalized, torch.zeros_like(weighted_state))
+
+    @staticmethod
+    def _apply_action_mask(logits: torch.Tensor, action_mask: torch.Tensor) -> torch.Tensor:
+        expanded = action_mask.unsqueeze(1).expand(-1, logits.shape[1], -1)
+        return logits.masked_fill(expanded <= 0.0, -1e9)
+
+    def _delay_packet_state(
+        self,
+        current_state: torch.Tensor,
+        updated_state: torch.Tensor,
+        delay_retain: torch.Tensor | None,
+    ) -> torch.Tensor:
+        if self.delay_state_mode == "hold":
+            return current_state
+        if self.delay_state_mode == "adaptive_blend" and delay_retain is not None:
+            return delay_retain * current_state + (1.0 - delay_retain) * updated_state
+        return updated_state
 
     @staticmethod
     def _route_actions(

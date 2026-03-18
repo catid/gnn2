@@ -1,0 +1,27 @@
+_base_: ../base/benchmark_b_v2_common.yaml
+
+experiment:
+  seed: 429
+
+model:
+  packet_update: gated_gru
+  delay_state_mode: adaptive_blend
+  delay_gate_bias: 2.5
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_trigger_exit_until_trigger: true
+  oracle_route_weight: 0.2
+
+objective_schedule:
+  delay_penalty_start: 0.0
+  delay_penalty_warmup_steps: 140
+
+training:
+  train_steps: 260
+  truncate_bptt_steps: 0
+
+method:
+  name: hard_st
+  temperature: 0.75
+  estimator: gumbel

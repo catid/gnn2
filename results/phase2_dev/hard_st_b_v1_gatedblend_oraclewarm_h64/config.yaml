@@ -1,0 +1,13 @@
+_base_: ../dev/hard_st_benchmark_b_v1_gatedblend_oraclewarm.yaml
+
+experiment:
+  seed: 410
+
+benchmark:
+  seq_len: 64
+  num_nodes: 4
+  obs_dim: 24
+  num_classes: 4
+
+training:
+  train_steps: 240

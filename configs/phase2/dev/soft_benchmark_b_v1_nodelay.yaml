@@ -1,0 +1,15 @@
+_base_: ../base/benchmark_b_v1_common.yaml
+
+experiment:
+  seed: 401
+
+objective:
+  lambda_delay: 0.0
+
+training:
+  train_steps: 220
+  truncate_bptt_steps: 0
+
+method:
+  name: soft
+  temperature: 1.0

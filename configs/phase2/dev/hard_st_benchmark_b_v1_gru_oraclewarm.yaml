@@ -1,0 +1,24 @@
+_base_: ../base/benchmark_b_v1_common.yaml
+
+experiment:
+  seed: 405
+
+model:
+  packet_update: gru
+
+routing:
+  force_oracle_actions: true
+  oracle_route_weight: 0.5
+
+objective_schedule:
+  delay_penalty_start: 0.0
+  delay_penalty_warmup_steps: 160
+
+training:
+  train_steps: 220
+  truncate_bptt_steps: 0
+
+method:
+  name: hard_st
+  temperature: 0.75
+  estimator: gumbel

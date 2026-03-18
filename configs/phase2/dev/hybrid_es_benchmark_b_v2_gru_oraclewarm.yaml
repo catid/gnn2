@@ -1,0 +1,33 @@
+_base_: ../base/benchmark_b_v2_common.yaml
+
+experiment:
+  seed: 423
+
+model:
+  packet_update: gru
+
+method:
+  name: hybrid_es
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 120
+  batch_size: 128
+  val_every: 30
+  routing:
+    force_oracle_actions: true
+    oracle_route_weight: 0.5
+  objective_schedule:
+    delay_penalty_start: 0.0
+    delay_penalty_warmup_steps: 100
+
+training:
+  truncate_bptt_steps: 0
+
+es:
+  generations: 48
+  population: 32
+  sigma: 0.04
+  rank: 4
+  fitness_mode: standardize
