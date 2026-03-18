@@ -127,8 +127,14 @@ Current headline outcome from the dev suite:
 
 - Benchmark A: the soft model wins raw accuracy, but hybrid ES beats hard ST on
   both task quality and route optimality while using less compute than soft
-- Benchmark B: all methods collapse to early exit and near-chance accuracy, and
-  the current hybrid setup does not rescue long-horizon delay-memory behavior
+- Benchmark B phase 2: all methods collapse to early exit and near-chance
+  accuracy, and the initial hybrid setup does not rescue long-horizon
+  delay-memory behavior
+- Benchmark B phase 3: explicit packet memory plus oracle-route pretraining and
+  a no-mask hard-routing release improves the 3-seed hard-routing result from
+  `0.4446 +/- 0.0048` to `0.6110 +/- 0.0308`, with real delayed behavior
+  (`delay_rate ~= 0.69`), but the gain is concentrated in the
+  `delay_to_trigger_exit` mode while `delay_to_final_query` remains near chance
 
 ## Phase 2 Commands
 
@@ -172,6 +178,26 @@ uv run python -m src.utils.phase2_report \
 
 The seed-sweep configs for the final hard-ST comparison live under
 `configs/phase2/final/`.
+
+## Phase 3 Commands
+
+Phase 3 adds explicit packet memory, payload-aware write/read auxiliaries, and
+oracle-release follow-ups that isolate the Benchmark B v2 train/eval mismatch.
+The main entrypoints are:
+
+```bash
+uv run python -m src.train.run \
+  --config configs/phase3/dev/hard_st_benchmark_b_v2_keymem_payloadaux_oraclewarm.yaml \
+  --results-dir results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm
+
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase3/dev/hybrid_es_benchmark_b_v2_keymem_payloadaux_maskcurr_pop64.yaml \
+  --results-dir results/phase3_dev/hybrid_es_b_v2_keymem_payloadaux_maskcurr_pop64
+
+./scripts/run_phase3_release_followups.sh phase3_release
+```
+
+The phase-3 writeup is [docs/phase3_release_note.md](docs/phase3_release_note.md).
 
 ## References
 

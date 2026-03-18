@@ -41,6 +41,8 @@ def test_model_initialization_is_reproducible_for_fixed_seed() -> None:
         "max_internal_steps": 4,
         "max_total_steps": 32,
         "adapter_rank": 0,
+        "packet_memory_slots": 2,
+        "packet_memory_dim": 8,
     }
     seed_everything(123)
     model_a = PacketRoutingModel(config)

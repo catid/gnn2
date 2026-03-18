@@ -248,6 +248,35 @@ def build_routing_controls(
     )
 
 
+def build_memory_controls(
+    batch: BenchmarkBatch,
+    routing_cfg: dict[str, Any] | None,
+    *,
+    split: str,
+) -> tuple[torch.Tensor | None, torch.Tensor | None, float]:
+    routing_cfg = routing_cfg or {}
+    memory_payload_weight = float(routing_cfg.get("memory_payload_weight", 0.0))
+    if split != "train" or memory_payload_weight <= 0.0 or "query_time" not in batch.metadata or "payload" not in batch.metadata:
+        return None, None, 0.0
+
+    batch_size = batch.labels.shape[0]
+    seq_len = batch.observations.shape[1]
+    device = batch.labels.device
+    mask = torch.zeros(batch_size, seq_len, device=device, dtype=batch.observations.dtype)
+    targets = torch.zeros(batch_size, seq_len, device=device, dtype=torch.long)
+    query_times = batch.metadata["query_time"].long()
+    payloads = batch.metadata["payload"].long()
+
+    sample_mask = torch.ones(batch_size, device=device, dtype=batch.observations.dtype)
+    if "needs_final_query" in batch.metadata:
+        sample_mask = batch.metadata["needs_final_query"].to(device=device, dtype=batch.observations.dtype)
+
+    batch_index = torch.arange(batch_size, device=device)
+    targets[batch_index, query_times] = payloads
+    mask[batch_index, query_times] = sample_mask
+    return targets, mask, memory_payload_weight
+
+
 def build_reward(
     logits: torch.Tensor,
     labels: torch.Tensor,
@@ -341,6 +370,10 @@ def grouped_slice_metrics(
         "delays",
         "delay_retain_mean",
         "delay_write_mean",
+        "memory_read_mean",
+        "memory_write_mean",
+        "memory_read_entropy",
+        "memory_write_entropy",
         "early_exit_rate",
         "exit_rate",
         "exit_time",
@@ -420,6 +453,11 @@ def evaluate_model(
                 routing_cfg,
                 split=split,
             )
+            memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
             with autocast_context(device, amp_enabled, amp_dtype):
                 output = model(
                     observations=batch.observations,
@@ -437,6 +475,9 @@ def evaluate_model(
                     delay_write_targets=batch.delay_write_targets,
                     delay_write_mask=batch.delay_write_mask,
                     delay_write_weight=delay_write_weight,
+                    memory_payload_targets=memory_payload_targets,
+                    memory_payload_mask=memory_payload_mask,
+                    memory_payload_weight=memory_payload_weight,
                 )
             batch_metrics = summarize_batch(batch, output, benchmark_name)
             collected.append(batch_metrics)
@@ -568,6 +609,11 @@ def run_supervised_phase(
             routing_cfg,
             split="train",
         )
+        memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
         optimizer.zero_grad(set_to_none=True)
         start_time = time.time()
         with autocast_context(device, amp_enabled, amp_dtype):
@@ -587,6 +633,9 @@ def run_supervised_phase(
                 delay_write_targets=batch.delay_write_targets,
                 delay_write_mask=batch.delay_write_mask,
                 delay_write_weight=delay_write_weight,
+                memory_payload_targets=memory_payload_targets,
+                memory_payload_mask=memory_payload_mask,
+                memory_payload_weight=memory_payload_weight,
             )
         scaler.scale(output.loss).backward()
         scaler.unscale_(optimizer)
@@ -780,6 +829,11 @@ def run_hybrid_es(
             routing_cfg,
             split="train",
         )
+        memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
         local_rewards = []
         local_stats = []
         start_time = time.time()
@@ -806,6 +860,9 @@ def run_hybrid_es(
                         delay_write_targets=batch.delay_write_targets,
                         delay_write_mask=batch.delay_write_mask,
                         delay_write_weight=delay_write_weight,
+                        memory_payload_targets=memory_payload_targets,
+                        memory_payload_mask=memory_payload_mask,
+                        memory_payload_weight=memory_payload_weight,
                     )
                 reward = build_reward(
                     output.logits,

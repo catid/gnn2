@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_keymem_payloadaux_maskcurr.yaml
+
+experiment:
+  seed: 710
+  results_root: results/phase3_dev
+
+training:
+  train_steps: 520
+  val_every: 20
+  lr: 0.0003
+  truncate_bptt_steps: 0
+

@@ -157,3 +157,61 @@ def test_delay_adaptive_blend_interpolates_packet_state() -> None:
         [[[1.0, 1.0, 1.0, 1.0], [-1.0, -1.0, -1.0, -1.0]]],
     )
     assert torch.allclose(delayed, expected)
+
+
+def test_packet_memory_write_and_read_round_trip() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "packet_memory_slots": 2,
+            "packet_memory_dim": 3,
+        }
+    )
+    with torch.no_grad():
+        for module in [model.memory_read_mlp, model.memory_write_mlp]:
+            for parameter in module.parameters():
+                parameter.zero_()
+        model.memory_write_slots.weight.zero_()
+        model.memory_write_slots.bias.copy_(torch.tensor([10.0, -10.0]))
+        model.memory_write_gate.weight.zero_()
+        model.memory_write_gate.bias.fill_(10.0)
+        model.memory_write_value.weight.zero_()
+        model.memory_write_value.bias.copy_(torch.tensor([1.0, 2.0, 3.0]))
+
+        model.memory_read_slots.weight.zero_()
+        model.memory_read_slots.bias.copy_(torch.tensor([10.0, -10.0]))
+        model.memory_read_gate.weight.zero_()
+        model.memory_read_gate.bias.fill_(10.0)
+
+    packet_memory = torch.zeros(1, 2, 2, 3)
+    packet_state = torch.zeros(1, 2, 4)
+    node_state = torch.zeros(1, 2, 4)
+    observations = torch.zeros(1, 2, 8)
+
+    updated_memory, write_gate, write_weights = model._write_packet_memory(
+        packet_memory=packet_memory,
+        packet_state=packet_state,
+        node_state=node_state,
+        observations=observations,
+    )
+    read_state, read_gate, read_weights = model._read_packet_memory(
+        packet_memory=updated_memory,
+        packet_state=packet_state,
+        node_state=node_state,
+        observations=observations,
+    )
+
+    expected_value = torch.tensor([1.0, 2.0, 3.0])
+    assert torch.allclose(write_gate.squeeze(-1), torch.ones(1, 2), atol=1e-4)
+    assert torch.allclose(write_weights[..., 0], torch.ones(1, 2), atol=1e-4)
+    assert torch.allclose(updated_memory[0, 0, 0], expected_value, atol=2e-4)
+    assert torch.allclose(updated_memory[0, 0, 1], torch.zeros(3), atol=1e-4)
+    assert torch.allclose(read_gate.squeeze(-1), torch.ones(1, 2), atol=1e-4)
+    assert torch.allclose(read_weights[..., 0], torch.ones(1, 2), atol=1e-4)
+    assert torch.allclose(read_state[0, 0], expected_value, atol=2e-4)

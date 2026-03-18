@@ -1,0 +1,27 @@
+_base_: ./hybrid_es_benchmark_b_v2_keymem_writeaux_maskcurr_pop64.yaml
+
+experiment:
+  seed: 707
+
+model:
+  packet_memory_write_bias: -0.5
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_trigger_exit_until_trigger: true
+  oracle_route_weight: 0.2
+  delay_write_weight: 0.5
+  memory_payload_weight: 0.75
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 180
+  batch_size: 128
+  val_every: 30
+  routing:
+    exit_mask_final_query_only: true
+    exit_mask_trigger_exit_until_trigger: true
+    oracle_route_weight: 0.2
+    delay_write_weight: 0.5
+    memory_payload_weight: 0.75

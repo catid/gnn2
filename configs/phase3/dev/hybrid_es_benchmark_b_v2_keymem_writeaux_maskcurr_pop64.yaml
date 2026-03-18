@@ -1,0 +1,32 @@
+_base_: ../../phase2/dev/hybrid_es_benchmark_b_v2_gatedblend_writeaux_maskcurr_pop64.yaml
+
+experiment:
+  seed: 704
+  results_root: results/phase3_dev
+
+model:
+  packet_update: gated_gru
+  delay_state_mode: adaptive_blend
+  delay_gate_bias: 2.5
+  packet_memory_slots: 4
+  packet_memory_dim: 64
+  packet_memory_read_bias: 1.5
+  packet_memory_write_bias: -2.0
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_trigger_exit_until_trigger: true
+  oracle_route_weight: 0.2
+  delay_write_weight: 0.25
+
+warmstart:
+  enabled: true
+  route_mode: soft
+  train_steps: 180
+  batch_size: 128
+  val_every: 30
+  routing:
+    exit_mask_final_query_only: true
+    exit_mask_trigger_exit_until_trigger: true
+    oracle_route_weight: 0.2
+    delay_write_weight: 0.25

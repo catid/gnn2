@@ -171,6 +171,10 @@ class PacketRoutingModel(nn.Module):
         self.packet_update = str(config.get("packet_update", "residual"))
         self.delay_state_mode = str(config.get("delay_state_mode", "updated"))
         self.delay_gate_bias = float(config.get("delay_gate_bias", 2.0))
+        self.packet_memory_slots = int(config.get("packet_memory_slots", 0))
+        self.packet_memory_dim = int(config.get("packet_memory_dim", self.hidden_dim))
+        self.packet_memory_read_bias = float(config.get("packet_memory_read_bias", 1.0))
+        self.packet_memory_write_bias = float(config.get("packet_memory_write_bias", -1.0))
         self.core = NodeCore(
             obs_dim=self.obs_dim,
             hidden_dim=self.hidden_dim,
@@ -180,6 +184,41 @@ class PacketRoutingModel(nn.Module):
             delay_state_mode=self.delay_state_mode,
             delay_gate_bias=self.delay_gate_bias,
         )
+        if self.packet_memory_slots > 0:
+            memory_feature_dim = self.hidden_dim * 2 + self.obs_dim
+            self.memory_read_mlp = nn.Sequential(
+                nn.LayerNorm(memory_feature_dim),
+                nn.Linear(memory_feature_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            self.memory_read_slots = nn.Linear(self.hidden_dim, self.packet_memory_slots)
+            self.memory_read_gate = nn.Linear(self.hidden_dim, 1)
+            nn.init.constant_(self.memory_read_gate.bias, self.packet_memory_read_bias)
+
+            self.memory_write_mlp = nn.Sequential(
+                nn.LayerNorm(memory_feature_dim),
+                nn.Linear(memory_feature_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            self.memory_write_slots = nn.Linear(self.hidden_dim, self.packet_memory_slots)
+            self.memory_write_gate = nn.Linear(self.hidden_dim, 1)
+            nn.init.constant_(self.memory_write_gate.bias, self.packet_memory_write_bias)
+            self.memory_write_value = nn.Linear(self.hidden_dim, self.packet_memory_dim)
+            self.memory_input_proj = nn.Linear(self.packet_memory_dim, self.hidden_dim)
+            self.memory_payload_head = nn.Sequential(
+                nn.LayerNorm(self.packet_memory_dim),
+                nn.Linear(self.packet_memory_dim, self.num_classes),
+            )
+        else:
+            self.memory_read_mlp = None
+            self.memory_read_slots = None
+            self.memory_read_gate = None
+            self.memory_write_mlp = None
+            self.memory_write_slots = None
+            self.memory_write_gate = None
+            self.memory_write_value = None
+            self.memory_input_proj = None
+            self.memory_payload_head = None
         self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.readout = nn.Sequential(
             nn.LayerNorm(self.hidden_dim),
@@ -218,6 +257,9 @@ class PacketRoutingModel(nn.Module):
         delay_write_targets: torch.Tensor | None = None,
         delay_write_mask: torch.Tensor | None = None,
         delay_write_weight: float = 0.0,
+        memory_payload_targets: torch.Tensor | None = None,
+        memory_payload_mask: torch.Tensor | None = None,
+        memory_payload_weight: float = 0.0,
     ) -> RoutingForwardOutput:
         batch_size, seq_len, num_nodes, _ = observations.shape
         if num_nodes != self.num_nodes:
@@ -235,6 +277,14 @@ class PacketRoutingModel(nn.Module):
         packet_masses = torch.zeros(batch_size, self.num_nodes, device=device, dtype=dtype)
         packet_masses[:, 0] = 1.0
         packet_ages = torch.zeros(batch_size, self.num_nodes, 1, device=device, dtype=dtype)
+        packet_memory = torch.zeros(
+            batch_size,
+            self.num_nodes,
+            self.packet_memory_slots,
+            self.packet_memory_dim,
+            device=device,
+            dtype=dtype,
+        )
         sink_state = torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype)
 
         hops = torch.zeros(batch_size, device=device, dtype=dtype)
@@ -264,17 +314,26 @@ class PacketRoutingModel(nn.Module):
         exit_age_mass = torch.zeros(batch_size, device=device, dtype=dtype)
         delay_retain_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         delay_retain_weight = torch.zeros(batch_size, device=device, dtype=dtype)
+        memory_read_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        memory_read_weight = torch.zeros(batch_size, device=device, dtype=dtype)
+        memory_read_entropy_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        memory_write_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        memory_write_weight = torch.zeros(batch_size, device=device, dtype=dtype)
+        memory_write_entropy_sum = torch.zeros(batch_size, device=device, dtype=dtype)
 
         oracle_route_loss = torch.zeros((), device=device, dtype=dtype)
         oracle_weight_total = torch.zeros((), device=device, dtype=dtype)
         delay_write_loss = torch.zeros((), device=device, dtype=dtype)
         delay_write_total = torch.zeros((), device=device, dtype=dtype)
+        memory_payload_loss = torch.zeros((), device=device, dtype=dtype)
+        memory_payload_total = torch.zeros((), device=device, dtype=dtype)
 
         for time_index in range(seq_len):
             obs_t = observations[:, time_index]
             carry_mass = torch.zeros_like(packet_masses)
             carry_state_sum = torch.zeros_like(packet_states)
             carry_age_sum = torch.zeros_like(packet_ages)
+            carry_memory_sum = torch.zeros_like(packet_memory)
 
             for _ in range(self.max_internal_steps):
                 mass = packet_masses
@@ -287,9 +346,42 @@ class PacketRoutingModel(nn.Module):
                     float(time_index) / max(1, seq_len - 1),
                 )
                 remaining_fraction = (1.0 - age_fraction).clamp_(0.0, 1.0)
+                active_mass = mass.sum(dim=1)
+
+                packet_core_input = packet_states
+                memory_write_gate = None
+                updated_memory = packet_memory
+                if self.packet_memory_slots > 0:
+                    memory_read, memory_read_gate, memory_read_weights = self._read_packet_memory(
+                        packet_memory=packet_memory,
+                        packet_state=packet_states,
+                        node_state=node_states,
+                        observations=obs_t,
+                    )
+                    memory_read_entropy = -(memory_read_weights * torch.log(memory_read_weights.clamp_min(1e-8))).sum(dim=-1)
+                    memory_read_sum = memory_read_sum + (memory_read_gate.squeeze(-1) * mass).sum(dim=1)
+                    memory_read_weight = memory_read_weight + active_mass
+                    memory_read_entropy_sum = memory_read_entropy_sum + (memory_read_entropy * mass).sum(dim=1)
+                    packet_core_input = packet_states + memory_read_gate * self.memory_input_proj(memory_read)
+                    if (
+                        memory_payload_targets is not None
+                        and memory_payload_mask is not None
+                        and memory_payload_weight > 0.0
+                    ):
+                        payload_target = memory_payload_targets[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                        payload_mask = memory_payload_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                        payload_logits = self.memory_payload_head(memory_read.float())
+                        per_node_ce = F.cross_entropy(
+                            payload_logits.reshape(-1, self.num_classes),
+                            payload_target.reshape(-1),
+                            reduction="none",
+                        ).reshape(batch_size, self.num_nodes).to(dtype)
+                        weight = payload_mask * mass
+                        memory_payload_loss = memory_payload_loss + (per_node_ce * weight).sum()
+                        memory_payload_total = memory_payload_total + weight.sum()
 
                 core_output = self.core(
-                    packet_state=packet_states,
+                    packet_state=packet_core_input,
                     node_state=node_states,
                     observations=obs_t,
                     node_index=node_indices.expand(batch_size, -1),
@@ -303,6 +395,18 @@ class PacketRoutingModel(nn.Module):
                 else:
                     node_state_next, packet_next, logits, delay_retain = core_output
 
+                if self.packet_memory_slots > 0:
+                    updated_memory, memory_write_gate, memory_write_weights = self._write_packet_memory(
+                        packet_memory=packet_memory,
+                        packet_state=packet_next,
+                        node_state=node_state_next,
+                        observations=obs_t,
+                    )
+                    memory_write_entropy = -(memory_write_weights * torch.log(memory_write_weights.clamp_min(1e-8))).sum(dim=-1)
+                    memory_write_sum = memory_write_sum + (memory_write_gate.squeeze(-1) * mass).sum(dim=1)
+                    memory_write_weight = memory_write_weight + active_mass
+                    memory_write_entropy_sum = memory_write_entropy_sum + (memory_write_entropy * mass).sum(dim=1)
+
                 masked_logits = logits
                 if action_masks is not None:
                     masked_logits = self._apply_action_mask(masked_logits, action_masks[:, time_index])
@@ -310,7 +414,6 @@ class PacketRoutingModel(nn.Module):
                 router_probs = F.softmax(masked_logits / max(temperature, 1e-6), dim=-1)
                 router_entropy = -(router_probs * torch.log(router_probs.clamp_min(1e-8))).sum(dim=-1)
                 router_conf = router_probs.max(dim=-1).values
-                active_mass = mass.sum(dim=1)
                 route_entropy_sum = route_entropy_sum + (router_entropy * mass).sum(dim=1)
                 route_conf_sum = route_conf_sum + (router_conf * mass).sum(dim=1)
                 route_weight_total = route_weight_total + active_mass
@@ -331,24 +434,24 @@ class PacketRoutingModel(nn.Module):
                     weight = step_mask * mass
                     oracle_route_loss = oracle_route_loss + (per_node_ce * weight).sum()
                     oracle_weight_total = oracle_weight_total + weight.sum()
-                if (
-                    delay_retain is not None
-                    and delay_write_targets is not None
-                    and delay_write_mask is not None
-                    and delay_write_weight > 0.0
-                ):
+                if delay_write_targets is not None and delay_write_mask is not None and delay_write_weight > 0.0:
                     write_target = delay_write_targets[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
                     write_mask = delay_write_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
-                    write_prob = (1.0 - delay_retain.squeeze(-1).float()).clamp(1e-4, 1.0 - 1e-4)
-                    write_logits = torch.logit(write_prob)
-                    per_node_bce = F.binary_cross_entropy_with_logits(
-                        write_logits,
-                        write_target.float(),
-                        reduction="none",
-                    ).to(dtype)
-                    weight = (write_mask * mass).float()
-                    delay_write_loss = delay_write_loss + (per_node_bce * weight).sum()
-                    delay_write_total = delay_write_total + weight.sum()
+                    write_prob: torch.Tensor | None = None
+                    if memory_write_gate is not None:
+                        write_prob = memory_write_gate.squeeze(-1).float().clamp(1e-4, 1.0 - 1e-4)
+                    elif delay_retain is not None:
+                        write_prob = (1.0 - delay_retain.squeeze(-1).float()).clamp(1e-4, 1.0 - 1e-4)
+                    if write_prob is not None:
+                        write_logits = torch.logit(write_prob)
+                        per_node_bce = F.binary_cross_entropy_with_logits(
+                            write_logits,
+                            write_target.float(),
+                            reduction="none",
+                        ).to(dtype)
+                        weight = (write_mask * mass).float()
+                        delay_write_loss = delay_write_loss + (per_node_bce * weight).sum()
+                        delay_write_total = delay_write_total + weight.sum()
 
                 actions = self._route_actions(
                     logits=masked_logits,
@@ -421,6 +524,7 @@ class PacketRoutingModel(nn.Module):
                 )
                 carry_state_sum = carry_state_sum + delay_mass.unsqueeze(-1) * delayed_packet
                 carry_age_sum = carry_age_sum + delay_mass.unsqueeze(-1) * next_age
+                carry_memory_sum = carry_memory_sum + delay_mass.unsqueeze(-1).unsqueeze(-1) * updated_memory
                 if delay_retain is not None:
                     delay_retain_sum = delay_retain_sum + (delay_retain.squeeze(-1) * delay_mass).sum(dim=1)
                     delay_retain_weight = delay_retain_weight + delay_mass.sum(dim=1)
@@ -428,10 +532,15 @@ class PacketRoutingModel(nn.Module):
                 next_mass = torch.zeros_like(packet_masses)
                 next_state_sum = torch.zeros_like(packet_states)
                 next_age_sum = torch.zeros_like(packet_ages)
+                next_memory_sum = torch.zeros_like(packet_memory)
                 if self.num_nodes > 1:
                     next_mass[:, 1:] = next_mass[:, 1:] + forward_mass[:, :-1]
                     next_state_sum[:, 1:, :] = next_state_sum[:, 1:, :] + weighted_packet[:, :-1, :] * actions[:, :-1, ACTION_FORWARD].unsqueeze(-1)
                     next_age_sum[:, 1:, :] = next_age_sum[:, 1:, :] + next_age[:, :-1, :] * forward_mass[:, :-1].unsqueeze(-1)
+                    next_memory_sum[:, 1:, :, :] = next_memory_sum[:, 1:, :, :] + (
+                        updated_memory[:, :-1, :, :]
+                        * forward_mass[:, :-1].unsqueeze(-1).unsqueeze(-1)
+                    )
 
                 terminal_forward_mass = forward_mass[:, -1]
                 sink_state = sink_state + terminal_forward_mass.unsqueeze(-1) * exit_features[:, -1, :]
@@ -451,6 +560,7 @@ class PacketRoutingModel(nn.Module):
                 packet_masses = next_mass
                 packet_states = self._normalize_state(next_state_sum, next_mass, eps)
                 packet_ages = self._normalize_state(next_age_sum, next_mass, eps)
+                packet_memory = self._normalize_weighted(next_memory_sum, next_mass, eps)
 
             forced_delay = packet_masses
             if float(forced_delay.max().detach().cpu()) > 0.0:
@@ -458,10 +568,12 @@ class PacketRoutingModel(nn.Module):
                 carry_mass = carry_mass + forced_delay
                 carry_state_sum = carry_state_sum + forced_delay.unsqueeze(-1) * packet_states
                 carry_age_sum = carry_age_sum + forced_delay.unsqueeze(-1) * (packet_ages + 1.0)
+                carry_memory_sum = carry_memory_sum + forced_delay.unsqueeze(-1).unsqueeze(-1) * packet_memory
 
             packet_masses = carry_mass
             packet_states = self._normalize_state(carry_state_sum, carry_mass, eps)
             packet_ages = self._normalize_state(carry_age_sum, carry_mass, eps)
+            packet_memory = self._normalize_weighted(carry_memory_sum, carry_mass, eps)
             mailbox_load = carry_mass.sum(dim=1)
             mailbox_mass_sum = mailbox_mass_sum + mailbox_load
             mailbox_peak = torch.maximum(mailbox_peak, mailbox_load)
@@ -472,6 +584,7 @@ class PacketRoutingModel(nn.Module):
                 packet_states = packet_states.detach()
                 packet_masses = packet_masses.detach()
                 packet_ages = packet_ages.detach()
+                packet_memory = packet_memory.detach()
                 sink_state = sink_state.detach()
 
         residual_mass = packet_masses.sum(dim=1)
@@ -501,7 +614,12 @@ class PacketRoutingModel(nn.Module):
         delay_write_term = torch.zeros((), device=device, dtype=dtype)
         if delay_write_weight > 0.0 and float(delay_write_total.detach().cpu()) > 0.0:
             delay_write_term = delay_write_weight * (delay_write_loss / delay_write_total.clamp_min(float(eps)))
-        total_loss = task_loss + route_penalty + oracle_route_term + delay_write_term
+        memory_payload_term = torch.zeros((), device=device, dtype=dtype)
+        if memory_payload_weight > 0.0 and float(memory_payload_total.detach().cpu()) > 0.0:
+            memory_payload_term = memory_payload_weight * (
+                memory_payload_loss / memory_payload_total.clamp_min(float(eps))
+            )
+        total_loss = task_loss + route_penalty + oracle_route_term + delay_write_term + memory_payload_term
 
         predictions = logits.argmax(dim=-1)
         accuracy = (predictions == labels).float()
@@ -515,6 +633,12 @@ class PacketRoutingModel(nn.Module):
         action_rates = action_totals / decision_denom
         transition_total = transition_totals.sum(dim=(1, 2), keepdim=True).clamp_min(float(eps))
         transition_norm = transition_totals / transition_total
+
+        delay_write_mean = (
+            memory_write_sum / memory_write_weight.clamp_min(float(eps))
+            if self.packet_memory_slots > 0
+            else 1.0 - (delay_retain_sum / delay_retain_weight.clamp_min(float(eps)))
+        )
 
         stats = {
             "accuracy": accuracy,
@@ -537,12 +661,17 @@ class PacketRoutingModel(nn.Module):
             "exit_age_mean": exit_age_sum / exit_age_mass.clamp_min(float(eps)),
             "decision_count": decision_mass_total,
             "delay_retain_mean": delay_retain_sum / delay_retain_weight.clamp_min(float(eps)),
-            "delay_write_mean": 1.0 - (delay_retain_sum / delay_retain_weight.clamp_min(float(eps))),
+            "delay_write_mean": delay_write_mean,
+            "memory_read_mean": memory_read_sum / memory_read_weight.clamp_min(float(eps)),
+            "memory_write_mean": memory_write_sum / memory_write_weight.clamp_min(float(eps)),
+            "memory_read_entropy": memory_read_entropy_sum / memory_read_weight.clamp_min(float(eps)),
+            "memory_write_entropy": memory_write_entropy_sum / memory_write_weight.clamp_min(float(eps)),
             "penalty_hops": torch.full_like(accuracy, float(penalty_hops.detach().item())),
             "penalty_delays": torch.full_like(accuracy, float(penalty_delays.detach().item())),
             "penalty_ttl": torch.full_like(accuracy, float(penalty_ttl.detach().item())),
             "oracle_route_loss": torch.full_like(accuracy, float(oracle_route_term.detach().item())),
             "delay_write_loss": torch.full_like(accuracy, float(delay_write_term.detach().item())),
+            "memory_payload_loss": torch.full_like(accuracy, float(memory_payload_term.detach().item())),
         }
         for src_index, src_name in ACTION_NAMES.items():
             for dst_index, dst_name in ACTION_NAMES.items():
@@ -552,7 +681,7 @@ class PacketRoutingModel(nn.Module):
             logits=logits,
             sink_state=sink_state,
             loss=total_loss,
-            route_loss=route_penalty + oracle_route_term + delay_write_term,
+            route_loss=route_penalty + oracle_route_term + delay_write_term + memory_payload_term,
             task_loss=task_loss,
             stats=stats,
         )
@@ -563,9 +692,21 @@ class PacketRoutingModel(nn.Module):
         mass: torch.Tensor,
         eps: torch.Tensor,
     ) -> torch.Tensor:
-        denom = mass.unsqueeze(-1).clamp_min(float(eps))
-        normalized = weighted_state / denom
-        return torch.where(mass.unsqueeze(-1) > 0.0, normalized, torch.zeros_like(weighted_state))
+        return PacketRoutingModel._normalize_weighted(weighted_state, mass, eps)
+
+    @staticmethod
+    def _normalize_weighted(
+        weighted_tensor: torch.Tensor,
+        mass: torch.Tensor,
+        eps: torch.Tensor,
+    ) -> torch.Tensor:
+        denom = mass
+        mask = mass
+        while denom.ndim < weighted_tensor.ndim:
+            denom = denom.unsqueeze(-1)
+            mask = mask.unsqueeze(-1)
+        normalized = weighted_tensor / denom.clamp_min(float(eps))
+        return torch.where(mask > 0.0, normalized, torch.zeros_like(weighted_tensor))
 
     @staticmethod
     def _apply_action_mask(logits: torch.Tensor, action_mask: torch.Tensor) -> torch.Tensor:
@@ -583,6 +724,42 @@ class PacketRoutingModel(nn.Module):
         if self.delay_state_mode == "adaptive_blend" and delay_retain is not None:
             return delay_retain * current_state + (1.0 - delay_retain) * updated_state
         return updated_state
+
+    def _read_packet_memory(
+        self,
+        packet_memory: torch.Tensor,
+        packet_state: torch.Tensor,
+        node_state: torch.Tensor,
+        observations: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if self.packet_memory_slots <= 0:
+            raise ValueError("Packet memory is disabled.")
+        memory_features = torch.cat([packet_state, node_state, observations], dim=-1)
+        read_hidden = self.memory_read_mlp(memory_features)
+        read_weights = F.softmax(self.memory_read_slots(read_hidden), dim=-1)
+        read_gate = torch.sigmoid(self.memory_read_gate(read_hidden))
+        read_state = (packet_memory * read_weights.unsqueeze(-1)).sum(dim=-2)
+        return read_state, read_gate, read_weights
+
+    def _write_packet_memory(
+        self,
+        packet_memory: torch.Tensor,
+        packet_state: torch.Tensor,
+        node_state: torch.Tensor,
+        observations: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if self.packet_memory_slots <= 0:
+            raise ValueError("Packet memory is disabled.")
+        memory_features = torch.cat([packet_state, node_state, observations], dim=-1)
+        write_hidden = self.memory_write_mlp(memory_features)
+        write_weights = F.softmax(self.memory_write_slots(write_hidden), dim=-1)
+        write_gate = torch.sigmoid(self.memory_write_gate(write_hidden))
+        write_value = self.memory_write_value(write_hidden)
+        slot_gate = write_gate * write_weights
+        updated_memory = packet_memory + slot_gate.unsqueeze(-1) * (
+            write_value.unsqueeze(-2) - packet_memory
+        )
+        return updated_memory, write_gate, write_weights
 
     @staticmethod
     def _route_actions(

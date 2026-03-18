@@ -1,0 +1,6 @@
+_base_: ./hard_st_benchmark_b_v2_keymem_payloadaux_release_nomask.yaml
+
+experiment:
+  seed: 712
+  results_root: results/phase3_dev
+

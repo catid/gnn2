@@ -1,0 +1,14 @@
+_base_: ../../phase2/dev/hard_st_benchmark_b_v1_gatedblend_oraclewarm.yaml
+
+experiment:
+  seed: 701
+  results_root: results/phase3_dev
+
+model:
+  packet_update: gated_gru
+  delay_state_mode: adaptive_blend
+  delay_gate_bias: 2.5
+  packet_memory_slots: 4
+  packet_memory_dim: 64
+  packet_memory_read_bias: 1.5
+  packet_memory_write_bias: -2.0
