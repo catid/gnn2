@@ -121,7 +121,8 @@ The test suite covers:
 
 ## Current Report
 
-The latest generated report is at [docs/experiment_report.md](docs/experiment_report.md).
+The latest targeted long-horizon report is at
+[docs/phase4_report.md](docs/phase4_report.md).
 
 Current headline outcome from the dev suite:
 
@@ -135,6 +136,12 @@ Current headline outcome from the dev suite:
   `0.4446 +/- 0.0048` to `0.6110 +/- 0.0308`, with real delayed behavior
   (`delay_rate ~= 0.69`), but the gain is concentrated in the
   `delay_to_trigger_exit` mode while `delay_to_final_query` remains near chance
+- Benchmark B phase 4: explicit control-state interventions can produce real
+  single-seed final-query improvements, but the promoted hard-routing seed panel
+  still collapses back to premature exit, so the primary story is a stronger
+  negative result about robustness; the notable secondary result is that
+  resume-based hybrid ES can polish a working controller checkpoint much more
+  successfully than scratch hybrid warmstart can discover one
 
 ## Phase 2 Commands
 
@@ -198,6 +205,42 @@ uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
 ```
 
 The phase-3 writeup is [docs/phase3_release_note.md](docs/phase3_release_note.md).
+
+## Phase 4 Commands
+
+Phase 4 targets the remaining `delay_to_final_query` failure with explicit
+control-state diagnostics, sticky control-memory interventions, a promoted
+hard-routing seed panel, and a hybrid-ES retest on the improved architecture.
+
+```bash
+uv run python -m src.utils.phase4_audit \
+  --run-dir results/phase3_dev/hard_st_b_v2_keymem_payloadaux_release_nomask_from_oraclewarm \
+  --num-batches 8 \
+  --probe-train-batches 8 \
+  --probe-test-batches 8
+
+uv run python -m src.train.run \
+  --config configs/phase4/dev/hard_st_benchmark_b_v2_control_sticky_aux_router2.yaml \
+  --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
+  --results-dir results/phase4_dev/hard_st_b_v2_control_sticky_aux_router2
+
+uv run python -m src.train.run \
+  --config configs/phase4/main/hard_st_benchmark_b_v2_control_sticky_both_main.yaml \
+  --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
+  --results-dir results/phase4_main/hard_st_b_v2_control_sticky_both_main_seed750
+
+./scripts/run_phase4_seed_compare.sh
+
+uv run torchrun --standalone --nproc_per_node=2 -m src.train.run \
+  --config configs/phase4/main/hybrid_es_benchmark_b_v2_control_sticky_aux_router2_resume_seed747.yaml \
+  --resume results/phase4_dev/hard_st_b_v2_control_sticky_aux_router2/hard_st_best.pt \
+  --results-dir results/phase4_main/hybrid_es_b_v2_control_sticky_aux_router2_resume_seed747
+```
+
+The phase-4 planning and final writeups are
+[docs/phase4_plan.md](docs/phase4_plan.md),
+[docs/phase4_report.md](docs/phase4_report.md), and
+[docs/phase4_lessons.md](docs/phase4_lessons.md).
 
 ## References
 

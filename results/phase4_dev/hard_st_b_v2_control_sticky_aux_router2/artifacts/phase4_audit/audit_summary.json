@@ -1,0 +1,69 @@
+{
+  "checkpoint": "results/phase4_dev/hard_st_b_v2_control_sticky_aux_router2/hard_st_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.504081130027771,
+    "control_probe_control_state": 1.0,
+    "control_probe_memory_read_state": 1.0,
+    "control_probe_packet_state": 1.0,
+    "count": 4043,
+    "exit_time": 70.07271575927734,
+    "mean_exit_minus_query": -56.92728042602539,
+    "premature_exit_rate": 0.6688103079795837,
+    "route_match": 0.33118972182273865
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.504081130027771,
+      "compute": 71.07914733886719,
+      "control_prob_mean": 0.6949707865715027,
+      "count": 4043,
+      "delay_rate": 0.9635944366455078,
+      "early_exit_rate": 0.0024734109174460173,
+      "exit_time": 70.07271575927734,
+      "premature_exit_rate": 0.6688103079795837,
+      "route_match": 0.33118972182273865
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 0.9677264094352722,
+      "compute": 32.028419494628906,
+      "control_prob_mean": 0.6938280463218689,
+      "count": 2076,
+      "delay_rate": 0.9385325908660889,
+      "early_exit_rate": 0.0014450866729021072,
+      "exit_time": 31.028419494628906,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.9527938365936279
+    },
+    "easy_exit": {
+      "accuracy": 1.0,
+      "compute": 1.0,
+      "control_prob_mean": 0.6855126619338989,
+      "count": 2073,
+      "delay_rate": 0.0,
+      "early_exit_rate": 1.0,
+      "exit_time": 0.0,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    }
+  },
+  "probe_summary": {
+    "control_state": {
+      "accuracy": 1.0,
+      "bce": 0.007988948374986649
+    },
+    "memory_read_state": {
+      "accuracy": 1.0,
+      "bce": 0.006679717916995287
+    },
+    "packet_state": {
+      "accuracy": 1.0,
+      "bce": 0.007025930564850569
+    },
+    "router_probs": {
+      "accuracy": 1.0,
+      "bce": 0.007576640695333481
+    }
+  },
+  "run_dir": "results/phase4_dev/hard_st_b_v2_control_sticky_aux_router2",
+  "split": "test"
+}

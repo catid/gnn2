@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_control_sticky_both_dim8.yaml
+
+experiment:
+  seed: 745
+
+routing:
+  oracle_route_weight: 0.0

@@ -1,0 +1,69 @@
+{
+  "checkpoint": "results/phase4_dev/hard_st_b_v2_control_sticky_both_dim8/hard_st_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.41876891255378723,
+    "control_probe_control_state": 1.0,
+    "control_probe_memory_read_state": 1.0,
+    "control_probe_packet_state": 1.0,
+    "count": 991,
+    "exit_time": 103.3097915649414,
+    "mean_exit_minus_query": -23.69021224975586,
+    "premature_exit_rate": 0.4924318790435791,
+    "route_match": 0.503531813621521
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.41876891255378723,
+      "compute": 105.48839569091797,
+      "control_prob_mean": 0.8739593625068665,
+      "count": 991,
+      "delay_rate": 0.9749075770378113,
+      "early_exit_rate": 0.0010090817231684923,
+      "exit_time": 103.3097915649414,
+      "premature_exit_rate": 0.4924318790435791,
+      "route_match": 0.503531813621521
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 0.9888476133346558,
+      "compute": 32.77695083618164,
+      "control_prob_mean": 0.8724110126495361,
+      "count": 538,
+      "delay_rate": 0.9362421035766602,
+      "early_exit_rate": 0.0018587360391393304,
+      "exit_time": 31.715614318847656,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.9832713603973389
+    },
+    "easy_exit": {
+      "accuracy": 0.9980732202529907,
+      "compute": 1.2466281652450562,
+      "control_prob_mean": 0.7854231595993042,
+      "count": 519,
+      "delay_rate": 0.0019267823081463575,
+      "early_exit_rate": 0.9980732202529907,
+      "exit_time": 0.2447013556957245,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.9980732202529907
+    }
+  },
+  "probe_summary": {
+    "control_state": {
+      "accuracy": 1.0,
+      "bce": 0.006150122731924057
+    },
+    "memory_read_state": {
+      "accuracy": 1.0,
+      "bce": 0.007044555153697729
+    },
+    "packet_state": {
+      "accuracy": 1.0,
+      "bce": 0.00706095015630126
+    },
+    "router_probs": {
+      "accuracy": 1.0,
+      "bce": 0.004974134266376495
+    }
+  },
+  "run_dir": "results/phase4_dev/hard_st_b_v2_control_sticky_both_dim8",
+  "split": "test"
+}

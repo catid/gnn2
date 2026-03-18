@@ -1,0 +1,34 @@
+_base_: ../../phase3/dev/hybrid_es_benchmark_b_v2_keymem_payloadaux_maskcurr_pop64.yaml
+
+experiment:
+  seed: 761
+  results_root: results/phase4_main
+
+resume_strict: false
+
+model:
+  control_state_dim: 4
+  control_state_mode: sticky
+  control_router_scale: 2.0
+  control_write_bias: -4.0
+
+routing:
+  exit_mask_final_query_only: false
+  exit_mask_trigger_exit_until_trigger: false
+  oracle_route_weight: 0.2
+  delay_write_weight: 0.5
+  memory_payload_weight: 0.75
+  control_state_weight: 1.0
+  anti_exit_weight: 0.0
+
+warmstart:
+  enabled: false
+
+es:
+  generations: 32
+  population: 64
+  rank: 4
+  val_every: 4
+  val_batches: 10
+  test_batches: 16
+  selection_metric: per_mode.delay_to_final_query.accuracy

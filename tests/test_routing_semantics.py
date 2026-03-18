@@ -215,3 +215,84 @@ def test_packet_memory_write_and_read_round_trip() -> None:
     assert torch.allclose(read_gate.squeeze(-1), torch.ones(1, 2), atol=1e-4)
     assert torch.allclose(read_weights[..., 0], torch.ones(1, 2), atol=1e-4)
     assert torch.allclose(read_state[0, 0], expected_value, atol=2e-4)
+
+
+def test_control_state_sticky_retains_set_signal() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "control_state_dim": 1,
+            "control_state_mode": "sticky",
+        }
+    )
+    with torch.no_grad():
+        for parameter in model.control_update_mlp.parameters():
+            parameter.zero_()
+        model.control_set_gate.weight.zero_()
+        model.control_set_gate.bias.fill_(10.0)
+
+    control_state = torch.zeros(1, 2, 1)
+    packet_state = torch.zeros(1, 2, 4)
+    node_state = torch.zeros(1, 2, 4)
+    observations = torch.zeros(1, 2, 8)
+
+    updated, _, _ = model._update_control_state(
+        control_state=control_state,
+        packet_state=packet_state,
+        node_state=node_state,
+        observations=observations,
+    )
+    assert torch.allclose(updated, torch.ones_like(updated), atol=1e-4)
+
+    with torch.no_grad():
+        model.control_set_gate.bias.fill_(-10.0)
+    retained, _, _ = model._update_control_state(
+        control_state=updated,
+        packet_state=packet_state,
+        node_state=node_state,
+        observations=observations,
+    )
+    assert torch.allclose(retained, torch.ones_like(retained), atol=1e-4)
+
+
+def test_control_state_set_clear_can_clear_signal() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "control_state_dim": 1,
+            "control_state_mode": "set_clear",
+        }
+    )
+    with torch.no_grad():
+        for parameter in model.control_update_mlp.parameters():
+            parameter.zero_()
+        model.control_set_gate.weight.zero_()
+        model.control_set_gate.bias.fill_(-10.0)
+        model.control_clear_gate.weight.zero_()
+        model.control_clear_gate.bias.fill_(10.0)
+
+    control_state = torch.ones(1, 2, 1)
+    packet_state = torch.zeros(1, 2, 4)
+    node_state = torch.zeros(1, 2, 4)
+    observations = torch.zeros(1, 2, 8)
+
+    updated, _, clear = model._update_control_state(
+        control_state=control_state,
+        packet_state=packet_state,
+        node_state=node_state,
+        observations=observations,
+    )
+    assert clear is not None
+    assert torch.allclose(updated, torch.zeros_like(updated), atol=1e-4)

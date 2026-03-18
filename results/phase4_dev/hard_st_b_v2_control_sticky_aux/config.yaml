@@ -1,0 +1,22 @@
+_base_: ../../phase3/dev/hard_st_benchmark_b_v2_keymem_payloadaux_release_nomask.yaml
+
+experiment:
+  seed: 740
+  results_root: results/phase4_dev
+
+resume_strict: false
+
+model:
+  control_state_dim: 4
+  control_state_mode: sticky
+  control_router_scale: 1.0
+  control_write_bias: -4.0
+
+routing:
+  control_state_weight: 0.75
+  anti_exit_weight: 0.0
+
+training:
+  train_steps: 640
+  val_every: 20
+  lr: 0.0003

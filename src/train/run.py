@@ -10,6 +10,7 @@ import time
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import timedelta
 from typing import Any
 
 import numpy as np
@@ -20,7 +21,10 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 from src.data import BenchmarkBatch, build_benchmark
-from src.data.benchmarks import LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT
+from src.data.benchmarks import (
+    LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY,
+    LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT,
+)
 from src.es import LowRankEvolutionStrategy, standardize_fitness
 from src.models import ACTION_EXIT, PacketRoutingModel
 from src.utils.config import load_config
@@ -60,7 +64,13 @@ def setup_distributed() -> DistContext:
     world_size = int(os.environ["WORLD_SIZE"])
     local_rank = int(os.environ.get("LOCAL_RANK", rank))
     backend = "nccl" if torch.cuda.is_available() else "gloo"
-    dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
+    timeout_minutes = int(os.environ.get("GNN2_DIST_TIMEOUT_MINUTES", "60"))
+    dist.init_process_group(
+        backend=backend,
+        rank=rank,
+        world_size=world_size,
+        timeout=timedelta(minutes=timeout_minutes),
+    )
     if torch.cuda.is_available():
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
@@ -127,6 +137,17 @@ def tensor_dict_mean(stats: list[dict[str, torch.Tensor]]) -> dict[str, float]:
         key: float(torch.cat([x.reshape(-1) for x in values]).mean().item())
         for key, values in merged.items()
     }
+
+
+def resolve_metric_path(metrics: dict[str, Any], path: str) -> float:
+    current: Any = metrics
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return float("nan")
+        current = current[part]
+    if isinstance(current, (int, float)):
+        return float(current)
+    return float("nan")
 
 
 def centered_rank_fitness(rewards: torch.Tensor) -> torch.Tensor:
@@ -277,6 +298,48 @@ def build_memory_controls(
     return targets, mask, memory_payload_weight
 
 
+def build_control_controls(
+    batch: BenchmarkBatch,
+    routing_cfg: dict[str, Any] | None,
+    *,
+    split: str,
+) -> tuple[torch.Tensor | None, torch.Tensor | None, float, torch.Tensor | None, float]:
+    routing_cfg = routing_cfg or {}
+    control_weight = float(routing_cfg.get("control_state_weight", 0.0))
+    anti_exit_weight = float(routing_cfg.get("anti_exit_weight", 0.0))
+    if (
+        split != "train"
+        or (control_weight <= 0.0 and anti_exit_weight <= 0.0)
+        or "trigger_time" not in batch.metadata
+        or "query_time" not in batch.metadata
+        or "needs_final_query" not in batch.metadata
+    ):
+        return None, None, 0.0, None, 0.0
+
+    batch_size = batch.labels.shape[0]
+    seq_len = batch.observations.shape[1]
+    device = batch.labels.device
+    dtype = batch.observations.dtype
+    targets = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+    target_mask = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+    anti_exit_mask = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+
+    trigger_times = batch.metadata["trigger_time"].long()
+    query_times = batch.metadata["query_time"].long()
+    final_query_mask = batch.metadata["needs_final_query"].long() > 0
+
+    for sample_index in torch.nonzero(final_query_mask, as_tuple=False).squeeze(-1).tolist():
+        trigger_time = int(trigger_times[sample_index].item())
+        query_time = int(query_times[sample_index].item())
+        trigger_time = max(0, min(trigger_time, seq_len - 1))
+        query_time = max(trigger_time, min(query_time, seq_len - 1))
+        targets[sample_index, trigger_time : query_time + 1] = 1.0
+        target_mask[sample_index, trigger_time : query_time + 1] = 1.0
+        anti_exit_mask[sample_index, trigger_time:query_time] = 1.0
+
+    return targets, target_mask, control_weight, anti_exit_mask, anti_exit_weight
+
+
 def build_reward(
     logits: torch.Tensor,
     labels: torch.Tensor,
@@ -326,6 +389,14 @@ def summarize_batch(
     metrics.update(output.stats)
     if benchmark_name.startswith("long_horizon_memory") or benchmark_name == "mixed_oracle_routing":
         metrics["route_match"] = route_match
+    if benchmark_name.startswith("long_horizon_memory") and "query_time" in batch.metadata:
+        query_time = batch.metadata["query_time"].float()
+        final_mask = (
+            batch.metadata.get("needs_final_query", torch.zeros_like(query_time)).float()
+        )
+        premature_exit = ((output.stats["exit_time"] < query_time).float()) * final_mask
+        metrics["premature_exit_rate"] = premature_exit
+        metrics["final_query_wait_gap"] = (query_time - output.stats["exit_time"]).clamp_min(0.0) * final_mask
     metrics["early_exit_rate"] = output.stats["early_exit_mass"]
     return metrics
 
@@ -381,6 +452,14 @@ def grouped_slice_metrics(
         "route_entropy",
         "router_confidence",
         "route_match",
+        "premature_exit_rate",
+        "final_query_wait_gap",
+        "control_state_mean",
+        "control_prob_mean",
+        "control_set_mean",
+        "control_clear_mean",
+        "control_loss",
+        "anti_exit_loss",
     ]
     grouped: dict[str, dict[str, float]] = {}
 
@@ -458,6 +537,11 @@ def evaluate_model(
                 routing_cfg,
                 split=split,
             )
+            control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
             with autocast_context(device, amp_enabled, amp_dtype):
                 output = model(
                     observations=batch.observations,
@@ -478,6 +562,11 @@ def evaluate_model(
                     memory_payload_targets=memory_payload_targets,
                     memory_payload_mask=memory_payload_mask,
                     memory_payload_weight=memory_payload_weight,
+                    control_targets=control_targets,
+                    control_mask=control_mask,
+                    control_weight=control_weight,
+                    anti_exit_mask=anti_exit_mask,
+                    anti_exit_weight=anti_exit_weight,
                 )
             batch_metrics = summarize_batch(batch, output, benchmark_name)
             collected.append(batch_metrics)
@@ -530,6 +619,13 @@ def evaluate_model(
     return metrics
 
 
+def validation_score(metrics: dict[str, Any], cfg: dict[str, Any], section: str = "training") -> tuple[float, str]:
+    section_cfg = cfg.get(section, {})
+    metric_path = str(section_cfg.get("selection_metric", "accuracy"))
+    score = resolve_metric_path(metrics, metric_path)
+    return score, metric_path
+
+
 def save_checkpoint(path: Path, model: PacketRoutingModel, optimizer: torch.optim.Optimizer | None, step: int, extra: dict[str, Any] | None = None) -> None:
     payload = {
         "model": model.state_dict(),
@@ -541,11 +637,23 @@ def save_checkpoint(path: Path, model: PacketRoutingModel, optimizer: torch.opti
     torch.save(payload, path)
 
 
-def load_checkpoint(path: str | Path, model: PacketRoutingModel, optimizer: torch.optim.Optimizer | None = None) -> dict[str, Any]:
+def load_checkpoint(
+    path: str | Path,
+    model: PacketRoutingModel,
+    optimizer: torch.optim.Optimizer | None = None,
+    *,
+    strict: bool = True,
+) -> dict[str, Any]:
     payload = torch.load(path, map_location="cpu")
-    model.load_state_dict(payload["model"])
+    model.load_state_dict(payload["model"], strict=strict)
     if optimizer is not None and "optimizer" in payload:
-        optimizer.load_state_dict(payload["optimizer"])
+        if strict:
+            optimizer.load_state_dict(payload["optimizer"])
+        else:
+            try:
+                optimizer.load_state_dict(payload["optimizer"])
+            except ValueError:
+                pass
     return payload
 
 
@@ -584,7 +692,12 @@ def run_supervised_phase(
     last_path = results_dir / f"{phase_name}_last.pt"
 
     if cfg.get("resume"):
-        payload = load_checkpoint(cfg["resume"], model, optimizer)
+        payload = load_checkpoint(
+            cfg["resume"],
+            model,
+            optimizer,
+            strict=bool(cfg.get("resume_strict", True)),
+        )
         start_step = int(payload.get("step", 0))
 
     total_steps = int(steps_override or train_cfg["train_steps"])
@@ -593,6 +706,8 @@ def run_supervised_phase(
     phase_start_time = time.time()
     peak_train_memory_mb = 0.0
     best_val_metrics: dict[str, Any] | None = None
+    best_val_score = float("-inf")
+    best_metric_name = str(train_cfg.get("selection_metric", "accuracy"))
     progress = tqdm(range(start_step, total_steps), disable=False)
     for step in progress:
         if device.type == "cuda":
@@ -610,6 +725,11 @@ def run_supervised_phase(
             split="train",
         )
         memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
+        control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
             batch,
             routing_cfg,
             split="train",
@@ -636,6 +756,11 @@ def run_supervised_phase(
                 memory_payload_targets=memory_payload_targets,
                 memory_payload_mask=memory_payload_mask,
                 memory_payload_weight=memory_payload_weight,
+                control_targets=control_targets,
+                control_mask=control_mask,
+                control_weight=control_weight,
+                anti_exit_mask=anti_exit_mask,
+                anti_exit_weight=anti_exit_weight,
             )
         scaler.scale(output.loss).backward()
         scaler.unscale_(optimizer)
@@ -687,7 +812,10 @@ def run_supervised_phase(
             val_metrics.update({"phase": phase_name, "split": "val", "step": step})
             peak_train_memory_mb = max(peak_train_memory_mb, float(val_metrics["peak_memory_mb"]))
             logger.write(val_metrics)
-            if val_metrics["accuracy"] > best_val:
+            val_score, metric_name = validation_score(val_metrics, cfg, section="training")
+            if val_score > best_val_score:
+                best_val_score = val_score
+                best_metric_name = metric_name
                 best_val = val_metrics["accuracy"]
                 best_val_metrics = val_metrics
                 save_checkpoint(best_path, model, optimizer, step, {"phase": phase_name})
@@ -717,6 +845,8 @@ def run_supervised_phase(
     logger.write(test_metrics)
     return {
         "best_val_accuracy": best_val,
+        "best_val_score": best_val_score,
+        "best_metric_name": best_metric_name,
         "best_val_metrics": best_val_metrics,
         "test": test_metrics,
         "checkpoint": str(best_path),
@@ -754,6 +884,12 @@ def run_hybrid_es(
 
     warmstart_cfg = cfg.get("warmstart", {})
     warmstart_summary: dict[str, Any] | None = None
+    if cfg.get("resume"):
+        load_checkpoint(
+            cfg["resume"],
+            model,
+            strict=bool(cfg.get("resume_strict", True)),
+        )
     if warmstart_cfg.get("enabled", False) and context.rank == 0:
         warmstart_summary = run_supervised_phase(
             phase_name="warmstart",
@@ -813,6 +949,8 @@ def run_hybrid_es(
     phase_start_time = time.time()
     peak_train_memory_mb = 0.0
     best_val_metrics: dict[str, Any] | None = None
+    best_val_score = float("-inf")
+    best_metric_name = str(es_cfg.get("selection_metric", "accuracy"))
     progress = tqdm(range(generations), disable=context.rank != 0)
     eval_compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, generations)
 
@@ -830,6 +968,11 @@ def run_hybrid_es(
             split="train",
         )
         memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
+        control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
             batch,
             routing_cfg,
             split="train",
@@ -863,6 +1006,11 @@ def run_hybrid_es(
                         memory_payload_targets=memory_payload_targets,
                         memory_payload_mask=memory_payload_mask,
                         memory_payload_weight=memory_payload_weight,
+                        control_targets=control_targets,
+                        control_mask=control_mask,
+                        control_weight=control_weight,
+                        anti_exit_mask=anti_exit_mask,
+                        anti_exit_weight=anti_exit_weight,
                     )
                 reward = build_reward(
                     output.logits,
@@ -938,7 +1086,10 @@ def run_hybrid_es(
                 val_metrics.update({"phase": "hybrid_es", "split": "val", "generation": generation})
                 peak_train_memory_mb = max(peak_train_memory_mb, float(val_metrics["peak_memory_mb"]))
                 logger.write(val_metrics)
-                if val_metrics["accuracy"] > best_val:
+                val_score, metric_name = validation_score(val_metrics, cfg, section="es")
+                if val_score > best_val_score:
+                    best_val_score = val_score
+                    best_metric_name = metric_name
                     best_val = val_metrics["accuracy"]
                     best_val_metrics = val_metrics
                     save_checkpoint(best_path, model, None, generation, {"phase": "hybrid_es"})
@@ -972,6 +1123,8 @@ def run_hybrid_es(
     return {
         "warmstart": warmstart_summary,
         "best_val_accuracy": best_val,
+        "best_val_score": best_val_score,
+        "best_metric_name": best_metric_name,
         "best_val_metrics": best_val_metrics,
         "test": test_metrics,
         "parameter_names": parameter_names,

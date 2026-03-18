@@ -1,0 +1,10 @@
+_base_: ./hard_st_benchmark_b_v2_control_sticky_aux.yaml
+
+experiment:
+  seed: 747
+
+model:
+  control_router_scale: 2.0
+
+routing:
+  control_state_weight: 1.0

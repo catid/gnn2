@@ -1,0 +1,4 @@
+_base_: ./hard_st_benchmark_b_v2_control_sticky_aux_router2_main.yaml
+
+experiment:
+  seed: 773

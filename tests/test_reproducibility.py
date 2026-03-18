@@ -3,8 +3,9 @@ from __future__ import annotations
 import torch
 
 from src.data import build_benchmark
+from src.data.benchmarks import BenchmarkBatch, LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY
 from src.models import PacketRoutingModel
-from src.train.run import seed_everything
+from src.train.run import build_control_controls, seed_everything
 
 
 def benchmark_config() -> dict:
@@ -54,3 +55,36 @@ def test_model_initialization_is_reproducible_for_fixed_seed() -> None:
     assert params_a.keys() == params_b.keys()
     for name in params_a:
         assert torch.equal(params_a[name], params_b[name]), name
+
+
+def test_build_control_controls_marks_wait_window_for_final_query_mode() -> None:
+    batch = BenchmarkBatch(
+        observations=torch.zeros(2, 8, 2, 4),
+        labels=torch.zeros(2, dtype=torch.long),
+        modes=torch.tensor([LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY, 0], dtype=torch.long),
+        oracle_hops=torch.zeros(2, dtype=torch.long),
+        oracle_delays=torch.zeros(2, dtype=torch.long),
+        oracle_exit_time=torch.zeros(2, dtype=torch.long),
+        oracle_depth=torch.zeros(2, dtype=torch.long),
+        metadata={
+            "trigger_time": torch.tensor([2, 0], dtype=torch.long),
+            "query_time": torch.tensor([7, 0], dtype=torch.long),
+            "needs_final_query": torch.tensor([1, 0], dtype=torch.long),
+        },
+    )
+
+    targets, target_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
+        batch,
+        {"control_state_weight": 0.4, "anti_exit_weight": 0.7},
+        split="train",
+    )
+
+    assert control_weight == 0.4
+    assert anti_exit_weight == 0.7
+    assert targets is not None
+    assert target_mask is not None
+    assert anti_exit_mask is not None
+    assert torch.equal(targets[0], torch.tensor([0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert torch.equal(target_mask[0], torch.tensor([0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]))
+    assert torch.equal(anti_exit_mask[0], torch.tensor([0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0]))
+    assert torch.equal(targets[1], torch.zeros(8))

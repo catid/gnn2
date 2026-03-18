@@ -1,0 +1,65 @@
+{
+  "checkpoint": "results/phase3_dev/hard_st_b_v2_keymem_payloadaux_release_nomask_from_oraclewarm/hard_st_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.2563067674636841,
+    "control_probe_control_state": null,
+    "control_probe_memory_read_state": 1.0,
+    "control_probe_packet_state": 1.0,
+    "count": 991,
+    "exit_time": 32.8102912902832,
+    "mean_exit_minus_query": -94.18970489501953,
+    "premature_exit_rate": 0.9989908933639526,
+    "route_match": 0.0010090817231684923
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.2563067674636841,
+      "compute": 33.81332015991211,
+      "control_prob_mean": 0.0,
+      "count": 991,
+      "delay_rate": 0.9465059638023376,
+      "early_exit_rate": 0.0,
+      "exit_time": 32.8102912902832,
+      "premature_exit_rate": 0.9989908933639526,
+      "route_match": 0.0010090817231684923
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 1.0,
+      "compute": 32.54460906982422,
+      "control_prob_mean": 0.0,
+      "count": 538,
+      "delay_rate": 0.9386565685272217,
+      "early_exit_rate": 0.0,
+      "exit_time": 31.54460906982422,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    },
+    "easy_exit": {
+      "accuracy": 1.0,
+      "compute": 1.0,
+      "control_prob_mean": 0.0,
+      "count": 519,
+      "delay_rate": 0.0,
+      "early_exit_rate": 1.0,
+      "exit_time": 0.0,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    }
+  },
+  "probe_summary": {
+    "memory_read_state": {
+      "accuracy": 1.0,
+      "bce": 0.007810626178979874
+    },
+    "packet_state": {
+      "accuracy": 1.0,
+      "bce": 0.008068712428212166
+    },
+    "router_probs": {
+      "accuracy": 1.0,
+      "bce": 0.005614695139229298
+    }
+  },
+  "run_dir": "results/phase3_dev/hard_st_b_v2_keymem_payloadaux_release_nomask_from_oraclewarm",
+  "split": "test"
+}
