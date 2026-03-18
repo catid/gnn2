@@ -1,0 +1,144 @@
+{
+  "benchmark": "mixed_oracle_routing",
+  "config_path": "configs/smoke/hard_st.yaml",
+  "method": "hard_st",
+  "results_dir": "results/smoke_suite_verify/hard_st",
+  "summary": {
+    "best_val_accuracy": 0.5208333134651184,
+    "best_val_metrics": {
+      "accuracy": 0.5208333134651184,
+      "compute": 1.3619791269302368,
+      "delays": 0.0729166641831398,
+      "early_exit_rate": 0.9270833134651184,
+      "examples_per_sec": 19369.73380957535,
+      "examples_seen": 384,
+      "exit_time": 0.0729166641831398,
+      "hops": 0.2890625,
+      "loss": 0.6855437159538269,
+      "peak_memory_mb": 70.13623046875,
+      "per_mode": {
+        "delay_1": {
+          "accuracy": 0.5357143140974499,
+          "compute": 1.4047619643665494,
+          "count": 84,
+          "delays": 0.11904762436946233,
+          "early_exit_rate": 0.8809524192696526,
+          "exit_time": 0.11904762436946233,
+          "hops": 0.2857142935196559,
+          "route_match": 0.0833333395421505,
+          "ttl_fail": 0.0
+        },
+        "delay_1_then_spatial_k": {
+          "accuracy": 0.49999999969589465,
+          "compute": 1.4591836722529665,
+          "count": 98,
+          "delays": 0.06122449101233969,
+          "early_exit_rate": 0.9387755089876603,
+          "exit_time": 0.06122449101233969,
+          "hops": 0.39795919127610263,
+          "route_match": 0.010204081936758392,
+          "ttl_fail": 0.0
+        },
+        "easy_exit": {
+          "accuracy": 0.6481481702239426,
+          "compute": 1.2592592857502125,
+          "count": 108,
+          "delays": 0.06481481536670967,
+          "early_exit_rate": 0.9351852039496104,
+          "exit_time": 0.06481481536670967,
+          "hops": 0.19444444554823417,
+          "route_match": 0.7777778009573618,
+          "ttl_fail": 0.0
+        },
+        "spatial_k": {
+          "accuracy": 0.3829787205508415,
+          "compute": 1.3404255293785257,
+          "count": 94,
+          "delays": 0.05319149126397803,
+          "early_exit_rate": 0.9468085112723899,
+          "exit_time": 0.05319149126397803,
+          "hops": 0.2872340460406973,
+          "route_match": 0.10638298007084969,
+          "ttl_fail": 0.0
+        }
+      },
+      "phase": "hard_st",
+      "route_loss": 0.007239582482725382,
+      "route_match": 0.265625,
+      "split": "val",
+      "step": 11,
+      "task_loss": 0.6783040165901184,
+      "ttl_fail": 0.0,
+      "wall_time_sec": 0.019824743270874023
+    },
+    "checkpoint": "results/smoke_suite_verify/hard_st/hard_st_best.pt",
+    "peak_train_memory_mb": 80.7763671875,
+    "phase_wall_time_sec": 0.5118348598480225,
+    "test": {
+      "accuracy": 0.498046875,
+      "compute": 1.37890625,
+      "delays": 0.08203125,
+      "early_exit_rate": 0.921875,
+      "examples_per_sec": 21723.35162256211,
+      "examples_seen": 512,
+      "exit_time": 0.078125,
+      "hops": 0.296875,
+      "loss": 0.7147961854934692,
+      "peak_memory_mb": 70.1416015625,
+      "per_mode": {
+        "delay_1": {
+          "accuracy": 0.45890410611890764,
+          "compute": 1.4109589253386405,
+          "count": 146,
+          "delays": 0.08904109812303357,
+          "early_exit_rate": 0.9178082424483888,
+          "exit_time": 0.08219178285041492,
+          "hops": 0.32191781077074677,
+          "route_match": 0.04109589106160892,
+          "ttl_fail": 0.006849315272618646
+        },
+        "delay_1_then_spatial_k": {
+          "accuracy": 0.5000000083271194,
+          "compute": 1.2941176610834457,
+          "count": 136,
+          "delays": 0.058823530712877124,
+          "early_exit_rate": 0.9411764863659354,
+          "exit_time": 0.058823530712877124,
+          "hops": 0.23529412224888802,
+          "route_match": 0.0,
+          "ttl_fail": 0.0
+        },
+        "easy_exit": {
+          "accuracy": 0.5327103032129947,
+          "compute": 1.3831775845768295,
+          "count": 107,
+          "delays": 0.08411215141276333,
+          "early_exit_rate": 0.9158878760917164,
+          "exit_time": 0.08411215141276333,
+          "hops": 0.2990654361582248,
+          "route_match": 0.7196261821506179,
+          "ttl_fail": 0.0
+        },
+        "spatial_k": {
+          "accuracy": 0.512195131885327,
+          "compute": 1.4308943438336132,
+          "count": 123,
+          "delays": 0.0975609767606588,
+          "early_exit_rate": 0.9105691284668155,
+          "exit_time": 0.08943089582328874,
+          "hops": 0.33333333817923944,
+          "route_match": 0.09756097754811853,
+          "ttl_fail": 0.008130081497677943
+        }
+      },
+      "phase": "hard_st",
+      "route_loss": 0.008554688654839993,
+      "route_match": 0.185546875,
+      "split": "test",
+      "step": 12,
+      "task_loss": 0.7062416076660156,
+      "ttl_fail": 0.00390625,
+      "wall_time_sec": 0.023569107055664062
+    }
+  }
+}
