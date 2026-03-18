@@ -65,6 +65,24 @@ So phase 3 changed the scientific story:
 - mask-driven training can make train metrics look route-perfect without
   learning a deployable policy
 
+## Follow-Up Sweep
+
+After the first 3-seed no-mask release result, I ran a small release-stage
+route-supervision sweep with the same resume checkpoint and stronger
+non-masking `oracle_route_weight` values:
+
+| Run | Test acc | Delay rate | Route match | Final-query acc | Final-query exit time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| No-mask release, `oracle_route_weight=0.2` | 0.6328 | 0.7027 | 0.5130 | 0.2460 | 33.19 |
+| No-mask release, `oracle_route_weight=0.5` | 0.6445 | 0.7019 | 0.5127 | 0.2701 | 33.21 |
+| No-mask release, `oracle_route_weight=1.0` | 0.6429 | 0.7026 | 0.5143 | 0.2680 | 34.18 |
+
+This did not materially solve the final-query mode. Stronger route CE nudged
+overall accuracy upward a bit, but `delay_to_final_query` still exited around
+step `34` instead of step `127`, and its route match stayed effectively zero.
+That narrows the remaining failure further: it is not just weak release-stage
+route supervision.
+
 ## Reproduction
 
 Generate the oracle-routed keyed-memory checkpoint:
@@ -95,7 +113,7 @@ PY
 
 ## Next Bottleneck
 
-The next intervention should target `delay_to_final_query` directly. The model is
-now willing to delay and can solve trigger-timed retrieval, but it still fails
-to preserve or decode the payload across the longest query distances.
-
+The next intervention should target a durable `needs_final_query` signal. The
+model is now willing to delay and can solve trigger-timed retrieval, but on the
+final-query mode it still behaves like a generic trigger-timed policy and exits
+around the average trigger distance instead of persisting to the end.

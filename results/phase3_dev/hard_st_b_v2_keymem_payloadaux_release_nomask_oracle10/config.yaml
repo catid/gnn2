@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_keymem_payloadaux_release_nomask.yaml
+
+experiment:
+  seed: 710
+  results_root: results/phase3_dev
+
+routing:
+  exit_mask_final_query_only: false
+  exit_mask_trigger_exit_until_trigger: false
+  oracle_route_weight: 1.0
+  delay_write_weight: 0.5
+  memory_payload_weight: 0.75
