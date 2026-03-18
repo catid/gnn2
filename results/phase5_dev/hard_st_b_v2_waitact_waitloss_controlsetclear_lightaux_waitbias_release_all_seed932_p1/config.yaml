@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss_controlsetclear_lightaux_waitbias.yaml
+
+experiment:
+  seed: 932
+
+model:
+  release_scale: 2.0
+
+routing:
+  wait_target_scope: oracle_all
+  release_loss_weight: 0.5
+  release_target_scope: oracle_all
+  release_positive_weight: 8.0

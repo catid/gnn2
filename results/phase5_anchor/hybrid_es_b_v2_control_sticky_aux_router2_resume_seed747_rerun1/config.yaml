@@ -1,0 +1,4 @@
+_base_: ./hybrid_es_benchmark_b_v2_control_sticky_aux_router2_resume_main.yaml
+
+experiment:
+  seed: 747

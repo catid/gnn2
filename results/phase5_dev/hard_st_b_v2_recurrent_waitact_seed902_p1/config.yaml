@@ -1,0 +1,14 @@
+_base_: ./hard_st_benchmark_b_v2_phase5_base.yaml
+
+experiment:
+  seed: 902
+
+model:
+  routing_head_mode: recurrent_wait_act
+  control_state_dim: 0
+  wait_state_dim: 8
+  wait_state_input_scale: 0.5
+
+routing:
+  control_state_weight: 0.0
+  anti_exit_weight: 0.0

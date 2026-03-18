@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss_controlsetclear_lightaux_waitbias_releasegate_finalquery_neg8.yaml
+
+experiment:
+  seed: 952
+
+benchmark:
+  mode_probs: [0.0, 0.0, 1.0]

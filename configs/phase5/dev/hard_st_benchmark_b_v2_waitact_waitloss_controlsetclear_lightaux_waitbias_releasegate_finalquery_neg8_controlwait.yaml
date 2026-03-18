@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss_controlsetclear_lightaux_waitbias_releasegate_finalquery_neg8.yaml
+
+experiment:
+  seed: 943
+
+routing:
+  control_target_scope: final_query_wait_only
+  control_state_weight: 0.5

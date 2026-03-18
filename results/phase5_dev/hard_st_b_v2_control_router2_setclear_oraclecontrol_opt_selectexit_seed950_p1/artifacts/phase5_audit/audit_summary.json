@@ -1,0 +1,81 @@
+{
+  "checkpoint": "results/phase5_dev/hard_st_b_v2_control_router2_setclear_oraclecontrol_opt_selectexit_seed950_p1/hard_st_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.24837450683116913,
+    "count": 769,
+    "exit_time": 41.997398376464844,
+    "mean_exit_minus_query": -85.00260162353516,
+    "needs_probe_control_state": 0.7413724660873413,
+    "needs_probe_memory_read_state": 0.7413724660873413,
+    "needs_probe_packet_state": 0.741232693195343,
+    "premature_exit_rate": 0.9960988163948059,
+    "release_probe_release_prob": null,
+    "route_match": 0.0039011703338474035,
+    "wait_probe_wait_prob": null
+  },
+  "needs_probe_summary": {
+    "control_prob": {
+      "accuracy": 0.7413724660873413,
+      "bce": 0.5682743191719055
+    },
+    "control_state": {
+      "accuracy": 0.7413724660873413,
+      "bce": 0.5391791462898254
+    },
+    "memory_read_state": {
+      "accuracy": 0.7413724660873413,
+      "bce": 0.4765850603580475
+    },
+    "packet_state": {
+      "accuracy": 0.741232693195343,
+      "bce": 0.48060256242752075
+    },
+    "router_logits": {
+      "accuracy": 0.7557730674743652,
+      "bce": 0.5447955131530762
+    },
+    "router_probs": {
+      "accuracy": 0.7555866241455078,
+      "bce": 0.5577399730682373
+    }
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.24837450683116913,
+      "compute": 43.68790817260742,
+      "control_prob_mean": 0.8518954515457153,
+      "count": 769,
+      "delay_rate": 0.9396158456802368,
+      "early_exit_rate": 0.0013003901112824678,
+      "exit_time": 41.997398376464844,
+      "premature_exit_rate": 0.9960988163948059,
+      "route_match": 0.0039011703338474035
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 0.6992481350898743,
+      "compute": 27.6365909576416,
+      "control_prob_mean": 0.8513588309288025,
+      "count": 399,
+      "delay_rate": 0.9164708852767944,
+      "early_exit_rate": 0.002506265649572015,
+      "exit_time": 26.35589027404785,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.621553897857666
+    },
+    "easy_exit": {
+      "accuracy": 0.989130437374115,
+      "compute": 1.45923912525177,
+      "control_prob_mean": 0.8347352147102356,
+      "count": 368,
+      "delay_rate": 0.010525614023208618,
+      "early_exit_rate": 0.989130437374115,
+      "exit_time": 0.45652174949645996,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.989130437374115
+    }
+  },
+  "release_probe_summary": {},
+  "run_dir": "results/phase5_dev/hard_st_b_v2_control_router2_setclear_oraclecontrol_opt_selectexit_seed950_p1",
+  "split": "confirm",
+  "wait_probe_summary": {}
+}

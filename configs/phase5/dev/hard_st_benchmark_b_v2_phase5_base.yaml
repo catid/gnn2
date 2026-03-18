@@ -1,0 +1,12 @@
+_base_: ../../phase4/dev/hard_st_benchmark_b_v2_control_sticky_aux.yaml
+
+experiment:
+  seed: 900
+  results_root: results/phase5_dev
+
+training:
+  train_steps: 640
+  val_every: 20
+  val_batches: 10
+  test_batches: 16
+  selection_metric: per_mode.delay_to_final_query.accuracy

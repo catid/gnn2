@@ -73,6 +73,7 @@ class SyntheticBenchmark:
         self.train_seed = int(config.get("train_seed", 11))
         self.val_seed = int(config.get("val_seed", 101))
         self.test_seed = int(config.get("test_seed", 1001))
+        self.confirm_seed = int(config.get("confirm_seed", self.test_seed + 10000))
         self.noise_std = float(config.get("noise_std", 0.05))
         self.mode_names: dict[int, str] = {}
 
@@ -88,6 +89,7 @@ class SyntheticBenchmark:
             "train": self.train_seed,
             "val": self.val_seed,
             "test": self.test_seed,
+            "confirm": self.confirm_seed,
         }[split]
         generator.manual_seed(base_seed + step)
         batch = self._sample(batch_size=batch_size, generator=generator)

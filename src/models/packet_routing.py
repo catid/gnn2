@@ -52,11 +52,13 @@ class NodeCore(nn.Module):
         packet_update: str = "residual",
         delay_state_mode: str = "updated",
         delay_gate_bias: float = 2.0,
+        routing_head_mode: str = "flat",
     ):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.packet_update = packet_update
         self.delay_state_mode = delay_state_mode
+        self.routing_head_mode = routing_head_mode
         self.obs_proj = nn.Linear(obs_dim, hidden_dim)
         self.meta_proj = nn.Linear(4, hidden_dim)
         self.node_embed = nn.Embedding(num_nodes, hidden_dim)
@@ -88,7 +90,14 @@ class NodeCore(nn.Module):
             nn.Linear(hidden_dim * 4, hidden_dim),
             nn.GELU(),
         )
-        self.router_out = nn.Linear(hidden_dim, 3)
+        if self.routing_head_mode == "flat":
+            self.router_out = nn.Linear(hidden_dim, 3)
+            self.router_act_out = None
+            self.router_wait_out = None
+        else:
+            self.router_out = None
+            self.router_act_out = nn.Linear(hidden_dim, 2)
+            self.router_wait_out = nn.Linear(hidden_dim, 1)
         self.delay_gate = nn.Sequential(
             nn.LayerNorm(hidden_dim * 4),
             nn.Linear(hidden_dim * 4, hidden_dim),
@@ -107,7 +116,7 @@ class NodeCore(nn.Module):
         age_fraction: torch.Tensor,
         time_fraction: torch.Tensor,
         remaining_fraction: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor | None, dict[str, torch.Tensor]]:
         obs_features = self.obs_proj(observations)
         node_features = self.node_embed(node_index)
         meta = torch.stack(
@@ -151,11 +160,22 @@ class NodeCore(nn.Module):
             packet_next = packet_state + packet_proposal
 
         router_hidden = self.router_mlp(packet_features)
-        logits = self.router_out(router_hidden)
+        if self.routing_head_mode == "flat":
+            logits = self.router_out(router_hidden)
+            act_logits = None
+            wait_logit = None
+        else:
+            logits = None
+            act_logits = self.router_act_out(router_hidden)
+            wait_logit = self.router_wait_out(router_hidden)
         delay_retain = None
         if self.delay_state_mode == "adaptive_blend":
             delay_retain = self.delay_gate(packet_features)
-        return node_state_next, packet_next, logits, delay_retain
+        return node_state_next, packet_next, logits, delay_retain, {
+            "router_hidden": router_hidden,
+            "act_logits": act_logits,
+            "wait_logit": wait_logit,
+        }
 
 
 class PacketRoutingModel(nn.Module):
@@ -172,6 +192,7 @@ class PacketRoutingModel(nn.Module):
         self.packet_update = str(config.get("packet_update", "residual"))
         self.delay_state_mode = str(config.get("delay_state_mode", "updated"))
         self.delay_gate_bias = float(config.get("delay_gate_bias", 2.0))
+        self.routing_head_mode = str(config.get("routing_head_mode", "flat"))
         self.packet_memory_slots = int(config.get("packet_memory_slots", 0))
         self.packet_memory_dim = int(config.get("packet_memory_dim", self.hidden_dim))
         self.packet_memory_read_bias = float(config.get("packet_memory_read_bias", 1.0))
@@ -180,8 +201,14 @@ class PacketRoutingModel(nn.Module):
         self.control_state_mode = str(config.get("control_state_mode", "sticky"))
         self.control_input_scale = float(config.get("control_input_scale", 1.0))
         self.control_router_scale = float(config.get("control_router_scale", 1.0))
+        self.control_wait_scale = float(config.get("control_wait_scale", 0.0))
         self.control_write_bias = float(config.get("control_write_bias", -3.0))
         self.control_clear_bias = float(config.get("control_clear_bias", -3.0))
+        self.wait_state_dim = int(config.get("wait_state_dim", 0))
+        self.wait_state_input_scale = float(config.get("wait_state_input_scale", 0.0))
+        self.release_scale = float(config.get("release_scale", 0.0))
+        self.release_gate_mode = str(config.get("release_gate_mode", "bias"))
+        self.release_gate_scale = float(config.get("release_gate_scale", 1.0))
         self.core = NodeCore(
             obs_dim=self.obs_dim,
             hidden_dim=self.hidden_dim,
@@ -190,6 +217,7 @@ class PacketRoutingModel(nn.Module):
             packet_update=self.packet_update,
             delay_state_mode=self.delay_state_mode,
             delay_gate_bias=self.delay_gate_bias,
+            routing_head_mode=self.routing_head_mode,
         )
         if self.packet_memory_slots > 0:
             memory_feature_dim = self.hidden_dim * 2 + self.obs_dim
@@ -242,6 +270,7 @@ class PacketRoutingModel(nn.Module):
                 self.control_clear_gate = None
             self.control_input_proj = nn.Linear(self.control_state_dim, self.hidden_dim)
             self.control_router_out = nn.Linear(self.control_state_dim, 3, bias=False)
+            self.control_wait_out = nn.Linear(self.control_state_dim, 1, bias=False)
             self.control_head = nn.Sequential(
                 nn.LayerNorm(self.control_state_dim),
                 nn.Linear(self.control_state_dim, 1),
@@ -252,7 +281,34 @@ class PacketRoutingModel(nn.Module):
             self.control_clear_gate = None
             self.control_input_proj = None
             self.control_router_out = None
+            self.control_wait_out = None
             self.control_head = None
+        if self.wait_state_dim > 0:
+            wait_feature_dim = self.hidden_dim * 2 + self.obs_dim
+            self.wait_update_mlp = nn.Sequential(
+                nn.LayerNorm(wait_feature_dim),
+                nn.Linear(wait_feature_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            self.wait_state_cell = nn.GRUCell(self.hidden_dim, self.wait_state_dim)
+            self.wait_head = nn.Sequential(
+                nn.LayerNorm(self.wait_state_dim),
+                nn.Linear(self.wait_state_dim, 1),
+            )
+            self.wait_input_proj = nn.Linear(self.wait_state_dim, self.hidden_dim)
+        else:
+            self.wait_update_mlp = None
+            self.wait_state_cell = None
+            self.wait_head = None
+            self.wait_input_proj = None
+        release_input_dim = self.hidden_dim + self.control_state_dim + self.wait_state_dim
+        if self.release_scale != 0.0 or self.release_gate_mode != "bias":
+            self.release_head = nn.Sequential(
+                nn.LayerNorm(release_input_dim),
+                nn.Linear(release_input_dim, 1),
+            )
+        else:
+            self.release_head = None
         self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.readout = nn.Sequential(
             nn.LayerNorm(self.hidden_dim),
@@ -263,6 +319,19 @@ class PacketRoutingModel(nn.Module):
         allowed = [
             "core.router_mlp",
             "core.router_out",
+            "core.router_act_out",
+            "core.router_wait_out",
+            "control_update_mlp",
+            "control_set_gate",
+            "control_clear_gate",
+            "control_router_out",
+            "control_wait_out",
+            "control_head",
+            "wait_update_mlp",
+            "wait_state_cell",
+            "wait_head",
+            "wait_input_proj",
+            "release_head",
         ]
         if include_adapters:
             allowed.append("core.packet_adapter")
@@ -299,6 +368,15 @@ class PacketRoutingModel(nn.Module):
         control_weight: float = 0.0,
         anti_exit_mask: torch.Tensor | None = None,
         anti_exit_weight: float = 0.0,
+        wait_targets: torch.Tensor | None = None,
+        wait_mask: torch.Tensor | None = None,
+        wait_weight: float = 0.0,
+        wait_positive_weight: float = 1.0,
+        wait_negative_weight: float = 1.0,
+        release_targets: torch.Tensor | None = None,
+        release_mask: torch.Tensor | None = None,
+        release_weight: float = 0.0,
+        release_positive_weight: float = 1.0,
         return_trace: bool = False,
     ) -> RoutingForwardOutput:
         batch_size, seq_len, num_nodes, _ = observations.shape
@@ -329,6 +407,13 @@ class PacketRoutingModel(nn.Module):
             batch_size,
             self.num_nodes,
             self.control_state_dim,
+            device=device,
+            dtype=dtype,
+        )
+        wait_state = torch.zeros(
+            batch_size,
+            self.num_nodes,
+            self.wait_state_dim,
             device=device,
             dtype=dtype,
         )
@@ -372,6 +457,9 @@ class PacketRoutingModel(nn.Module):
         control_set_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         control_clear_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         control_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        wait_state_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        wait_state_weight = torch.zeros(batch_size, device=device, dtype=dtype)
+        wait_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
 
         oracle_route_loss = torch.zeros((), device=device, dtype=dtype)
         oracle_weight_total = torch.zeros((), device=device, dtype=dtype)
@@ -383,6 +471,12 @@ class PacketRoutingModel(nn.Module):
         control_total = torch.zeros((), device=device, dtype=dtype)
         anti_exit_loss = torch.zeros((), device=device, dtype=dtype)
         anti_exit_total = torch.zeros((), device=device, dtype=dtype)
+        wait_loss = torch.zeros((), device=device, dtype=dtype)
+        wait_total = torch.zeros((), device=device, dtype=dtype)
+        release_loss = torch.zeros((), device=device, dtype=dtype)
+        release_total = torch.zeros((), device=device, dtype=dtype)
+        release_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+        release_prob_weight = torch.zeros(batch_size, device=device, dtype=dtype)
 
         trace: dict[str, torch.Tensor] | None = None
         if return_trace:
@@ -431,6 +525,18 @@ class PacketRoutingModel(nn.Module):
                     dtype=dtype,
                 )
                 trace["control_prob"] = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+            if self.wait_state_dim > 0:
+                trace["wait_state"] = torch.zeros(
+                    batch_size,
+                    seq_len,
+                    self.wait_state_dim,
+                    device=device,
+                    dtype=dtype,
+                )
+            if self.routing_head_mode != "flat" or self.wait_state_dim > 0:
+                trace["wait_prob"] = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+            if self.release_head is not None:
+                trace["release_prob"] = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
 
         for time_index in range(seq_len):
             obs_t = observations[:, time_index]
@@ -439,6 +545,7 @@ class PacketRoutingModel(nn.Module):
             carry_age_sum = torch.zeros_like(packet_ages)
             carry_memory_sum = torch.zeros_like(packet_memory)
             carry_control_sum = torch.zeros_like(control_state)
+            carry_wait_sum = torch.zeros_like(wait_state)
 
             if trace is not None:
                 time_active_mass = torch.zeros(batch_size, device=device, dtype=dtype)
@@ -479,6 +586,17 @@ class PacketRoutingModel(nn.Module):
                         dtype=dtype,
                     )
                     time_control_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+                if self.wait_state_dim > 0:
+                    time_wait_state_sum = torch.zeros(
+                        batch_size,
+                        self.wait_state_dim,
+                        device=device,
+                        dtype=dtype,
+                    )
+                if self.routing_head_mode != "flat" or self.wait_state_dim > 0:
+                    time_wait_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
+                if self.release_head is not None:
+                    time_release_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
 
             for _ in range(self.max_internal_steps):
                 mass = packet_masses
@@ -533,6 +651,10 @@ class PacketRoutingModel(nn.Module):
                     packet_core_input = packet_core_input + (
                         self.control_input_scale * self.control_input_proj(control_state)
                     )
+                if self.wait_state_dim > 0 and self.wait_input_proj is not None:
+                    packet_core_input = packet_core_input + (
+                        self.wait_state_input_scale * self.wait_input_proj(wait_state)
+                    )
 
                 if trace is not None:
                     time_active_mass = time_active_mass + active_mass
@@ -557,6 +679,10 @@ class PacketRoutingModel(nn.Module):
                         control_logits_live = self.control_head(control_state.float()).squeeze(-1).to(dtype)
                         control_prob_live = torch.sigmoid(control_logits_live)
                         time_control_prob_sum = time_control_prob_sum + (control_prob_live * mass).sum(dim=1)
+                    if self.wait_state_dim > 0:
+                        time_wait_state_sum = time_wait_state_sum + (
+                            wait_state * mass.unsqueeze(-1)
+                        ).sum(dim=1)
 
                 core_output = self.core(
                     packet_state=packet_core_input,
@@ -567,11 +693,17 @@ class PacketRoutingModel(nn.Module):
                     time_fraction=time_fraction,
                     remaining_fraction=remaining_fraction,
                 )
-                if len(core_output) == 3:
+                if len(core_output) == 5:
+                    node_state_next, packet_next, logits, delay_retain, router_aux = core_output
+                elif len(core_output) == 4:
+                    node_state_next, packet_next, logits, delay_retain = core_output
+                    router_aux = {"act_logits": None, "wait_logit": None}
+                elif len(core_output) == 3:
                     node_state_next, packet_next, logits = core_output
                     delay_retain = None
+                    router_aux = {"act_logits": None, "wait_logit": None}
                 else:
-                    node_state_next, packet_next, logits, delay_retain = core_output
+                    raise ValueError(f"Unexpected core output size: {len(core_output)}")
 
                 if self.packet_memory_slots > 0:
                     updated_memory, memory_write_gate, memory_write_weights = self._write_packet_memory(
@@ -621,11 +753,82 @@ class PacketRoutingModel(nn.Module):
                         control_loss = control_loss + (per_node_bce * weight).sum()
                         control_total = control_total + weight.sum()
 
-                masked_logits = logits
-                if self.control_state_dim > 0 and self.control_router_out is not None:
-                    masked_logits = masked_logits + (
-                        self.control_router_scale * self.control_router_out(control_state)
+                updated_wait = wait_state
+                if self.wait_state_dim > 0:
+                    updated_wait = self._update_wait_state(
+                        wait_state=wait_state,
+                        packet_state=packet_next,
+                        node_state=node_state_next,
+                        observations=obs_t,
                     )
+                    wait_state_mean = updated_wait.mean(dim=-1)
+                    wait_state_sum = wait_state_sum + (wait_state_mean * mass).sum(dim=1)
+                    wait_state_weight = wait_state_weight + active_mass
+
+                wait_logit = self._select_wait_logit(
+                    core_wait_logit=router_aux.get("wait_logit"),
+                    updated_control=updated_control,
+                    updated_wait=updated_wait,
+                    router_hidden=router_aux.get("router_hidden"),
+                )
+                release_logit = self._compute_release_logit(
+                    router_hidden=router_aux.get("router_hidden"),
+                    updated_control=updated_control,
+                    updated_wait=updated_wait,
+                )
+                if release_logit is not None:
+                    release_probs = torch.sigmoid(release_logit.float()).to(dtype).squeeze(-1)
+                    release_prob_sum = release_prob_sum + (release_probs * mass).sum(dim=1)
+                    release_prob_weight = release_prob_weight + active_mass
+                    if trace is not None:
+                        time_release_prob_sum = time_release_prob_sum + (release_probs * mass).sum(dim=1)
+                    if (
+                        release_targets is not None
+                        and release_mask is not None
+                        and release_weight > 0.0
+                    ):
+                        target = release_targets[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                        target_mask = release_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                        positive_scale = torch.where(
+                            target > 0.5,
+                            torch.full_like(target, float(release_positive_weight)),
+                            torch.ones_like(target),
+                        )
+                        per_node_bce = F.binary_cross_entropy_with_logits(
+                            release_logit.float().squeeze(-1),
+                            target.float(),
+                            reduction="none",
+                        ).to(dtype)
+                        weight = target_mask * mass * positive_scale
+                        release_loss = release_loss + (per_node_bce * weight).sum()
+                        release_total = release_total + weight.sum()
+                if wait_logit is not None:
+                    wait_probs = torch.sigmoid(wait_logit.float()).to(dtype).squeeze(-1)
+                    wait_prob_sum = wait_prob_sum + (wait_probs * mass).sum(dim=1)
+                    if wait_targets is not None and wait_mask is not None and wait_weight > 0.0:
+                        target = wait_targets[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                        target_mask = wait_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                        class_scale = torch.where(
+                            target > 0.5,
+                            torch.full_like(target, float(wait_positive_weight)),
+                            torch.full_like(target, float(wait_negative_weight)),
+                        )
+                        per_node_bce = F.binary_cross_entropy_with_logits(
+                            wait_logit.float().squeeze(-1),
+                            target.float(),
+                            reduction="none",
+                        ).to(dtype)
+                        weight = target_mask * mass * class_scale
+                        wait_loss = wait_loss + (per_node_bce * weight).sum()
+                        wait_total = wait_total + weight.sum()
+
+                masked_logits = self._compose_routing_logits(
+                    flat_logits=logits,
+                    act_logits=router_aux.get("act_logits"),
+                    wait_logit=wait_logit,
+                    release_logit=release_logit,
+                    control_state=control_state,
+                )
                 if action_masks is not None:
                     masked_logits = self._apply_action_mask(masked_logits, action_masks[:, time_index])
 
@@ -640,6 +843,10 @@ class PacketRoutingModel(nn.Module):
                     time_router_mass = time_router_mass + active_mass
                     time_router_logits_sum = time_router_logits_sum + (masked_logits * mass.unsqueeze(-1)).sum(dim=1)
                     time_router_probs_sum = time_router_probs_sum + (router_probs * mass.unsqueeze(-1)).sum(dim=1)
+                    if wait_logit is not None:
+                        time_wait_prob_sum = time_wait_prob_sum + (
+                            torch.sigmoid(wait_logit.float()).to(dtype).squeeze(-1) * mass
+                        ).sum(dim=1)
                     if self.packet_memory_slots > 0 and memory_write_gate is not None and memory_write_weights is not None:
                         time_memory_write_gate_sum = time_memory_write_gate_sum + (
                             memory_write_gate.squeeze(-1) * mass
@@ -690,10 +897,10 @@ class PacketRoutingModel(nn.Module):
                         delay_write_loss = delay_write_loss + (per_node_bce * weight).sum()
                         delay_write_total = delay_write_total + weight.sum()
                 if anti_exit_mask is not None and anti_exit_weight > 0.0:
-                    wait_mask = anti_exit_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
+                    anti_exit_step_mask = anti_exit_mask[:, time_index].unsqueeze(1).expand(-1, self.num_nodes)
                     exit_prob = router_probs[..., ACTION_EXIT].float().clamp_max(1.0 - 1e-6)
                     penalty = -torch.log1p(-exit_prob)
-                    weight = (wait_mask * mass).float()
+                    weight = (anti_exit_step_mask * mass).float()
                     anti_exit_loss = anti_exit_loss + (penalty.to(dtype) * weight.to(dtype)).sum()
                     anti_exit_total = anti_exit_total + weight.sum().to(dtype)
 
@@ -772,6 +979,7 @@ class PacketRoutingModel(nn.Module):
                 carry_age_sum = carry_age_sum + delay_mass.unsqueeze(-1) * next_age
                 carry_memory_sum = carry_memory_sum + delay_mass.unsqueeze(-1).unsqueeze(-1) * updated_memory
                 carry_control_sum = carry_control_sum + delay_mass.unsqueeze(-1) * updated_control
+                carry_wait_sum = carry_wait_sum + delay_mass.unsqueeze(-1) * updated_wait
                 if delay_retain is not None:
                     delay_retain_sum = delay_retain_sum + (delay_retain.squeeze(-1) * delay_mass).sum(dim=1)
                     delay_retain_weight = delay_retain_weight + delay_mass.sum(dim=1)
@@ -781,6 +989,7 @@ class PacketRoutingModel(nn.Module):
                 next_age_sum = torch.zeros_like(packet_ages)
                 next_memory_sum = torch.zeros_like(packet_memory)
                 next_control_sum = torch.zeros_like(control_state)
+                next_wait_sum = torch.zeros_like(wait_state)
                 if self.num_nodes > 1:
                     next_mass[:, 1:] = next_mass[:, 1:] + forward_mass[:, :-1]
                     next_state_sum[:, 1:, :] = next_state_sum[:, 1:, :] + weighted_packet[:, :-1, :] * actions[:, :-1, ACTION_FORWARD].unsqueeze(-1)
@@ -791,6 +1000,9 @@ class PacketRoutingModel(nn.Module):
                     )
                     next_control_sum[:, 1:, :] = next_control_sum[:, 1:, :] + (
                         updated_control[:, :-1, :] * forward_mass[:, :-1].unsqueeze(-1)
+                    )
+                    next_wait_sum[:, 1:, :] = next_wait_sum[:, 1:, :] + (
+                        updated_wait[:, :-1, :] * forward_mass[:, :-1].unsqueeze(-1)
                     )
 
                 terminal_forward_mass = forward_mass[:, -1]
@@ -813,6 +1025,7 @@ class PacketRoutingModel(nn.Module):
                 packet_ages = self._normalize_state(next_age_sum, next_mass, eps)
                 packet_memory = self._normalize_weighted(next_memory_sum, next_mass, eps)
                 control_state = self._normalize_weighted(next_control_sum, next_mass, eps)
+                wait_state = self._normalize_weighted(next_wait_sum, next_mass, eps)
 
             forced_delay = packet_masses
             if float(forced_delay.max().detach().cpu()) > 0.0:
@@ -822,12 +1035,14 @@ class PacketRoutingModel(nn.Module):
                 carry_age_sum = carry_age_sum + forced_delay.unsqueeze(-1) * (packet_ages + 1.0)
                 carry_memory_sum = carry_memory_sum + forced_delay.unsqueeze(-1).unsqueeze(-1) * packet_memory
                 carry_control_sum = carry_control_sum + forced_delay.unsqueeze(-1) * control_state
+                carry_wait_sum = carry_wait_sum + forced_delay.unsqueeze(-1) * wait_state
 
             packet_masses = carry_mass
             packet_states = self._normalize_state(carry_state_sum, carry_mass, eps)
             packet_ages = self._normalize_state(carry_age_sum, carry_mass, eps)
             packet_memory = self._normalize_weighted(carry_memory_sum, carry_mass, eps)
             control_state = self._normalize_weighted(carry_control_sum, carry_mass, eps)
+            wait_state = self._normalize_weighted(carry_wait_sum, carry_mass, eps)
             mailbox_load = carry_mass.sum(dim=1)
             mailbox_mass_sum = mailbox_mass_sum + mailbox_load
             mailbox_peak = torch.maximum(mailbox_peak, mailbox_load)
@@ -853,6 +1068,12 @@ class PacketRoutingModel(nn.Module):
                 if self.control_state_dim > 0:
                     trace["control_state"][:, time_index, :] = time_control_state_sum / time_active_mass.clamp_min(float(eps)).unsqueeze(-1)
                     trace["control_prob"][:, time_index] = time_control_prob_sum / time_active_mass.clamp_min(float(eps))
+                if self.wait_state_dim > 0:
+                    trace["wait_state"][:, time_index, :] = time_wait_state_sum / time_active_mass.clamp_min(float(eps)).unsqueeze(-1)
+                if "wait_prob" in trace:
+                    trace["wait_prob"][:, time_index] = time_wait_prob_sum / time_active_mass.clamp_min(float(eps))
+                if "release_prob" in trace:
+                    trace["release_prob"][:, time_index] = time_release_prob_sum / time_active_mass.clamp_min(float(eps))
 
             if truncate_bptt_steps > 0 and (time_index + 1) % truncate_bptt_steps == 0:
                 node_states = node_states.detach()
@@ -861,6 +1082,7 @@ class PacketRoutingModel(nn.Module):
                 packet_ages = packet_ages.detach()
                 packet_memory = packet_memory.detach()
                 control_state = control_state.detach()
+                wait_state = wait_state.detach()
                 sink_state = sink_state.detach()
 
         residual_mass = packet_masses.sum(dim=1)
@@ -901,7 +1123,13 @@ class PacketRoutingModel(nn.Module):
         anti_exit_term = torch.zeros((), device=device, dtype=dtype)
         if anti_exit_weight > 0.0 and float(anti_exit_total.detach().cpu()) > 0.0:
             anti_exit_term = anti_exit_weight * (anti_exit_loss / anti_exit_total.clamp_min(float(eps)))
-        total_loss = task_loss + route_penalty + oracle_route_term + delay_write_term + memory_payload_term + control_term + anti_exit_term
+        wait_term = torch.zeros((), device=device, dtype=dtype)
+        if wait_weight > 0.0 and float(wait_total.detach().cpu()) > 0.0:
+            wait_term = wait_weight * (wait_loss / wait_total.clamp_min(float(eps)))
+        release_term = torch.zeros((), device=device, dtype=dtype)
+        if release_weight > 0.0 and float(release_total.detach().cpu()) > 0.0:
+            release_term = release_weight * (release_loss / release_total.clamp_min(float(eps)))
+        total_loss = task_loss + route_penalty + oracle_route_term + delay_write_term + memory_payload_term + control_term + anti_exit_term + wait_term + release_term
 
         predictions = logits.argmax(dim=-1)
         accuracy = (predictions == labels).float()
@@ -952,6 +1180,9 @@ class PacketRoutingModel(nn.Module):
             "control_set_mean": control_set_sum / control_state_weight.clamp_min(float(eps)),
             "control_clear_mean": control_clear_sum / control_state_weight.clamp_min(float(eps)),
             "control_prob_mean": control_prob_sum / control_state_weight.clamp_min(float(eps)),
+            "wait_state_mean": wait_state_sum / wait_state_weight.clamp_min(float(eps)),
+            "wait_prob_mean": wait_prob_sum / route_weight_total.clamp_min(float(eps)),
+            "release_prob_mean": release_prob_sum / release_prob_weight.clamp_min(float(eps)),
             "penalty_hops": torch.full_like(accuracy, float(penalty_hops.detach().item())),
             "penalty_delays": torch.full_like(accuracy, float(penalty_delays.detach().item())),
             "penalty_ttl": torch.full_like(accuracy, float(penalty_ttl.detach().item())),
@@ -960,6 +1191,8 @@ class PacketRoutingModel(nn.Module):
             "memory_payload_loss": torch.full_like(accuracy, float(memory_payload_term.detach().item())),
             "control_loss": torch.full_like(accuracy, float(control_term.detach().item())),
             "anti_exit_loss": torch.full_like(accuracy, float(anti_exit_term.detach().item())),
+            "wait_loss": torch.full_like(accuracy, float(wait_term.detach().item())),
+            "release_loss": torch.full_like(accuracy, float(release_term.detach().item())),
         }
         for src_index, src_name in ACTION_NAMES.items():
             for dst_index, dst_name in ACTION_NAMES.items():
@@ -969,7 +1202,7 @@ class PacketRoutingModel(nn.Module):
             logits=logits,
             sink_state=sink_state,
             loss=total_loss,
-            route_loss=route_penalty + oracle_route_term + delay_write_term + memory_payload_term + control_term + anti_exit_term,
+            route_loss=route_penalty + oracle_route_term + delay_write_term + memory_payload_term + control_term + anti_exit_term + wait_term + release_term,
             task_loss=task_loss,
             stats=stats,
             trace=trace,
@@ -1068,6 +1301,124 @@ class PacketRoutingModel(nn.Module):
             return updated_control.clamp_(0.0, 1.0), control_set, control_clear
         updated_control = control_state + (1.0 - control_state) * control_set
         return updated_control.clamp_(0.0, 1.0), control_set, None
+
+    def _update_wait_state(
+        self,
+        wait_state: torch.Tensor,
+        packet_state: torch.Tensor,
+        node_state: torch.Tensor,
+        observations: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.wait_state_dim <= 0 or self.wait_update_mlp is None or self.wait_state_cell is None:
+            raise ValueError("Wait state is disabled.")
+        wait_features = torch.cat([packet_state, node_state, observations], dim=-1)
+        wait_hidden = self.wait_update_mlp(wait_features)
+        batch_shape = wait_state.shape[:-1]
+        return self.wait_state_cell(
+            wait_hidden.reshape(-1, self.hidden_dim),
+            wait_state.reshape(-1, self.wait_state_dim),
+        ).reshape(*batch_shape, self.wait_state_dim)
+
+    def _select_wait_logit(
+        self,
+        *,
+        core_wait_logit: torch.Tensor | None,
+        updated_control: torch.Tensor,
+        updated_wait: torch.Tensor,
+        router_hidden: torch.Tensor | None,
+    ) -> torch.Tensor | None:
+        if self.routing_head_mode == "flat":
+            return None
+        if self.routing_head_mode == "control_wait_act":
+            if self.control_head is None:
+                raise ValueError("control_wait_act requires control_state_dim > 0.")
+            return self.control_head(updated_control.float()).to(updated_control.dtype)
+        if self.routing_head_mode == "recurrent_wait_act":
+            if self.wait_head is None:
+                raise ValueError("recurrent_wait_act requires wait_state_dim > 0.")
+            return self.wait_head(updated_wait.float()).to(updated_wait.dtype)
+        if core_wait_logit is None:
+            raise ValueError(f"{self.routing_head_mode} requires core wait logits.")
+        wait_logit = core_wait_logit
+        if (
+            self.control_state_dim > 0
+            and self.control_wait_out is not None
+            and self.control_wait_scale != 0.0
+        ):
+            wait_logit = wait_logit + (
+                self.control_wait_scale * self.control_wait_out(updated_control.float()).to(updated_control.dtype)
+            )
+        release_logit = self._compute_release_logit(
+            router_hidden=router_hidden,
+            updated_control=updated_control,
+            updated_wait=updated_wait,
+        )
+        if (
+            release_logit is not None
+            and self.release_scale != 0.0
+            and self.release_gate_mode == "bias"
+        ):
+            wait_logit = wait_logit - (
+                self.release_scale * release_logit.to(wait_logit.dtype)
+            )
+        return wait_logit
+
+    def _compute_release_logit(
+        self,
+        *,
+        router_hidden: torch.Tensor | None,
+        updated_control: torch.Tensor,
+        updated_wait: torch.Tensor,
+    ) -> torch.Tensor | None:
+        if self.release_head is None or router_hidden is None:
+            return None
+        release_inputs = [router_hidden]
+        if self.control_state_dim > 0:
+            release_inputs.append(updated_control)
+        if self.wait_state_dim > 0:
+            release_inputs.append(updated_wait)
+        release_features = torch.cat(release_inputs, dim=-1)
+        return self.release_head(release_features.float()).to(release_features.dtype)
+
+    def _compose_routing_logits(
+        self,
+        *,
+        flat_logits: torch.Tensor | None,
+        act_logits: torch.Tensor | None,
+        wait_logit: torch.Tensor | None,
+        release_logit: torch.Tensor | None,
+        control_state: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.routing_head_mode == "flat":
+            if flat_logits is None:
+                raise ValueError("Flat routing requires flat logits.")
+            masked_logits = flat_logits
+            if self.control_state_dim > 0 and self.control_router_out is not None:
+                masked_logits = masked_logits + (
+                    self.control_router_scale * self.control_router_out(control_state)
+                )
+            return masked_logits
+        if act_logits is None or wait_logit is None:
+            raise ValueError(f"{self.routing_head_mode} requires factorized act/wait logits.")
+        act_log_probs = F.log_softmax(act_logits.float(), dim=-1)
+        if self.release_gate_mode == "direct":
+            if release_logit is None:
+                raise ValueError("release_gate_mode=direct requires release_logit.")
+            gate_logit = self.release_gate_scale * release_logit.float()
+            wait_log_prob = F.logsigmoid(-gate_logit).squeeze(-1)
+            act_log_prob = F.logsigmoid(gate_logit).squeeze(-1)
+        else:
+            wait_log_prob = F.logsigmoid(wait_logit.float()).squeeze(-1)
+            act_log_prob = F.logsigmoid(-wait_logit.float()).squeeze(-1)
+        composed = torch.stack(
+            [
+                act_log_prob + act_log_probs[..., 0],
+                act_log_prob + act_log_probs[..., 1],
+                wait_log_prob,
+            ],
+            dim=-1,
+        )
+        return composed.to(act_logits.dtype)
 
     @staticmethod
     def _route_actions(

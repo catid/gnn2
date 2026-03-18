@@ -1,0 +1,77 @@
+{
+  "checkpoint": "results/phase5_dev/hard_st_b_v2_waitact_seed900_p1/hard_st_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.28318583965301514,
+    "count": 113,
+    "exit_time": 30.56637191772461,
+    "mean_exit_minus_query": -96.43363189697266,
+    "needs_probe_control_state": null,
+    "needs_probe_memory_read_state": 0.6478504538536072,
+    "needs_probe_packet_state": 0.6648598313331604,
+    "premature_exit_rate": 1.0,
+    "release_probe_release_prob": null,
+    "route_match": 0.0,
+    "wait_probe_wait_prob": null
+  },
+  "needs_probe_summary": {
+    "memory_read_state": {
+      "accuracy": 0.6478504538536072,
+      "bce": 0.645599365234375
+    },
+    "packet_state": {
+      "accuracy": 0.6648598313331604,
+      "bce": 0.636523962020874
+    },
+    "router_logits": {
+      "accuracy": 0.6684111952781677,
+      "bce": 0.6387790441513062
+    },
+    "router_probs": {
+      "accuracy": 0.6558878421783447,
+      "bce": 0.6543641686439514
+    },
+    "wait_prob": {
+      "accuracy": 0.6570093631744385,
+      "bce": 0.6542982459068298
+    }
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.28318583965301514,
+      "compute": 31.619468688964844,
+      "control_prob_mean": 0.0,
+      "count": 113,
+      "delay_rate": 0.9229700565338135,
+      "early_exit_rate": 0.017699114978313446,
+      "exit_time": 30.56637191772461,
+      "premature_exit_rate": 1.0,
+      "route_match": 0.0
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 0.8550724387168884,
+      "compute": 24.04347801208496,
+      "control_prob_mean": 0.0,
+      "count": 69,
+      "delay_rate": 0.8643619418144226,
+      "early_exit_rate": 0.043478261679410934,
+      "exit_time": 23.04347801208496,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.7536231875419617
+    },
+    "easy_exit": {
+      "accuracy": 1.0,
+      "compute": 1.9189189672470093,
+      "control_prob_mean": 0.0,
+      "count": 74,
+      "delay_rate": 0.03284651041030884,
+      "early_exit_rate": 0.9594594836235046,
+      "exit_time": 0.9054054021835327,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.9594594836235046
+    }
+  },
+  "release_probe_summary": {},
+  "run_dir": "results/phase5_dev/hard_st_b_v2_waitact_seed900_p1",
+  "split": "test",
+  "wait_probe_summary": {}
+}

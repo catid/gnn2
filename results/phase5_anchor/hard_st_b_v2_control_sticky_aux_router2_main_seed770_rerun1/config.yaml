@@ -1,0 +1,11 @@
+_base_: ../../phase4/dev/hard_st_benchmark_b_v2_control_sticky_aux_router2.yaml
+
+experiment:
+  seed: 770
+  results_root: results/phase4_main
+
+training:
+  train_steps: 840
+  val_every: 20
+  val_batches: 10
+  test_batches: 16

@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss_controlsetclear_lightaux_waitbias.yaml
+
+experiment:
+  seed: 931
+
+routing:
+  wait_target_scope: oracle_all

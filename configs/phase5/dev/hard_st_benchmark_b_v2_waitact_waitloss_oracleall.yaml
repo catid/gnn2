@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss.yaml
+
+experiment:
+  seed: 930
+
+routing:
+  wait_target_scope: oracle_all

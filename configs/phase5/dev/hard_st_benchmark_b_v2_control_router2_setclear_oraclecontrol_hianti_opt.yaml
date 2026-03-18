@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_control_router2_setclear_oraclecontrol_opt.yaml
+
+experiment:
+  seed: 949
+
+routing:
+  anti_exit_weight: 0.2

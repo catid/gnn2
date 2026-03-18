@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ def test_cli_soft_smoke_end_to_end(tmp_path: Path) -> None:
             "train_seed": 11,
             "val_seed": 101,
             "test_seed": 1001,
+            "confirm_seed": 2001,
         },
         "model": {"hidden_dim": 32, "max_internal_steps": 4, "adapter_rank": 0},
         "objective": {"task_score": "neg_ce", "lambda_hops": 0.01, "lambda_delay": 0.01, "lambda_ttl": 0.1},
@@ -35,6 +37,7 @@ def test_cli_soft_smoke_end_to_end(tmp_path: Path) -> None:
             "truncate_bptt_steps": 0,
             "val_batches": 1,
             "test_batches": 1,
+            "confirm_batches": 1,
         },
         "method": {"name": "soft", "temperature": 1.0, "estimator": "straight_through"},
         "warmstart": {"enabled": False},
@@ -52,6 +55,7 @@ def test_cli_soft_smoke_end_to_end(tmp_path: Path) -> None:
             "val_every": 1,
             "val_batches": 1,
             "test_batches": 1,
+            "confirm_batches": 1,
             "evolve_adapters": False,
         },
     }
@@ -73,5 +77,20 @@ def test_cli_soft_smoke_end_to_end(tmp_path: Path) -> None:
         cwd="/home/catid/gnn2",
     )
 
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.utils.phase5_verify",
+            "--run-dir",
+            str(results_dir),
+        ],
+        check=True,
+        cwd="/home/catid/gnn2",
+    )
+
     assert (results_dir / "summary.json").exists()
     assert (results_dir / "metrics.jsonl").exists()
+    summary = json.loads((results_dir / "summary.json").read_text())
+    assert "confirm" in summary["summary"]
+    assert (results_dir / "artifacts" / "phase5_verify" / "verification.json").exists()

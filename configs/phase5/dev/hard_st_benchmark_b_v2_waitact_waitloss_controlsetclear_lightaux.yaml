@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss_controlsetclear_opt.yaml
+
+experiment:
+  seed: 920
+
+routing:
+  oracle_route_weight: 0.05
+  delay_write_weight: 0.1
+  memory_payload_weight: 0.25
+  control_state_weight: 0.25
+  anti_exit_weight: 0.05
+  wait_loss_weight: 0.25

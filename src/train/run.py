@@ -26,7 +26,7 @@ from src.data.benchmarks import (
     LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT,
 )
 from src.es import LowRankEvolutionStrategy, standardize_fitness
-from src.models import ACTION_EXIT, PacketRoutingModel
+from src.models import ACTION_DELAY, ACTION_EXIT, PacketRoutingModel
 from src.utils.config import load_config
 
 
@@ -180,6 +180,17 @@ def current_compute_penalties(
     }
 
 
+def current_training_temperature(method_cfg: dict[str, Any], step: int) -> float:
+    default = float(method_cfg.get("temperature", 1.0))
+    start = float(method_cfg.get("temperature_start", default))
+    end = float(method_cfg.get("temperature_end", default))
+    schedule_steps = int(method_cfg.get("temperature_schedule_steps", 0))
+    if schedule_steps <= 0:
+        return end
+    frac = min(1.0, max(0.0, step / schedule_steps))
+    return start + frac * (end - start)
+
+
 def build_routing_controls(
     batch: BenchmarkBatch,
     routing_cfg: dict[str, Any] | None,
@@ -323,6 +334,92 @@ def build_control_controls(
     targets = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
     target_mask = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
     anti_exit_mask = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+    target_scope = str(routing_cfg.get("control_target_scope", "final_query_inclusive"))
+
+    trigger_times = batch.metadata["trigger_time"].long()
+    query_times = batch.metadata["query_time"].long()
+    final_query_mask = batch.metadata["needs_final_query"].long() > 0
+
+    if target_scope == "oracle_all":
+        if batch.oracle_actions is None or batch.oracle_action_mask is None:
+            return None, None, 0.0, None, 0.0
+        targets = (batch.oracle_actions == ACTION_DELAY).to(device=device, dtype=dtype)
+        target_mask = batch.oracle_action_mask.to(device=device, dtype=dtype)
+        anti_exit_mask = targets.clone()
+        return targets, target_mask, control_weight, anti_exit_mask, anti_exit_weight
+    if target_scope == "oracle_delayed_only":
+        if batch.oracle_actions is None or batch.oracle_action_mask is None:
+            return None, None, 0.0, None, 0.0
+        delayed_modes = (
+            (batch.modes == LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT)
+            | (batch.modes == LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY)
+        ).to(device=device, dtype=dtype)
+        targets = (batch.oracle_actions == ACTION_DELAY).to(device=device, dtype=dtype)
+        target_mask = batch.oracle_action_mask.to(device=device, dtype=dtype) * delayed_modes.unsqueeze(1)
+        anti_exit_mask = targets * delayed_modes.unsqueeze(1)
+        return targets, target_mask, control_weight, anti_exit_mask, anti_exit_weight
+    if target_scope not in {"final_query_inclusive", "final_query_wait_only"}:
+        raise ValueError(f"Unknown control_target_scope: {target_scope}")
+
+    for sample_index in torch.nonzero(final_query_mask, as_tuple=False).squeeze(-1).tolist():
+        trigger_time = int(trigger_times[sample_index].item())
+        query_time = int(query_times[sample_index].item())
+        trigger_time = max(0, min(trigger_time, seq_len - 1))
+        query_time = max(trigger_time, min(query_time, seq_len - 1))
+        target_stop = query_time + 1 if target_scope == "final_query_inclusive" else query_time
+        if target_stop > trigger_time:
+            targets[sample_index, trigger_time:target_stop] = 1.0
+        target_mask[sample_index, trigger_time : query_time + 1] = 1.0
+        anti_exit_mask[sample_index, trigger_time:query_time] = 1.0
+
+    return targets, target_mask, control_weight, anti_exit_mask, anti_exit_weight
+
+
+def build_wait_controls(
+    batch: BenchmarkBatch,
+    routing_cfg: dict[str, Any] | None,
+    *,
+    split: str,
+) -> tuple[torch.Tensor | None, torch.Tensor | None, float, float, float]:
+    routing_cfg = routing_cfg or {}
+    wait_weight = float(routing_cfg.get("wait_loss_weight", 0.0))
+    wait_positive_weight = float(routing_cfg.get("wait_positive_weight", 1.0))
+    wait_negative_weight = float(routing_cfg.get("wait_negative_weight", 1.0))
+    if (
+        split != "train"
+        or wait_weight <= 0.0
+        or "trigger_time" not in batch.metadata
+        or "query_time" not in batch.metadata
+        or "needs_final_query" not in batch.metadata
+    ):
+        return None, None, 0.0, 1.0, 1.0
+
+    batch_size = batch.labels.shape[0]
+    seq_len = batch.observations.shape[1]
+    device = batch.labels.device
+    dtype = batch.observations.dtype
+    targets = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+    target_mask = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
+    target_scope = str(routing_cfg.get("wait_target_scope", "final_query_only"))
+
+    if target_scope == "oracle_all":
+        if batch.oracle_actions is None or batch.oracle_action_mask is None:
+            return None, None, 0.0, 1.0, 1.0
+        targets = (batch.oracle_actions == ACTION_DELAY).to(dtype=dtype)
+        target_mask = batch.oracle_action_mask.to(device=device, dtype=dtype)
+        return targets, target_mask, wait_weight, wait_positive_weight, wait_negative_weight
+    if target_scope == "oracle_delayed_only":
+        if batch.oracle_actions is None or batch.oracle_action_mask is None:
+            return None, None, 0.0, 1.0, 1.0
+        delayed_modes = (
+            (batch.modes == LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT)
+            | (batch.modes == LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY)
+        ).to(device=device, dtype=dtype)
+        targets = (batch.oracle_actions == ACTION_DELAY).to(dtype=dtype)
+        target_mask = batch.oracle_action_mask.to(device=device, dtype=dtype) * delayed_modes.unsqueeze(1)
+        return targets, target_mask, wait_weight, wait_positive_weight, wait_negative_weight
+    if target_scope != "final_query_only":
+        raise ValueError(f"Unknown wait_target_scope: {target_scope}")
 
     trigger_times = batch.metadata["trigger_time"].long()
     query_times = batch.metadata["query_time"].long()
@@ -333,11 +430,44 @@ def build_control_controls(
         query_time = int(query_times[sample_index].item())
         trigger_time = max(0, min(trigger_time, seq_len - 1))
         query_time = max(trigger_time, min(query_time, seq_len - 1))
-        targets[sample_index, trigger_time : query_time + 1] = 1.0
+        targets[sample_index, trigger_time:query_time] = 1.0
         target_mask[sample_index, trigger_time : query_time + 1] = 1.0
-        anti_exit_mask[sample_index, trigger_time:query_time] = 1.0
 
-    return targets, target_mask, control_weight, anti_exit_mask, anti_exit_weight
+    return targets, target_mask, wait_weight, wait_positive_weight, wait_negative_weight
+
+
+def build_release_controls(
+    batch: BenchmarkBatch,
+    routing_cfg: dict[str, Any] | None,
+    *,
+    split: str,
+) -> tuple[torch.Tensor | None, torch.Tensor | None, float, float]:
+    routing_cfg = routing_cfg or {}
+    release_weight = float(routing_cfg.get("release_loss_weight", 0.0))
+    if split != "train" or release_weight <= 0.0 or batch.oracle_actions is None or batch.oracle_action_mask is None:
+        return None, None, 0.0, 1.0
+
+    dtype = batch.observations.dtype
+    device = batch.labels.device
+    target_scope = str(routing_cfg.get("release_target_scope", "oracle_all"))
+    targets = (batch.oracle_actions != ACTION_DELAY).to(device=device, dtype=dtype)
+    target_mask = batch.oracle_action_mask.to(device=device, dtype=dtype)
+    if target_scope == "final_query_only":
+        final_query_mask = batch.metadata.get("needs_final_query")
+        if final_query_mask is None:
+            return None, None, 0.0, 1.0
+        target_mask = target_mask * final_query_mask.to(device=device, dtype=dtype).unsqueeze(1)
+    elif target_scope == "delayed_only":
+        delayed_mask = (
+            (batch.modes == LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT)
+            | (batch.modes == LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY)
+        ).to(device=device, dtype=dtype)
+        target_mask = target_mask * delayed_mask.unsqueeze(1)
+    elif target_scope != "oracle_all":
+        raise ValueError(f"Unknown release_target_scope: {target_scope}")
+
+    release_positive_weight = float(routing_cfg.get("release_positive_weight", 1.0))
+    return targets, target_mask, release_weight, release_positive_weight
 
 
 def build_reward(
@@ -458,7 +588,12 @@ def grouped_slice_metrics(
         "control_prob_mean",
         "control_set_mean",
         "control_clear_mean",
+        "wait_state_mean",
+        "wait_prob_mean",
+        "release_prob_mean",
         "control_loss",
+        "wait_loss",
+        "release_loss",
         "anti_exit_loss",
     ]
     grouped: dict[str, dict[str, float]] = {}
@@ -542,6 +677,16 @@ def evaluate_model(
                 routing_cfg,
                 split=split,
             )
+            wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
+            release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
             with autocast_context(device, amp_enabled, amp_dtype):
                 output = model(
                     observations=batch.observations,
@@ -567,6 +712,15 @@ def evaluate_model(
                     control_weight=control_weight,
                     anti_exit_mask=anti_exit_mask,
                     anti_exit_weight=anti_exit_weight,
+                    wait_targets=wait_targets,
+                    wait_mask=wait_mask,
+                    wait_weight=wait_weight,
+                    wait_positive_weight=wait_positive_weight,
+                    wait_negative_weight=wait_negative_weight,
+                    release_targets=release_targets,
+                    release_mask=release_mask,
+                    release_weight=release_weight,
+                    release_positive_weight=release_positive_weight,
                 )
             batch_metrics = summarize_batch(batch, output, benchmark_name)
             collected.append(batch_metrics)
@@ -626,6 +780,29 @@ def validation_score(metrics: dict[str, Any], cfg: dict[str, Any], section: str 
     return score, metric_path
 
 
+def evaluation_requests(
+    *,
+    section_cfg: dict[str, Any],
+    train_cfg: dict[str, Any],
+) -> tuple[int, list[tuple[str, int]]]:
+    eval_batch_size = int(
+        section_cfg.get(
+            "eval_batch_size",
+            section_cfg.get(
+                "val_batch_size",
+                train_cfg.get("val_batch_size", train_cfg["batch_size"]),
+            ),
+        )
+    )
+    requests = [
+        ("test", int(section_cfg.get("test_batches", train_cfg.get("test_batches", 16)))),
+    ]
+    confirm_batches = int(section_cfg.get("confirm_batches", train_cfg.get("confirm_batches", 0)))
+    if confirm_batches > 0:
+        requests.append(("confirm", confirm_batches))
+    return eval_batch_size, requests
+
+
 def save_checkpoint(path: Path, model: PacketRoutingModel, optimizer: torch.optim.Optimizer | None, step: int, extra: dict[str, Any] | None = None) -> None:
     payload = {
         "model": model.state_dict(),
@@ -635,6 +812,59 @@ def save_checkpoint(path: Path, model: PacketRoutingModel, optimizer: torch.opti
     if optimizer is not None:
         payload["optimizer"] = optimizer.state_dict()
     torch.save(payload, path)
+
+
+def build_supervised_optimizer(
+    model: PacketRoutingModel,
+    train_cfg: dict[str, Any],
+) -> torch.optim.Optimizer:
+    lr = float(train_cfg["lr"])
+    weight_decay = float(train_cfg.get("weight_decay", 0.0))
+    optimizer_name = str(train_cfg.get("optimizer", "adamw")).lower()
+    controller_lr_scale = float(train_cfg.get("controller_lr_scale", 1.0))
+    controller_weight_decay = float(train_cfg.get("controller_weight_decay", weight_decay))
+    controller_prefixes = tuple(
+        train_cfg.get(
+            "controller_prefixes",
+            [
+                "control_",
+                "wait_",
+                "core.router_mlp",
+                "core.router_out",
+                "core.router_act_out",
+                "core.router_wait_out",
+            ],
+        )
+    )
+
+    controller_params = []
+    other_params = []
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        if any(name.startswith(prefix) for prefix in controller_prefixes):
+            controller_params.append(parameter)
+        else:
+            other_params.append(parameter)
+
+    if controller_lr_scale == 1.0 and controller_weight_decay == weight_decay:
+        param_groups = [{"params": other_params + controller_params, "lr": lr, "weight_decay": weight_decay}]
+    else:
+        param_groups = []
+        if other_params:
+            param_groups.append({"params": other_params, "lr": lr, "weight_decay": weight_decay})
+        if controller_params:
+            param_groups.append(
+                {
+                    "params": controller_params,
+                    "lr": lr * controller_lr_scale,
+                    "weight_decay": controller_weight_decay,
+                }
+            )
+
+    if optimizer_name == "adam":
+        return torch.optim.Adam(param_groups)
+    return torch.optim.AdamW(param_groups)
 
 
 def load_checkpoint(
@@ -680,11 +910,7 @@ def run_supervised_phase(
     amp_enabled = bool(system_cfg.get("amp", False))
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
 
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=float(train_cfg["lr"]),
-        weight_decay=float(train_cfg.get("weight_decay", 0.0)),
-    )
+    optimizer = build_supervised_optimizer(model, train_cfg)
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled and device.type == "cuda")
     start_step = 0
     best_val = -1.0
@@ -718,6 +944,7 @@ def run_supervised_phase(
             step=step,
             device=device,
         )
+        train_temperature = current_training_temperature(cfg["method"], step)
         compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, step)
         forced_actions, action_masks, oracle_actions, oracle_action_mask, oracle_route_weight, delay_write_weight = build_routing_controls(
             batch,
@@ -734,6 +961,21 @@ def run_supervised_phase(
             routing_cfg,
             split="train",
         )
+        wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
+        release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
+        release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
         optimizer.zero_grad(set_to_none=True)
         start_time = time.time()
         with autocast_context(device, amp_enabled, amp_dtype):
@@ -742,7 +984,7 @@ def run_supervised_phase(
                 labels=batch.labels,
                 route_mode=route_mode,
                 compute_penalties=compute_penalties,
-                temperature=temperature,
+                temperature=train_temperature,
                 estimator=estimator,
                 truncate_bptt_steps=int(train_cfg.get("truncate_bptt_steps", 0)),
                 forced_actions=forced_actions,
@@ -761,6 +1003,15 @@ def run_supervised_phase(
                 control_weight=control_weight,
                 anti_exit_mask=anti_exit_mask,
                 anti_exit_weight=anti_exit_weight,
+                wait_targets=wait_targets,
+                wait_mask=wait_mask,
+                wait_weight=wait_weight,
+                wait_positive_weight=wait_positive_weight,
+                wait_negative_weight=wait_negative_weight,
+                release_targets=release_targets,
+                release_mask=release_mask,
+                release_weight=release_weight,
+                release_positive_weight=release_positive_weight,
             )
         scaler.scale(output.loss).backward()
         scaler.unscale_(optimizer)
@@ -783,6 +1034,7 @@ def run_supervised_phase(
                     if device.type == "cuda"
                     else 0.0
                 ),
+                "temperature": train_temperature,
             }
         )
         peak_train_memory_mb = max(peak_train_memory_mb, float(batch_metrics["peak_memory_mb"]))
@@ -825,30 +1077,34 @@ def run_supervised_phase(
         load_checkpoint(best_path, model)
 
     phase_wall_time_sec = time.time() - phase_start_time
-    test_metrics = evaluate_model(
-        model=model,
-        benchmark=benchmark,
-        device=device,
-        benchmark_name=benchmark_name,
-        split="test",
-        num_batches=int(train_cfg.get("test_batches", 16)),
-        batch_size=int(train_cfg.get("val_batch_size", train_cfg["batch_size"])),
-        route_mode=route_mode,
-        compute_penalties=eval_compute_penalties,
-        temperature=temperature,
-        estimator=estimator,
-        amp_enabled=amp_enabled,
-        amp_dtype=amp_dtype,
-        routing_cfg=None,
-    )
-    test_metrics.update({"phase": phase_name, "split": "test", "step": total_steps})
-    logger.write(test_metrics)
+    eval_batch_size, eval_splits = evaluation_requests(section_cfg=train_cfg, train_cfg=train_cfg)
+    final_evals: dict[str, Any] = {}
+    for split_name, num_batches in eval_splits:
+        split_metrics = evaluate_model(
+            model=model,
+            benchmark=benchmark,
+            device=device,
+            benchmark_name=benchmark_name,
+            split=split_name,
+            num_batches=num_batches,
+            batch_size=eval_batch_size,
+            route_mode=route_mode,
+            compute_penalties=eval_compute_penalties,
+            temperature=temperature,
+            estimator=estimator,
+            amp_enabled=amp_enabled,
+            amp_dtype=amp_dtype,
+            routing_cfg=None,
+        )
+        split_metrics.update({"phase": phase_name, "split": split_name, "step": total_steps})
+        logger.write(split_metrics)
+        final_evals[split_name] = split_metrics
     return {
         "best_val_accuracy": best_val,
         "best_val_score": best_val_score,
         "best_metric_name": best_metric_name,
         "best_val_metrics": best_val_metrics,
-        "test": test_metrics,
+        **final_evals,
         "checkpoint": str(best_path),
         "phase_wall_time_sec": phase_wall_time_sec,
         "peak_train_memory_mb": peak_train_memory_mb,
@@ -977,6 +1233,16 @@ def run_hybrid_es(
             routing_cfg,
             split="train",
         )
+        wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
+        release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
+            batch,
+            routing_cfg,
+            split="train",
+        )
         local_rewards = []
         local_stats = []
         start_time = time.time()
@@ -1011,6 +1277,15 @@ def run_hybrid_es(
                         control_weight=control_weight,
                         anti_exit_mask=anti_exit_mask,
                         anti_exit_weight=anti_exit_weight,
+                        wait_targets=wait_targets,
+                        wait_mask=wait_mask,
+                        wait_weight=wait_weight,
+                        wait_positive_weight=wait_positive_weight,
+                        wait_negative_weight=wait_negative_weight,
+                        release_targets=release_targets,
+                        release_mask=release_mask,
+                        release_weight=release_weight,
+                        release_positive_weight=release_positive_weight,
                     )
                 reward = build_reward(
                     output.logits,
@@ -1099,26 +1374,29 @@ def run_hybrid_es(
 
     if context.enabled:
         distributed_barrier(context)
-    test_metrics = None
+    eval_batch_size, eval_splits = evaluation_requests(section_cfg=es_cfg, train_cfg=train_cfg)
+    final_evals: dict[str, Any] = {}
     if context.rank == 0:
-        test_metrics = evaluate_model(
-            model=model,
-            benchmark=benchmark,
-            device=context.device,
-            benchmark_name=benchmark_name,
-            split="test",
-            num_batches=int(es_cfg.get("test_batches", train_cfg.get("test_batches", 16))),
-            batch_size=int(es_cfg.get("eval_batch_size", train_cfg.get("val_batch_size", train_cfg["batch_size"]))),
-            route_mode="hard",
-            compute_penalties=eval_compute_penalties,
-            temperature=float(cfg["method"].get("temperature", 1.0)),
-            estimator="straight_through",
-            amp_enabled=amp_enabled,
-            amp_dtype=amp_dtype,
-            routing_cfg=None,
-        )
-        test_metrics.update({"phase": "hybrid_es", "split": "test", "generation": generations})
-        logger.write(test_metrics)
+        for split_name, num_batches in eval_splits:
+            split_metrics = evaluate_model(
+                model=model,
+                benchmark=benchmark,
+                device=context.device,
+                benchmark_name=benchmark_name,
+                split=split_name,
+                num_batches=num_batches,
+                batch_size=eval_batch_size,
+                route_mode="hard",
+                compute_penalties=eval_compute_penalties,
+                temperature=float(cfg["method"].get("temperature", 1.0)),
+                estimator="straight_through",
+                amp_enabled=amp_enabled,
+                amp_dtype=amp_dtype,
+                routing_cfg=None,
+            )
+            split_metrics.update({"phase": "hybrid_es", "split": split_name, "generation": generations})
+            logger.write(split_metrics)
+            final_evals[split_name] = split_metrics
     total_wall_time_sec = time.time() - phase_start_time
     return {
         "warmstart": warmstart_summary,
@@ -1126,7 +1404,7 @@ def run_hybrid_es(
         "best_val_score": best_val_score,
         "best_metric_name": best_metric_name,
         "best_val_metrics": best_val_metrics,
-        "test": test_metrics,
+        **final_evals,
         "parameter_names": parameter_names,
         "parameter_count": sum(dict(model.named_parameters())[name].numel() for name in parameter_names),
         "es_wall_time_sec": total_wall_time_sec,
@@ -1143,8 +1421,8 @@ def main() -> None:
     system_cfg = cfg.get("system", {})
     cpu_threads = int(system_cfg.get("cpu_threads", 16))
     torch.set_num_threads(cpu_threads)
-    os.environ.setdefault("OMP_NUM_THREADS", str(cpu_threads))
-    os.environ.setdefault("MKL_NUM_THREADS", str(cpu_threads))
+    os.environ["OMP_NUM_THREADS"] = str(cpu_threads)
+    os.environ["MKL_NUM_THREADS"] = str(cpu_threads)
 
     context = setup_distributed()
     seed_everything(int(cfg["experiment"]["seed"]) + context.rank)

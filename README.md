@@ -121,8 +121,9 @@ The test suite covers:
 
 ## Current Report
 
-The latest targeted long-horizon report is at
-[docs/phase4_report.md](docs/phase4_report.md).
+The latest targeted long-horizon reports are at
+[docs/phase4_report.md](docs/phase4_report.md) and
+[docs/phase5_report.md](docs/phase5_report.md).
 
 Current headline outcome from the dev suite:
 
@@ -142,6 +143,10 @@ Current headline outcome from the dev suite:
   negative result about robustness; the notable secondary result is that
   resume-based hybrid ES can polish a working controller checkpoint much more
   successfully than scratch hybrid warmstart can discover one
+- Benchmark B phase 5: medium-basin resumed hybrid ES is now confirmed by an
+  exact same-seed rerun and confirmation split, router-only ES is essentially as
+  good as router+adapter ES on that medium basin, and weak-basin ES can repair
+  routing completely while only partially recovering task accuracy
 
 ## Phase 2 Commands
 
@@ -241,6 +246,35 @@ The phase-4 planning and final writeups are
 [docs/phase4_plan.md](docs/phase4_plan.md),
 [docs/phase4_report.md](docs/phase4_report.md), and
 [docs/phase4_lessons.md](docs/phase4_lessons.md).
+
+## Phase 5 Commands
+
+Phase 5 focuses on controller-factorization follow-ups, stricter verification,
+and ES role mapping across checkpoint quality.
+
+```bash
+./scripts/run_phase5_main.sh medium-adapter
+./scripts/run_phase5_main.sh medium-routeronly
+./scripts/run_phase5_main.sh weak-adapter
+./scripts/run_phase5_main.sh weak-routeronly
+
+./scripts/run_phase5_confirm.sh \
+  results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from950_seed951_p1
+
+./scripts/run_phase5_seed_panels.sh
+
+uv run python -m src.utils.phase5_audit \
+  --run-dir results/phase5_dev/hard_st_b_v2_control_router2_setclear_oraclecontrol_opt_selectexit_seed950_p1 \
+  --split confirm \
+  --num-batches 6 \
+  --probe-train-batches 6 \
+  --probe-test-batches 6
+```
+
+The phase-5 planning and writeups are
+[docs/phase5_plan.md](docs/phase5_plan.md),
+[docs/phase5_report.md](docs/phase5_report.md), and
+[docs/phase5_lessons.md](docs/phase5_lessons.md).
 
 ## References
 

@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_control_waitact.yaml
+
+experiment:
+  seed: 945
+
+model:
+  control_state_mode: set_clear
+  control_clear_bias: -4.0
+
+routing:
+  control_target_scope: oracle_delayed_only
+  control_state_weight: 1.0
+  anti_exit_weight: 0.1

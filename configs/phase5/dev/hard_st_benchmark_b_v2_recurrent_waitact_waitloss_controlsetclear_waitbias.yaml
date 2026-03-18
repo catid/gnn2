@@ -1,0 +1,16 @@
+_base_: ./hard_st_benchmark_b_v2_recurrent_waitact_waitloss_controlsetclear.yaml
+
+experiment:
+  seed: 919
+
+training:
+  controller_lr_scale: 2.0
+  controller_weight_decay: 0.0
+
+method:
+  temperature_start: 2.0
+  temperature_end: 1.0
+  temperature_schedule_steps: 240
+
+model:
+  control_wait_scale: 2.0

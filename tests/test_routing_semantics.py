@@ -296,3 +296,75 @@ def test_control_state_set_clear_can_clear_signal() -> None:
     )
     assert clear is not None
     assert torch.allclose(updated, torch.zeros_like(updated), atol=1e-4)
+
+
+def test_wait_loss_and_anti_exit_can_run_together_without_mask_collision() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 16,
+            "adapter_rank": 0,
+            "routing_head_mode": "wait_act",
+            "control_state_dim": 4,
+            "control_state_mode": "set_clear",
+        }
+    )
+    observations = torch.zeros(2, 8, 2, 8)
+    labels = torch.zeros(2, dtype=torch.long)
+    wait_targets = torch.zeros(2, 8)
+    wait_mask = torch.zeros(2, 8)
+    anti_exit_mask = torch.zeros(2, 8)
+    wait_targets[0, 2:7] = 1.0
+    wait_mask[0, 2:8] = 1.0
+    anti_exit_mask[0, 2:7] = 1.0
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard_st",
+        compute_penalties={},
+        wait_targets=wait_targets,
+        wait_mask=wait_mask,
+        wait_weight=0.5,
+        anti_exit_mask=anti_exit_mask,
+        anti_exit_weight=0.5,
+    )
+
+    assert torch.isfinite(output.loss)
+    assert torch.isfinite(output.stats["wait_loss"]).all()
+    assert torch.isfinite(output.stats["anti_exit_loss"]).all()
+
+
+def test_direct_release_gate_controls_wait_vs_act_decision() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 16,
+            "adapter_rank": 0,
+            "routing_head_mode": "wait_act",
+            "release_gate_mode": "direct",
+            "release_gate_scale": 2.0,
+        }
+    )
+    act_logits = torch.tensor([[[4.0, -4.0], [4.0, -4.0]]])
+    wait_logit = torch.tensor([[[6.0], [-6.0]]])
+    release_logit = torch.tensor([[[-6.0], [6.0]]])
+
+    composed = model._compose_routing_logits(
+        flat_logits=None,
+        act_logits=act_logits,
+        wait_logit=wait_logit,
+        release_logit=release_logit,
+        control_state=torch.zeros(1, 2, 0),
+    )
+
+    actions = composed.argmax(dim=-1)
+    assert actions.tolist() == [[2, 0]]

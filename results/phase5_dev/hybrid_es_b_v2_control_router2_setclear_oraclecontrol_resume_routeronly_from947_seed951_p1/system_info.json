@@ -1,0 +1,14 @@
+{
+  "cpu_threads": 16,
+  "cuda_available": true,
+  "device": "cuda:0",
+  "gpu_count": 2,
+  "gpu_names": [
+    "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "NVIDIA RTX PRO 6000 Blackwell Workstation Edition"
+  ],
+  "logical_cpus": 128,
+  "rank": 0,
+  "torch_version": "2.12.0.dev20260317+cu130",
+  "world_size": 2
+}

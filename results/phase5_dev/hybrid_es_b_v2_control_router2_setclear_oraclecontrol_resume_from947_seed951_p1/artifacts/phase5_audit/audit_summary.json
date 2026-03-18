@@ -1,0 +1,81 @@
+{
+  "checkpoint": "results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_p1/hybrid_es_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.8296489119529724,
+    "count": 769,
+    "exit_time": 127.0,
+    "mean_exit_minus_query": 0.0,
+    "needs_probe_control_state": 0.8774782419204712,
+    "needs_probe_memory_read_state": 0.8774782419204712,
+    "needs_probe_packet_state": 0.8774782419204712,
+    "premature_exit_rate": 0.0,
+    "release_probe_release_prob": null,
+    "route_match": 1.0,
+    "wait_probe_wait_prob": null
+  },
+  "needs_probe_summary": {
+    "control_prob": {
+      "accuracy": 0.8774782419204712,
+      "bce": 0.3251323401927948
+    },
+    "control_state": {
+      "accuracy": 0.8774782419204712,
+      "bce": 0.25137627124786377
+    },
+    "memory_read_state": {
+      "accuracy": 0.8774782419204712,
+      "bce": 0.2314717322587967
+    },
+    "packet_state": {
+      "accuracy": 0.8774782419204712,
+      "bce": 0.2309534251689911
+    },
+    "router_logits": {
+      "accuracy": 0.8757666349411011,
+      "bce": 0.2914856970310211
+    },
+    "router_probs": {
+      "accuracy": 0.870729923248291,
+      "bce": 0.36733898520469666
+    }
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.8296489119529724,
+      "compute": 128.0,
+      "control_prob_mean": 0.47187376022338867,
+      "count": 769,
+      "delay_rate": 0.9921875,
+      "early_exit_rate": 0.0,
+      "exit_time": 127.0,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 1.0,
+      "compute": 33.52381134033203,
+      "control_prob_mean": 0.4646679759025574,
+      "count": 399,
+      "delay_rate": 0.9390590190887451,
+      "early_exit_rate": 0.0,
+      "exit_time": 32.52381134033203,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    },
+    "easy_exit": {
+      "accuracy": 1.0,
+      "compute": 1.0,
+      "control_prob_mean": 0.48754382133483887,
+      "count": 368,
+      "delay_rate": 0.0,
+      "early_exit_rate": 1.0,
+      "exit_time": 0.0,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    }
+  },
+  "release_probe_summary": {},
+  "run_dir": "results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_p1",
+  "split": "confirm",
+  "wait_probe_summary": {}
+}

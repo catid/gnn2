@@ -1,0 +1,155 @@
+{
+  "checkpoint": "results/phase5_dev/hard_st_b_v2_waitact_waitloss_controlsetclear_lightaux_waitbias_release_all_seed932_p1/hard_st_best.pt",
+  "final_query_summary": {
+    "accuracy": 0.26778241991996765,
+    "count": 239,
+    "exit_time": 20.259414672851562,
+    "mean_exit_minus_query": -106.74058532714844,
+    "needs_probe_control_state": 0.6637245416641235,
+    "needs_probe_memory_read_state": 0.6592491269111633,
+    "needs_probe_packet_state": 0.6770263314247131,
+    "premature_exit_rate": 1.0,
+    "release_probe_release_prob": 1.0,
+    "route_match": 0.0,
+    "wait_probe_wait_prob": 0.9990054965019226
+  },
+  "needs_probe_summary": {
+    "control_prob": {
+      "accuracy": 0.6639731526374817,
+      "bce": 0.6365278959274292
+    },
+    "control_state": {
+      "accuracy": 0.6637245416641235,
+      "bce": 0.6190141439437866
+    },
+    "memory_read_state": {
+      "accuracy": 0.6592491269111633,
+      "bce": 0.623648464679718
+    },
+    "packet_state": {
+      "accuracy": 0.6770263314247131,
+      "bce": 0.6107224225997925
+    },
+    "release_prob": {
+      "accuracy": 0.6843610405921936,
+      "bce": 0.617194652557373
+    },
+    "router_logits": {
+      "accuracy": 0.6843610405921936,
+      "bce": 0.5978434681892395
+    },
+    "router_probs": {
+      "accuracy": 0.6843610405921936,
+      "bce": 0.6195734739303589
+    },
+    "wait_prob": {
+      "accuracy": 0.6822476387023926,
+      "bce": 0.6283068060874939
+    }
+  },
+  "per_mode": {
+    "delay_to_final_query": {
+      "accuracy": 0.26778241991996765,
+      "compute": 21.372385025024414,
+      "control_prob_mean": 0.9386137127876282,
+      "count": 239,
+      "delay_rate": 0.8802574276924133,
+      "early_exit_rate": 0.02092050202190876,
+      "exit_time": 20.259414672851562,
+      "premature_exit_rate": 1.0,
+      "route_match": 0.0
+    },
+    "delay_to_trigger_exit": {
+      "accuracy": 0.5407407283782959,
+      "compute": 16.207406997680664,
+      "control_prob_mean": 0.9369741082191467,
+      "count": 135,
+      "delay_rate": 0.845008134841919,
+      "early_exit_rate": 0.03703703731298447,
+      "exit_time": 15.118518829345703,
+      "premature_exit_rate": 0.0,
+      "route_match": 0.3629629611968994
+    },
+    "easy_exit": {
+      "accuracy": 1.0,
+      "compute": 1.0,
+      "control_prob_mean": 0.6012524366378784,
+      "count": 138,
+      "delay_rate": 0.0,
+      "early_exit_rate": 1.0,
+      "exit_time": 0.0,
+      "premature_exit_rate": 0.0,
+      "route_match": 1.0
+    }
+  },
+  "release_probe_summary": {
+    "control_prob": {
+      "accuracy": 0.9751367568969727,
+      "bce": 0.08191101253032684
+    },
+    "control_state": {
+      "accuracy": 0.9751367568969727,
+      "bce": 0.08132786303758621
+    },
+    "memory_read_state": {
+      "accuracy": 0.9751367568969727,
+      "bce": 0.11511983722448349
+    },
+    "packet_state": {
+      "accuracy": 0.9904276728630066,
+      "bce": 0.022063402459025383
+    },
+    "release_prob": {
+      "accuracy": 1.0,
+      "bce": 0.004102084320038557
+    },
+    "router_logits": {
+      "accuracy": 1.0,
+      "bce": 0.005240554455667734
+    },
+    "router_probs": {
+      "accuracy": 0.9998756647109985,
+      "bce": 0.004864667542278767
+    },
+    "wait_prob": {
+      "accuracy": 0.9990054965019226,
+      "bce": 0.00561821274459362
+    }
+  },
+  "run_dir": "results/phase5_dev/hard_st_b_v2_waitact_waitloss_controlsetclear_lightaux_waitbias_release_all_seed932_p1",
+  "split": "test",
+  "wait_probe_summary": {
+    "control_prob": {
+      "accuracy": 0.9751367568969727,
+      "bce": 0.08185812085866928
+    },
+    "control_state": {
+      "accuracy": 0.9751367568969727,
+      "bce": 0.08143410086631775
+    },
+    "memory_read_state": {
+      "accuracy": 0.9751367568969727,
+      "bce": 0.11519815027713776
+    },
+    "packet_state": {
+      "accuracy": 0.9904276728630066,
+      "bce": 0.02191225439310074
+    },
+    "release_prob": {
+      "accuracy": 0.9998756647109985,
+      "bce": 0.0075147198513150215
+    },
+    "router_logits": {
+      "accuracy": 1.0,
+      "bce": 0.00486385403200984
+    },
+    "router_probs": {
+      "accuracy": 0.9998756647109985,
+      "bce": 0.005439162719994783
+    },
+    "wait_prob": {
+      "accuracy": 0.9990054965019226,
+      "bce": 0.0064497035928070545
+    }
+  }
+}

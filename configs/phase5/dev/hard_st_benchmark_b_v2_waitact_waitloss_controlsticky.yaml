@@ -1,0 +1,14 @@
+_base_: ./hard_st_benchmark_b_v2_waitact_waitloss.yaml
+
+experiment:
+  seed: 913
+
+model:
+  control_state_dim: 8
+  control_state_mode: sticky
+  control_router_scale: 2.0
+  control_write_bias: -3.0
+
+routing:
+  control_state_weight: 0.75
+  anti_exit_weight: 0.2
