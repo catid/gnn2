@@ -44,19 +44,19 @@ case "${1:-}" in
   a-scout)
     uv run python -m src.train.run \
       --config configs/phase6/dev/hard_st_benchmark_b_v2_weak_es_content_refine_all.yaml \
-      --resume results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_p1/hybrid_es_best.pt \
+      --resume results/phase6_anchor/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_rerun1/hybrid_es_best.pt \
       --results-dir results/phase6_dev/hard_st_b_v2_weak_es_content_refine_all_seed970_p1
     uv run python -m src.train.run \
       --config configs/phase6/dev/hard_st_benchmark_b_v2_weak_es_content_refine_memoryreadout.yaml \
-      --resume results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_p1/hybrid_es_best.pt \
+      --resume results/phase6_anchor/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_rerun1/hybrid_es_best.pt \
       --results-dir results/phase6_dev/hard_st_b_v2_weak_es_content_refine_memoryreadout_seed971_p1
     uv run python -m src.train.run \
       --config configs/phase6/dev/hard_st_benchmark_b_v2_weak_es_content_refine_adapter.yaml \
-      --resume results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_p1/hybrid_es_best.pt \
+      --resume results/phase6_anchor/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_rerun1/hybrid_es_best.pt \
       --results-dir results/phase6_dev/hard_st_b_v2_weak_es_content_refine_adapter_seed972_p1
     uv run python -m src.train.run \
       --config configs/phase6/dev/hard_st_benchmark_b_v2_weak_es_content_refine_sinkcore.yaml \
-      --resume results/phase5_dev/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_p1/hybrid_es_best.pt \
+      --resume results/phase6_anchor/hybrid_es_b_v2_control_router2_setclear_oraclecontrol_resume_from947_seed951_rerun1/hybrid_es_best.pt \
       --results-dir results/phase6_dev/hard_st_b_v2_weak_es_content_refine_sinkcore_seed973_p1
     ;;
   d-scout)
@@ -73,8 +73,26 @@ case "${1:-}" in
       --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
       --results-dir results/phase6_dev/hard_st_b_v2_finalqueryonly_controller_pretrain_seed988_p1
     ;;
+  f-scout)
+    uv run python -m src.train.run \
+      --config configs/phase6/dev/hard_st_benchmark_b_v2_controlwaitact_supervision_waitheavy.yaml \
+      --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
+      --results-dir results/phase6_dev/hard_st_b_v2_controlwaitact_supervision_waitheavy_seed991_p1
+    uv run python -m src.train.run \
+      --config configs/phase6/dev/hard_st_benchmark_b_v2_controlwaitact_supervision_releaseaux.yaml \
+      --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
+      --results-dir results/phase6_dev/hard_st_b_v2_controlwaitact_supervision_releaseaux_seed992_p1
+    uv run python -m src.train.run \
+      --config configs/phase6/dev/hard_st_benchmark_b_v2_controlwaitact_supervision_unlocklate.yaml \
+      --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
+      --results-dir results/phase6_dev/hard_st_b_v2_controlwaitact_supervision_unlocklate_seed993_p1
+    uv run python -m src.train.run \
+      --config configs/phase6/dev/hard_st_benchmark_b_v2_controlwaitact_supervision_controlonly.yaml \
+      --resume results/phase3_dev/hard_st_b_v2_keymem_payloadaux_oraclewarm/hard_st_best.pt \
+      --results-dir results/phase6_dev/hard_st_b_v2_controlwaitact_supervision_controlonly_seed994_p1
+    ;;
   *)
-    echo "usage: $0 {a-scout|b-scout|c-scout|d-scout}" >&2
+    echo "usage: $0 {a-scout|b-scout|c-scout|d-scout|f-scout}" >&2
     exit 1
     ;;
 esac

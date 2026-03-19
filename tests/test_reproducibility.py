@@ -15,6 +15,7 @@ from src.train.run import (
     current_routing_cfg,
     build_release_controls,
     build_wait_controls,
+    load_checkpoint,
     seed_everything,
 )
 
@@ -336,6 +337,43 @@ def test_configure_trainable_parameters_respects_allowlist_and_freeze_rules() ->
     assert "memory_read_gate.weight" not in enabled
     assert "core.router_mlp.1.weight" not in enabled
     assert summary["trainable_parameter_count"] < summary["total_parameter_count"]
+
+
+def test_load_checkpoint_strict_false_skips_shape_mismatches(tmp_path) -> None:
+    source = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "packet_memory_slots": 2,
+            "packet_memory_dim": 3,
+        }
+    )
+    target = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "packet_memory_slots": 4,
+            "packet_memory_dim": 3,
+        }
+    )
+    with torch.no_grad():
+        source.sink_proj.weight.fill_(0.25)
+        source.memory_read_slots.bias.fill_(1.0)
+
+    ckpt = tmp_path / "shape_mismatch.pt"
+    torch.save({"model": source.state_dict(), "step": 0, "extra": {}}, ckpt)
+
+    load_checkpoint(ckpt, target, strict=False)
+
+    assert torch.allclose(target.sink_proj.weight, torch.full_like(target.sink_proj.weight, 0.25))
 
 
 def test_build_release_controls_can_focus_on_final_query_mode() -> None:

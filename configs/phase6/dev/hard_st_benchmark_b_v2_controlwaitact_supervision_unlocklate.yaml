@@ -1,0 +1,15 @@
+_base_: ./hard_st_benchmark_b_v2_controlwaitact_setclear_curriculum.yaml
+
+experiment:
+  seed: 993
+
+routing:
+  exit_mask_final_query_only_until_step: 160
+  exit_mask_trigger_exit_until_trigger_until_step: 160
+  oracle_route_weight_start: 0.15
+  oracle_route_weight_end: 0.0
+  oracle_route_weight_schedule_steps: 200
+
+training:
+  train_steps_delta: 320
+  val_every: 20

@@ -967,7 +967,17 @@ def load_checkpoint(
     strict: bool = True,
 ) -> dict[str, Any]:
     payload = torch.load(path, map_location="cpu")
-    model.load_state_dict(payload["model"], strict=strict)
+    state_dict = payload["model"]
+    if strict:
+        model.load_state_dict(state_dict, strict=True)
+    else:
+        current_state = model.state_dict()
+        filtered_state = {
+            name: tensor
+            for name, tensor in state_dict.items()
+            if name in current_state and current_state[name].shape == tensor.shape
+        }
+        model.load_state_dict(filtered_state, strict=False)
     if optimizer is not None and "optimizer" in payload:
         if strict:
             optimizer.load_state_dict(payload["optimizer"])
@@ -1019,7 +1029,11 @@ def run_supervised_phase(
         )
         start_step = int(payload.get("step", 0))
 
-    total_steps = int(steps_override or train_cfg["train_steps"])
+    configured_total_steps = int(steps_override or train_cfg["train_steps"])
+    if "train_steps_delta" in train_cfg:
+        total_steps = start_step + int(train_cfg["train_steps_delta"])
+    else:
+        total_steps = configured_total_steps
     eval_compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, total_steps)
     model.train()
     phase_start_time = time.time()

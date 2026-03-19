@@ -1,0 +1,17 @@
+_base_: ./hard_st_benchmark_b_v2_controlwaitact_setclear_curriculum.yaml
+
+experiment:
+  seed: 994
+
+routing:
+  control_target_scope: final_query_wait_only
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.3
+  control_state_weight_schedule_steps: 240
+  anti_exit_weight_start: 0.25
+  anti_exit_weight_end: 0.05
+  anti_exit_weight_schedule_steps: 240
+
+training:
+  train_steps_delta: 320
+  val_every: 20

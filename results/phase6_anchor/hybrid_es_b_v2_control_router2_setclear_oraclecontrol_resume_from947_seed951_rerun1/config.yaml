@@ -1,0 +1,23 @@
+_base_: ../../phase4/main/hybrid_es_benchmark_b_v2_control_sticky_aux_router2_resume_main.yaml
+
+experiment:
+  seed: 951
+  results_root: results/phase5_dev
+
+model:
+  control_state_mode: set_clear
+  control_clear_bias: -4.0
+
+routing:
+  control_target_scope: oracle_delayed_only
+  control_state_weight: 1.0
+  anti_exit_weight: 0.1
+
+es:
+  generations: 24
+  population: 64
+  rank: 4
+  val_every: 4
+  val_batches: 10
+  test_batches: 16
+  selection_metric: per_mode.delay_to_final_query.accuracy

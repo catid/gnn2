@@ -1,0 +1,9 @@
+_base_: ../../phase5/dev/hard_st_benchmark_b_v2_control_router2_setclear_oraclecontrol_opt.yaml
+
+experiment:
+  seed: 960
+  results_root: results/phase6_dev
+
+training:
+  selection_metric: per_mode.delay_to_final_query.accuracy
+

@@ -45,6 +45,9 @@ bd sync               # Sync with git
 - Prefer the latest PyTorch nightly builds from the CUDA 13.0 index.
 - When rebuilding native code or extensions, use 16-way parallelism:
   `MAX_JOBS=16`, `CMAKE_BUILD_PARALLEL_LEVEL=16`, and `MAKEFLAGS=-j16`.
+- For substantive experiment campaigns, use both GPUs by default:
+  prefer 2-GPU `torchrun` for distributed/ES jobs, and otherwise keep both GPUs occupied with parallel
+  single-GPU runs when that is the fairest way to execute sweeps.
 - Track substantive work in `bd` instead of ad hoc notes.
 
 ## EGGROLL Reference Discipline

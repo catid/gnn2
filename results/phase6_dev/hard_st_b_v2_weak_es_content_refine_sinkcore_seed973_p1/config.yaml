@@ -1,0 +1,18 @@
+_base_: ./hard_st_benchmark_b_v2_weak_es_content_refine_all.yaml
+
+experiment:
+  seed: 973
+
+training:
+  trainable_prefixes:
+    - core.obs_proj
+    - core.meta_proj
+    - core.pre
+    - core.state_cell
+    - core.packet_mlp
+    - core.packet_cell
+    - core.packet_gate
+    - memory_
+    - sink_proj
+    - readout
+

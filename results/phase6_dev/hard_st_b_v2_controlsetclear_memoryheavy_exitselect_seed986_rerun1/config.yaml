@@ -1,0 +1,17 @@
+_base_: ./hard_st_benchmark_b_v2_controlsetclear_memoryheavy.yaml
+
+experiment:
+  seed: 986
+
+routing:
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.35
+  control_state_weight_schedule_steps: 320
+  anti_exit_weight_start: 0.2
+  anti_exit_weight_end: 0.08
+  anti_exit_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 320
+  val_every: 20
+  selection_metric: per_mode.delay_to_final_query.exit_time

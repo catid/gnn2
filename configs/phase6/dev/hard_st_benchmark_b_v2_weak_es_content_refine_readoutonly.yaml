@@ -1,0 +1,10 @@
+_base_: ./hard_st_benchmark_b_v2_weak_es_content_refine_all.yaml
+
+experiment:
+  seed: 997
+
+training:
+  trainable_prefixes:
+    - sink_proj
+    - readout
+
