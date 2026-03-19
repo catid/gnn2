@@ -48,6 +48,10 @@ bd sync               # Sync with git
 - For substantive experiment campaigns, use both GPUs by default:
   prefer 2-GPU `torchrun` for distributed/ES jobs, and otherwise keep both GPUs occupied with parallel
   single-GPU runs when that is the fairest way to execute sweeps.
+- For git pushes on this machine, prefer the current forwarded SSH agent over local keys:
+  if `SSH_AUTH_SOCK` is stale, locate the newest `/tmp/ssh-*/agent*` socket, confirm it with
+  `ssh-add -L` / `ssh -T git@github.com`, and use that socket for `git pull --rebase`, `bd sync`,
+  and `git push`. Do not fall back to stale local GitHub keys unless explicitly requested.
 - Track substantive work in `bd` instead of ad hoc notes.
 
 ## EGGROLL Reference Discipline
