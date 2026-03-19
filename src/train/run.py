@@ -191,6 +191,66 @@ def current_training_temperature(method_cfg: dict[str, Any], step: int) -> float
     return start + frac * (end - start)
 
 
+def _scheduled_bool(routing_cfg: dict[str, Any], key: str, step: int) -> bool:
+    value = bool(routing_cfg.get(key, False))
+    start_step = routing_cfg.get(f"{key}_start_step")
+    until_step = routing_cfg.get(f"{key}_until_step")
+    if start_step is not None and step < int(start_step):
+        return False
+    if until_step is not None and step >= int(until_step):
+        return False
+    return value
+
+
+def _scheduled_scalar(routing_cfg: dict[str, Any], key: str, step: int) -> float:
+    if f"{key}_start" not in routing_cfg and f"{key}_end" not in routing_cfg:
+        return float(routing_cfg.get(key, 0.0))
+    default = float(routing_cfg.get(key, 0.0))
+    start = float(routing_cfg.get(f"{key}_start", default))
+    end = float(routing_cfg.get(f"{key}_end", routing_cfg.get(key, start)))
+    schedule_steps = int(routing_cfg.get(f"{key}_schedule_steps", 0))
+    if schedule_steps <= 0:
+        return end
+    frac = min(1.0, max(0.0, step / schedule_steps))
+    return start + frac * (end - start)
+
+
+def current_routing_cfg(routing_cfg: dict[str, Any] | None, step: int) -> dict[str, Any]:
+    routing_cfg = dict(routing_cfg or {})
+    boolean_keys = [
+        "force_oracle_actions",
+        "exit_mask_until_final",
+        "exit_mask_until_trigger",
+        "exit_mask_final_query_only",
+        "exit_mask_trigger_exit_until_trigger",
+    ]
+    scalar_keys = [
+        "oracle_route_weight",
+        "delay_write_weight",
+        "memory_payload_weight",
+        "control_state_weight",
+        "anti_exit_weight",
+        "wait_loss_weight",
+        "release_loss_weight",
+    ]
+    for key in boolean_keys:
+        if (
+            key in routing_cfg
+            or f"{key}_start_step" in routing_cfg
+            or f"{key}_until_step" in routing_cfg
+        ):
+            routing_cfg[key] = _scheduled_bool(routing_cfg, key, step)
+    for key in scalar_keys:
+        if (
+            key in routing_cfg
+            or f"{key}_start" in routing_cfg
+            or f"{key}_end" in routing_cfg
+            or f"{key}_schedule_steps" in routing_cfg
+        ):
+            routing_cfg[key] = _scheduled_scalar(routing_cfg, key, step)
+    return routing_cfg
+
+
 def build_routing_controls(
     batch: BenchmarkBatch,
     routing_cfg: dict[str, Any] | None,
@@ -814,6 +874,37 @@ def save_checkpoint(path: Path, model: PacketRoutingModel, optimizer: torch.opti
     torch.save(payload, path)
 
 
+def configure_trainable_parameters(
+    model: PacketRoutingModel,
+    section_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    trainable_prefixes = tuple(section_cfg.get("trainable_prefixes", []))
+    freeze_prefixes = tuple(section_cfg.get("freeze_prefixes", []))
+    trainable_exact = set(section_cfg.get("trainable_exact_names", []))
+    freeze_exact = set(section_cfg.get("freeze_exact_names", []))
+
+    def matches(name: str, prefixes: tuple[str, ...], exact: set[str]) -> bool:
+        return name in exact or any(name.startswith(prefix) for prefix in prefixes)
+
+    use_allowlist = bool(trainable_prefixes or trainable_exact)
+    enabled_names: list[str] = []
+    total_params = 0
+    trainable_params = 0
+    for name, parameter in model.named_parameters():
+        total_params += parameter.numel()
+        allow = matches(name, trainable_prefixes, trainable_exact) if use_allowlist else True
+        blocked = matches(name, freeze_prefixes, freeze_exact)
+        parameter.requires_grad = allow and not blocked
+        if parameter.requires_grad:
+            enabled_names.append(name)
+            trainable_params += parameter.numel()
+    return {
+        "total_parameter_count": total_params,
+        "trainable_parameter_count": trainable_params,
+        "trainable_parameter_names": enabled_names,
+    }
+
+
 def build_supervised_optimizer(
     model: PacketRoutingModel,
     train_cfg: dict[str, Any],
@@ -833,6 +924,7 @@ def build_supervised_optimizer(
                 "core.router_out",
                 "core.router_act_out",
                 "core.router_wait_out",
+                "release_",
             ],
         )
     )
@@ -910,6 +1002,7 @@ def run_supervised_phase(
     amp_enabled = bool(system_cfg.get("amp", False))
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
 
+    trainable_summary = configure_trainable_parameters(model, train_cfg)
     optimizer = build_supervised_optimizer(model, train_cfg)
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled and device.type == "cuda")
     start_step = 0
@@ -946,34 +1039,35 @@ def run_supervised_phase(
         )
         train_temperature = current_training_temperature(cfg["method"], step)
         compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, step)
+        step_routing_cfg = current_routing_cfg(routing_cfg, step)
         forced_actions, action_masks, oracle_actions, oracle_action_mask, oracle_route_weight, delay_write_weight = build_routing_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         optimizer.zero_grad(set_to_none=True)
@@ -1108,6 +1202,7 @@ def run_supervised_phase(
         "checkpoint": str(best_path),
         "phase_wall_time_sec": phase_wall_time_sec,
         "peak_train_memory_mb": peak_train_memory_mb,
+        **trainable_summary,
     }
 
 
@@ -1218,29 +1313,30 @@ def run_hybrid_es(
             device=context.device,
         )
         compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, generation)
+        step_routing_cfg = current_routing_cfg(routing_cfg, generation)
         forced_actions, action_masks, oracle_actions, oracle_action_mask, oracle_route_weight, delay_write_weight = build_routing_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
             batch,
-            routing_cfg,
+            step_routing_cfg,
             split="train",
         )
         local_rewards = []

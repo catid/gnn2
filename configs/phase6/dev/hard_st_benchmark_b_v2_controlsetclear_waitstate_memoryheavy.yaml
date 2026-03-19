@@ -1,0 +1,18 @@
+_base_: ./hard_st_benchmark_b_v2_controlsetclear_memoryheavy.yaml
+
+experiment:
+  seed: 990
+
+model:
+  wait_state_dim: 8
+  wait_state_input_scale: 0.5
+  control_input_scale: 2.0
+  packet_memory_slots: 8
+
+routing:
+  wait_loss_weight: 0.25
+  wait_target_scope: oracle_delayed_only
+
+training:
+  train_steps: 320
+  val_every: 20

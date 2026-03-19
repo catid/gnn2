@@ -1,0 +1,27 @@
+_base_: ../../phase5/dev/hard_st_benchmark_b_v2_control_router2_sticky_oraclecontrol_opt.yaml
+
+experiment:
+  seed: 984
+  results_root: results/phase6_dev
+
+model:
+  control_state_dim: 8
+  control_input_scale: 2.0
+  control_router_scale: 2.0
+  packet_memory_slots: 8
+
+routing:
+  oracle_route_weight_start: 0.2
+  oracle_route_weight_end: 0.05
+  oracle_route_weight_schedule_steps: 240
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.25
+  control_state_weight_schedule_steps: 240
+  anti_exit_weight_start: 0.15
+  anti_exit_weight_end: 0.05
+  anti_exit_weight_schedule_steps: 240
+
+training:
+  train_steps: 320
+  val_every: 20
+  selection_metric: per_mode.delay_to_final_query.accuracy

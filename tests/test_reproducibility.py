@@ -11,6 +11,8 @@ from src.data.benchmarks import (
 from src.models import PacketRoutingModel
 from src.train.run import (
     build_control_controls,
+    configure_trainable_parameters,
+    current_routing_cfg,
     build_release_controls,
     build_wait_controls,
     seed_everything,
@@ -273,6 +275,67 @@ def test_build_wait_controls_oracle_all_uses_oracle_delay_actions() -> None:
     assert torch.equal(targets[0], torch.tensor([1.0, 1.0, 1.0, 0.0]))
     assert torch.equal(targets[1], torch.tensor([1.0, 1.0, 0.0, 0.0]))
     assert torch.equal(target_mask[1], torch.tensor([1.0, 1.0, 1.0, 0.0]))
+
+
+def test_current_routing_cfg_applies_boolean_and_scalar_schedules() -> None:
+    cfg = {
+        "force_oracle_actions": True,
+        "force_oracle_actions_until_step": 5,
+        "exit_mask_final_query_only": True,
+        "exit_mask_final_query_only_start_step": 3,
+        "oracle_route_weight_start": 0.4,
+        "oracle_route_weight_end": 0.1,
+        "oracle_route_weight_schedule_steps": 10,
+    }
+
+    step0 = current_routing_cfg(cfg, 0)
+    step4 = current_routing_cfg(cfg, 4)
+    step7 = current_routing_cfg(cfg, 7)
+
+    assert step0["force_oracle_actions"] is True
+    assert step0["exit_mask_final_query_only"] is False
+    assert abs(step0["oracle_route_weight"] - 0.4) < 1e-6
+
+    assert step4["force_oracle_actions"] is True
+    assert step4["exit_mask_final_query_only"] is True
+    assert abs(step4["oracle_route_weight"] - 0.28) < 1e-6
+
+    assert step7["force_oracle_actions"] is False
+    assert step7["exit_mask_final_query_only"] is True
+    assert abs(step7["oracle_route_weight"] - 0.19) < 1e-6
+
+
+def test_configure_trainable_parameters_respects_allowlist_and_freeze_rules() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 2,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 2,
+            "packet_memory_slots": 2,
+            "packet_memory_dim": 3,
+            "control_state_dim": 2,
+        }
+    )
+
+    summary = configure_trainable_parameters(
+        model,
+        {
+            "trainable_prefixes": ["memory_", "readout", "core.packet_adapter"],
+            "freeze_prefixes": ["memory_read_gate"],
+        },
+    )
+
+    enabled = set(summary["trainable_parameter_names"])
+    assert "readout.0.weight" in enabled
+    assert "core.packet_adapter.down.weight" in enabled
+    assert "memory_write_gate.weight" in enabled
+    assert "memory_read_gate.weight" not in enabled
+    assert "core.router_mlp.1.weight" not in enabled
+    assert summary["trainable_parameter_count"] < summary["total_parameter_count"]
 
 
 def test_build_release_controls_can_focus_on_final_query_mode() -> None:

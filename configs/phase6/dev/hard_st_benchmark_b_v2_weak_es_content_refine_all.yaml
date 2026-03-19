@@ -1,0 +1,25 @@
+_base_: ./hard_st_benchmark_b_v2_router2_setclear_base.yaml
+
+experiment:
+  seed: 970
+
+training:
+  train_steps: 160
+  val_every: 20
+  lr: 0.0001
+  selection_metric: per_mode.delay_to_final_query.accuracy
+  freeze_prefixes:
+    - core.router_
+    - control_
+    - wait_
+    - release_
+
+routing:
+  oracle_route_weight: 0.0
+  control_state_weight: 0.0
+  anti_exit_weight: 0.0
+  wait_loss_weight: 0.0
+  release_loss_weight: 0.0
+  delay_write_weight: 0.25
+  memory_payload_weight: 0.75
+

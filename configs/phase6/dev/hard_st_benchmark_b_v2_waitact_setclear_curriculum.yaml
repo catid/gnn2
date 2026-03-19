@@ -1,0 +1,26 @@
+_base_: ../../phase5/dev/hard_st_benchmark_b_v2_waitact_waitloss_controlsetclear_opt.yaml
+
+experiment:
+  seed: 980
+  results_root: results/phase6_dev
+
+routing:
+  wait_target_scope: oracle_delayed_only
+  oracle_route_weight_start: 0.2
+  oracle_route_weight_end: 0.05
+  oracle_route_weight_schedule_steps: 240
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.25
+  control_state_weight_schedule_steps: 240
+  anti_exit_weight_start: 0.15
+  anti_exit_weight_end: 0.05
+  anti_exit_weight_schedule_steps: 240
+  exit_mask_final_query_only: true
+  exit_mask_final_query_only_until_step: 96
+  exit_mask_trigger_exit_until_trigger: true
+  exit_mask_trigger_exit_until_trigger_until_step: 96
+
+training:
+  train_steps: 320
+  val_every: 20
+  selection_metric: per_mode.delay_to_final_query.accuracy

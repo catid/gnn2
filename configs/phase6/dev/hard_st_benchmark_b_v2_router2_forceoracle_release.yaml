@@ -1,0 +1,21 @@
+_base_: ./hard_st_benchmark_b_v2_router2_setclear_base.yaml
+
+experiment:
+  seed: 986
+
+routing:
+  force_oracle_actions: true
+  force_oracle_actions_until_step: 96
+  oracle_route_weight_start: 0.5
+  oracle_route_weight_end: 0.05
+  oracle_route_weight_schedule_steps: 160
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.25
+  control_state_weight_schedule_steps: 240
+  anti_exit_weight_start: 0.15
+  anti_exit_weight_end: 0.05
+  anti_exit_weight_schedule_steps: 240
+
+training:
+  train_steps: 320
+  val_every: 20

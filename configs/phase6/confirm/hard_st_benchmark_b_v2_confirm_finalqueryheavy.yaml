@@ -1,0 +1,6 @@
+_base_: ../dev/hard_st_benchmark_b_v2_router2_setclear_base.yaml
+
+benchmark:
+  confirm_seed: 22001
+  mode_probs: [0.1, 0.1, 0.8]
+

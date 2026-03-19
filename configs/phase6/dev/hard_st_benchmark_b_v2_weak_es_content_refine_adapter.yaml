@@ -1,0 +1,15 @@
+_base_: ./hard_st_benchmark_b_v2_weak_es_content_refine_all.yaml
+
+experiment:
+  seed: 972
+
+training:
+  trainable_prefixes:
+    - core.packet_adapter
+    - sink_proj
+    - readout
+
+routing:
+  delay_write_weight: 0.1
+  memory_payload_weight: 0.5
+
