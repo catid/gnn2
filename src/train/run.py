@@ -989,6 +989,29 @@ def load_checkpoint(
     return payload
 
 
+def reinforce_advantages(
+    reward: torch.Tensor,
+    method_cfg: dict[str, Any],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    reward = reward.float()
+    baseline_mode = str(method_cfg.get("baseline_mode", "batch_mean"))
+    if baseline_mode == "none":
+        baseline = torch.zeros((), device=reward.device, dtype=reward.dtype)
+        centered = reward
+    else:
+        baseline = reward.mean()
+        centered = reward - baseline
+    advantage_mode = str(method_cfg.get("advantage_mode", "standardize"))
+    if advantage_mode == "standardize":
+        denom = centered.std(unbiased=False).clamp_min(1e-6)
+        return centered / denom, baseline
+    if advantage_mode == "center":
+        return centered, baseline
+    if advantage_mode == "none":
+        return reward, baseline
+    raise ValueError(f"Unknown advantage_mode: {advantage_mode}")
+
+
 def run_supervised_phase(
     *,
     phase_name: str,
@@ -1200,6 +1223,258 @@ def run_supervised_phase(
             compute_penalties=eval_compute_penalties,
             temperature=temperature,
             estimator=estimator,
+            amp_enabled=amp_enabled,
+            amp_dtype=amp_dtype,
+            routing_cfg=None,
+        )
+        split_metrics.update({"phase": phase_name, "split": split_name, "step": total_steps})
+        logger.write(split_metrics)
+        final_evals[split_name] = split_metrics
+    return {
+        "best_val_accuracy": best_val,
+        "best_val_score": best_val_score,
+        "best_metric_name": best_metric_name,
+        "best_val_metrics": best_val_metrics,
+        **final_evals,
+        "checkpoint": str(best_path),
+        "phase_wall_time_sec": phase_wall_time_sec,
+        "peak_train_memory_mb": peak_train_memory_mb,
+        **trainable_summary,
+    }
+
+
+def run_reinforce_phase(
+    *,
+    phase_name: str,
+    model: PacketRoutingModel,
+    benchmark,
+    benchmark_name: str,
+    cfg: dict[str, Any],
+    device: torch.device,
+    results_dir: Path,
+    logger: JsonlLogger,
+    temperature: float,
+) -> dict[str, Any]:
+    train_cfg = cfg["training"]
+    system_cfg = cfg.get("system", {})
+    objective_cfg = cfg["objective"]
+    schedule_cfg = cfg.get("objective_schedule", {})
+    routing_cfg = cfg.get("routing", {})
+    method_cfg = cfg["method"]
+    amp_enabled = bool(system_cfg.get("amp", False))
+    amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
+    policy_weight = float(method_cfg.get("policy_weight", 1.0))
+    supervised_weight = float(method_cfg.get("supervised_weight", 1.0))
+    entropy_weight = float(method_cfg.get("entropy_weight", 0.0))
+
+    trainable_summary = configure_trainable_parameters(model, train_cfg)
+    optimizer = build_supervised_optimizer(model, train_cfg)
+    scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled and device.type == "cuda")
+    start_step = 0
+    best_val = -1.0
+    best_path = results_dir / f"{phase_name}_best.pt"
+    last_path = results_dir / f"{phase_name}_last.pt"
+
+    if cfg.get("resume"):
+        payload = load_checkpoint(
+            cfg["resume"],
+            model,
+            optimizer,
+            strict=bool(cfg.get("resume_strict", True)),
+        )
+        start_step = int(payload.get("step", 0))
+
+    configured_total_steps = int(train_cfg["train_steps"])
+    if "train_steps_delta" in train_cfg:
+        total_steps = start_step + int(train_cfg["train_steps_delta"])
+    else:
+        total_steps = configured_total_steps
+    eval_compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, total_steps)
+    model.train()
+    phase_start_time = time.time()
+    peak_train_memory_mb = 0.0
+    best_val_metrics: dict[str, Any] | None = None
+    best_val_score = float("-inf")
+    best_metric_name = str(train_cfg.get("selection_metric", "accuracy"))
+    progress = tqdm(range(start_step, total_steps), disable=False)
+    for step in progress:
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
+        batch = benchmark.sample_batch(
+            batch_size=int(train_cfg["batch_size"]),
+            split="train",
+            step=step,
+            device=device,
+        )
+        train_temperature = current_training_temperature(method_cfg, step)
+        compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, step)
+        step_routing_cfg = current_routing_cfg(routing_cfg, step)
+        forced_actions, action_masks, oracle_actions, oracle_action_mask, oracle_route_weight, delay_write_weight = build_routing_controls(
+            batch,
+            step_routing_cfg,
+            split="train",
+        )
+        memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+            batch,
+            step_routing_cfg,
+            split="train",
+        )
+        control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
+            batch,
+            step_routing_cfg,
+            split="train",
+        )
+        wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
+            batch,
+            step_routing_cfg,
+            split="train",
+        )
+        release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
+            batch,
+            step_routing_cfg,
+            split="train",
+        )
+        optimizer.zero_grad(set_to_none=True)
+        start_time = time.time()
+        with autocast_context(device, amp_enabled, amp_dtype):
+            output = model(
+                observations=batch.observations,
+                labels=batch.labels,
+                route_mode="sample",
+                compute_penalties=compute_penalties,
+                temperature=train_temperature,
+                estimator="straight_through",
+                truncate_bptt_steps=int(train_cfg.get("truncate_bptt_steps", 0)),
+                forced_actions=forced_actions,
+                action_masks=action_masks,
+                oracle_actions=oracle_actions,
+                oracle_action_mask=oracle_action_mask,
+                oracle_route_weight=oracle_route_weight,
+                delay_write_targets=batch.delay_write_targets,
+                delay_write_mask=batch.delay_write_mask,
+                delay_write_weight=delay_write_weight,
+                memory_payload_targets=memory_payload_targets,
+                memory_payload_mask=memory_payload_mask,
+                memory_payload_weight=memory_payload_weight,
+                control_targets=control_targets,
+                control_mask=control_mask,
+                control_weight=control_weight,
+                anti_exit_mask=anti_exit_mask,
+                anti_exit_weight=anti_exit_weight,
+                wait_targets=wait_targets,
+                wait_mask=wait_mask,
+                wait_weight=wait_weight,
+                wait_positive_weight=wait_positive_weight,
+                wait_negative_weight=wait_negative_weight,
+                release_targets=release_targets,
+                release_mask=release_mask,
+                release_weight=release_weight,
+                release_positive_weight=release_positive_weight,
+            )
+            reward = build_reward(
+                output.logits,
+                batch.labels,
+                output.stats,
+                objective_cfg,
+                reward_penalties=compute_penalties,
+            )
+            advantages, baseline = reinforce_advantages(reward, method_cfg)
+            policy_logprob = output.stats["policy_logprob"].float()
+            policy_loss = -(advantages.detach() * policy_logprob).mean()
+            entropy_bonus = output.stats["route_entropy"].float().mean()
+            total_loss = (
+                supervised_weight * output.loss.float()
+                + policy_weight * policy_loss
+                - entropy_weight * entropy_bonus
+            )
+        scaler.scale(total_loss).backward()
+        scaler.unscale_(optimizer)
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            float(train_cfg.get("grad_clip", 1.0)),
+        )
+        scaler.step(optimizer)
+        scaler.update()
+
+        batch_metrics = tensor_dict_mean([summarize_batch(batch, output, benchmark_name)])
+        batch_metrics.update(
+            {
+                "phase": phase_name,
+                "split": "train",
+                "step": step,
+                "examples_per_sec": float(train_cfg["batch_size"]) / max(1e-6, time.time() - start_time),
+                "peak_memory_mb": (
+                    float(torch.cuda.max_memory_allocated(device) / (1024**2))
+                    if device.type == "cuda"
+                    else 0.0
+                ),
+                "temperature": train_temperature,
+                "reward_mean": float(reward.mean().detach().item()),
+                "reward_std": float(reward.std(unbiased=False).detach().item()),
+                "baseline": float(baseline.detach().item()),
+                "advantage_mean": float(advantages.mean().detach().item()),
+                "advantage_std": float(advantages.std(unbiased=False).detach().item()),
+                "policy_logprob_mean": float(policy_logprob.mean().detach().item()),
+                "policy_loss": float(policy_loss.detach().item()),
+                "entropy_bonus": float(entropy_bonus.detach().item()),
+                "policy_total_loss": float(total_loss.detach().item()),
+            }
+        )
+        peak_train_memory_mb = max(peak_train_memory_mb, float(batch_metrics["peak_memory_mb"]))
+        logger.write(batch_metrics)
+        progress.set_description(
+            f"{phase_name} step={step} reward={batch_metrics['reward_mean']:.3f} acc={batch_metrics['accuracy']:.3f}"
+        )
+
+        val_every = int(train_cfg.get("val_every", 25))
+        if (step + 1) % val_every == 0 or step + 1 == total_steps:
+            val_metrics = evaluate_model(
+                model=model,
+                benchmark=benchmark,
+                device=device,
+                benchmark_name=benchmark_name,
+                split="val",
+                num_batches=int(train_cfg.get("val_batches", 8)),
+                batch_size=int(train_cfg.get("val_batch_size", train_cfg["batch_size"])),
+                route_mode="hard",
+                compute_penalties=eval_compute_penalties,
+                temperature=temperature,
+                estimator="straight_through",
+                amp_enabled=amp_enabled,
+                amp_dtype=amp_dtype,
+                routing_cfg=None,
+            )
+            val_metrics.update({"phase": phase_name, "split": "val", "step": step})
+            peak_train_memory_mb = max(peak_train_memory_mb, float(val_metrics["peak_memory_mb"]))
+            logger.write(val_metrics)
+            val_score, metric_name = validation_score(val_metrics, cfg, section="training")
+            if val_score > best_val_score:
+                best_val_score = val_score
+                best_metric_name = metric_name
+                best_val = val_metrics["accuracy"]
+                best_val_metrics = val_metrics
+                save_checkpoint(best_path, model, optimizer, step, {"phase": phase_name})
+            save_checkpoint(last_path, model, optimizer, step, {"phase": phase_name})
+
+    if best_path.exists():
+        load_checkpoint(best_path, model)
+
+    phase_wall_time_sec = time.time() - phase_start_time
+    eval_batch_size, eval_splits = evaluation_requests(section_cfg=train_cfg, train_cfg=train_cfg)
+    final_evals: dict[str, Any] = {}
+    for split_name, num_batches in eval_splits:
+        split_metrics = evaluate_model(
+            model=model,
+            benchmark=benchmark,
+            device=device,
+            benchmark_name=benchmark_name,
+            split=split_name,
+            num_batches=num_batches,
+            batch_size=eval_batch_size,
+            route_mode="hard",
+            compute_penalties=eval_compute_penalties,
+            temperature=temperature,
+            estimator="straight_through",
             amp_enabled=amp_enabled,
             amp_dtype=amp_dtype,
             routing_cfg=None,
@@ -1612,6 +1887,18 @@ def main() -> None:
             context=context,
             results_dir=results_dir,
             logger=logger,
+        )
+    elif method_name == "reinforce":
+        summary = run_reinforce_phase(
+            phase_name="reinforce",
+            model=model,
+            benchmark=benchmark,
+            benchmark_name=benchmark_name,
+            cfg=cfg,
+            device=context.device,
+            results_dir=results_dir,
+            logger=logger,
+            temperature=float(cfg["method"].get("temperature", 1.0)),
         )
     else:
         raise ValueError(f"Unknown method: {method_name}")

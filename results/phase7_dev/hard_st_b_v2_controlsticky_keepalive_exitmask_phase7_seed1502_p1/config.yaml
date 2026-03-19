@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_finalquerywaitonly.yaml
+
+experiment:
+  seed: 1502
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_final_query_only_until_step: 128
+  anti_exit_weight_start: 0.18
+  anti_exit_weight_end: 0.04
+  anti_exit_weight_schedule_steps: 320
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.35
+  control_state_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 384
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

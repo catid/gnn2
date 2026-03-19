@@ -1,0 +1,18 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_controlwaitact_supervision_releaseaux.yaml
+
+experiment:
+  seed: 1303
+  results_root: results/phase7_dev
+
+routing:
+  release_loss_weight_start: 0.65
+  release_loss_weight_end: 0.15
+  release_loss_weight_schedule_steps: 320
+  release_positive_weight: 5.0
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.3
+  control_state_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 384
+  val_every: 24

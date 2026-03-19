@@ -432,6 +432,7 @@ class PacketRoutingModel(nn.Module):
         route_entropy_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         route_conf_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         route_weight_total = torch.zeros(batch_size, device=device, dtype=dtype)
+        policy_logprob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         transition_totals = torch.zeros(batch_size, 3, 3, device=device, dtype=dtype)
         prev_action_summary = torch.zeros(batch_size, 3, device=device, dtype=dtype)
         prev_has_action = torch.zeros(batch_size, device=device, dtype=torch.bool)
@@ -904,12 +905,27 @@ class PacketRoutingModel(nn.Module):
                     anti_exit_loss = anti_exit_loss + (penalty.to(dtype) * weight.to(dtype)).sum()
                     anti_exit_total = anti_exit_total + weight.sum().to(dtype)
 
-                actions = self._route_actions(
-                    logits=masked_logits,
-                    route_mode=route_mode,
-                    temperature=temperature,
-                    estimator=estimator,
-                )
+                selected_logprob = None
+                if route_mode == "sample":
+                    sampled_indices = torch.multinomial(
+                        router_probs.reshape(-1, router_probs.shape[-1]),
+                        num_samples=1,
+                    ).reshape(batch_size, self.num_nodes)
+                    actions = F.one_hot(sampled_indices, num_classes=3).to(dtype)
+                    selected_logprob = torch.log(
+                        torch.gather(
+                            router_probs,
+                            dim=-1,
+                            index=sampled_indices.unsqueeze(-1),
+                        ).squeeze(-1).clamp_min(1e-8)
+                    )
+                else:
+                    actions = self._route_actions(
+                        logits=masked_logits,
+                        route_mode=route_mode,
+                        temperature=temperature,
+                        estimator=estimator,
+                    )
                 if forced_actions is not None:
                     forced_step = forced_actions[:, time_index]
                     valid = forced_step >= 0
@@ -920,6 +936,14 @@ class PacketRoutingModel(nn.Module):
                             forced.view(batch_size, 1, 3).expand(-1, self.num_nodes, -1),
                             actions,
                         )
+                        if selected_logprob is not None:
+                            selected_logprob = torch.where(
+                                valid.view(batch_size, 1),
+                                torch.zeros_like(selected_logprob),
+                                selected_logprob,
+                            )
+                if selected_logprob is not None:
+                    policy_logprob_sum = policy_logprob_sum + (selected_logprob.to(dtype) * mass).sum(dim=1)
 
                 action_summary = (mass.unsqueeze(-1) * actions).sum(dim=1)
                 if trace is not None:
@@ -1164,6 +1188,7 @@ class PacketRoutingModel(nn.Module):
             "delay_rate": action_rates[:, ACTION_DELAY],
             "route_entropy": route_entropy_sum / route_weight_total.clamp_min(float(eps)),
             "router_confidence": route_conf_sum / route_weight_total.clamp_min(float(eps)),
+            "policy_logprob": policy_logprob_sum,
             "mailbox_occupancy": mailbox_mass_sum / mailbox_steps.clamp_min(1.0),
             "mailbox_peak": mailbox_peak,
             "packet_age_mean": age_mass_sum / age_weight_total.clamp_min(float(eps)),

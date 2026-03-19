@@ -1,0 +1,30 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_controlwaitact_releasegate_curriculum.yaml
+
+experiment:
+  seed: 1305
+  results_root: results/phase7_dev
+
+model:
+  routing_head_mode: control_wait_act
+  control_state_mode: sticky
+  control_input_scale: 2.0
+  control_router_scale: 2.0
+  release_scale: 1.5
+  release_gate_mode: direct
+  release_gate_scale: 2.0
+
+routing:
+  control_target_scope: final_query_wait_only
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.3
+  control_state_weight_schedule_steps: 320
+  release_loss_weight_start: 0.5
+  release_loss_weight_end: 0.1
+  release_loss_weight_schedule_steps: 320
+  release_target_scope: final_query_only
+  release_positive_weight: 4.0
+
+training:
+  train_steps_delta: 384
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

@@ -1,0 +1,29 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_base.yaml
+
+experiment:
+  seed: 1401
+  results_root: results/phase7_dev
+
+method:
+  name: reinforce
+  temperature_start: 1.5
+  temperature_end: 1.0
+  temperature_schedule_steps: 320
+  policy_weight: 1.0
+  supervised_weight: 1.0
+  entropy_weight: 0.02
+  baseline_mode: batch_mean
+  advantage_mode: standardize
+
+routing:
+  oracle_route_weight_start: 0.0
+  oracle_route_weight_end: 0.0
+  control_state_weight_start: 0.0
+  control_state_weight_end: 0.0
+  anti_exit_weight_start: 0.0
+  anti_exit_weight_end: 0.0
+
+training:
+  controller_lr_scale: 2.0
+  controller_weight_decay: 0.0
+  selection_metric: per_mode.delay_to_final_query.accuracy

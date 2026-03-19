@@ -1,0 +1,5 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_controlsetclear_memoryheavy_exitselect.yaml
+
+experiment:
+  seed: 1306
+  results_root: results/phase7_dev

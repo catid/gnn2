@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_base.yaml
+
+experiment:
+  seed: 1003
+
+routing:
+  control_target_scope: final_query_wait_only
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.6
+  control_state_weight_schedule_steps: 384
+  anti_exit_weight_start: 0.25
+  anti_exit_weight_end: 0.08
+  anti_exit_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 384
+  controller_lr_scale: 2.5
+  controller_weight_decay: 0.0
+  val_every: 24

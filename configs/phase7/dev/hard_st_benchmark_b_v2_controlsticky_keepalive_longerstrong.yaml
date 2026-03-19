@@ -1,0 +1,22 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_finalqueryinclusive.yaml
+
+experiment:
+  seed: 1006
+
+model:
+  control_input_scale: 3.0
+  control_router_scale: 2.75
+  control_write_bias: -1.5
+  packet_memory_slots: 6
+
+routing:
+  control_state_weight_end: 0.65
+  control_state_weight_schedule_steps: 448
+  anti_exit_weight_start: 0.22
+  anti_exit_weight_end: 0.1
+  anti_exit_weight_schedule_steps: 384
+
+training:
+  train_steps_delta: 448
+  controller_lr_scale: 3.0
+  val_every: 24

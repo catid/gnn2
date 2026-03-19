@@ -1,0 +1,13 @@
+_base_: ./reinforce_benchmark_b_v2_controlsticky_keepalive_base.yaml
+
+experiment:
+  seed: 1403
+  results_root: results/phase7_dev
+
+routing:
+  control_state_weight_start: 0.25
+  control_state_weight_end: 0.05
+  control_state_weight_schedule_steps: 320
+  anti_exit_weight_start: 0.05
+  anti_exit_weight_end: 0.0
+  anti_exit_weight_schedule_steps: 320

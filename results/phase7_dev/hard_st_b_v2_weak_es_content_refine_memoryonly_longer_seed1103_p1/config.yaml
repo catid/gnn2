@@ -1,0 +1,10 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_weak_es_content_refine_memoryonly.yaml
+
+experiment:
+  seed: 1101
+  results_root: results/phase7_dev
+
+training:
+  train_steps_delta: 224
+  lr: 0.00008
+  val_every: 16

@@ -1,0 +1,21 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_releaseaux.yaml
+
+experiment:
+  seed: 1503
+
+routing:
+  exit_mask_final_query_only: true
+  exit_mask_final_query_only_until_step: 128
+  release_loss_weight_start: 0.45
+  release_loss_weight_end: 0.10
+  release_loss_weight_schedule_steps: 320
+  release_target_scope: final_query_only
+  release_positive_weight: 5.0
+  anti_exit_weight_start: 0.20
+  anti_exit_weight_end: 0.05
+  anti_exit_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 384
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

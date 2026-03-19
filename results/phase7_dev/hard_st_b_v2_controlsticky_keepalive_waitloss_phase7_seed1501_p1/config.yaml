@@ -1,0 +1,20 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_finalquerywaitonly.yaml
+
+experiment:
+  seed: 1501
+
+routing:
+  wait_loss_weight_start: 0.45
+  wait_loss_weight_end: 0.10
+  wait_loss_weight_schedule_steps: 320
+  wait_target_scope: final_query_only
+  wait_positive_weight: 4.0
+  wait_negative_weight: 1.5
+  anti_exit_weight_start: 0.28
+  anti_exit_weight_end: 0.06
+  anti_exit_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 384
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

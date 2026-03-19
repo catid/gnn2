@@ -1,0 +1,10 @@
+_base_: ./reinforce_benchmark_b_v2_controlsticky_keepalive_base.yaml
+
+experiment:
+  seed: 1402
+  results_root: results/phase7_dev
+
+method:
+  entropy_weight: 0.05
+  temperature_start: 2.0
+  temperature_end: 1.0

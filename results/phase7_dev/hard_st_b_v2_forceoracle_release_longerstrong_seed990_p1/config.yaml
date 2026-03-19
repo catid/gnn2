@@ -1,0 +1,19 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_router2_forceoracle_release_longer.yaml
+
+experiment:
+  seed: 1302
+  results_root: results/phase7_dev
+
+routing:
+  force_oracle_actions_until_step: 128
+  oracle_route_weight_start: 0.6
+  oracle_route_weight_end: 0.02
+  oracle_route_weight_schedule_steps: 224
+  anti_exit_weight_start: 0.22
+  anti_exit_weight_end: 0.08
+  anti_exit_weight_schedule_steps: 352
+
+training:
+  train_steps_delta: 384
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

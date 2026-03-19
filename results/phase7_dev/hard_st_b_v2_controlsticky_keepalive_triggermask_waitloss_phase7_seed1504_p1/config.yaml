@@ -1,0 +1,17 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_waitloss_phase7.yaml
+
+experiment:
+  seed: 1504
+
+routing:
+  exit_mask_trigger_exit_until_trigger: true
+  exit_mask_trigger_exit_until_trigger_until_step: 128
+  wait_loss_weight_start: 0.35
+  wait_loss_weight_end: 0.08
+  wait_loss_weight_schedule_steps: 320
+  anti_exit_weight_start: 0.22
+  anti_exit_weight_end: 0.05
+  anti_exit_weight_schedule_steps: 320
+
+training:
+  selection_metric: per_mode.delay_to_final_query.route_match

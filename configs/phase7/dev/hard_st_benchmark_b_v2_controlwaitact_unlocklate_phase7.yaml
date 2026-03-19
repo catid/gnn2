@@ -1,0 +1,17 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_controlwaitact_supervision_unlocklate.yaml
+
+experiment:
+  seed: 1304
+  results_root: results/phase7_dev
+
+routing:
+  oracle_route_weight_start: 0.2
+  oracle_route_weight_end: 0.0
+  oracle_route_weight_schedule_steps: 240
+  anti_exit_weight_start: 0.18
+  anti_exit_weight_end: 0.06
+  anti_exit_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 384
+  val_every: 24

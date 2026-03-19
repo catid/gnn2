@@ -1,0 +1,29 @@
+_base_: ../../phase5/dev/hybrid_es_benchmark_b_v2_control_router2_setclear_oraclecontrol_resume.yaml
+
+experiment:
+  seed: 1201
+  results_root: results/phase7_dev
+
+resume_strict: false
+
+model:
+  control_state_mode: sticky
+  control_router_scale: 2.0
+  control_input_scale: 2.5
+  control_write_bias: -2.0
+  packet_memory_slots: 4
+
+routing:
+  control_target_scope: final_query_wait_only
+  control_state_weight: 1.0
+  anti_exit_weight: 0.1
+
+es:
+  generations: 32
+  population: 64
+  rank: 4
+  sigma: 0.03
+  val_every: 4
+  val_batches: 10
+  test_batches: 16
+  selection_metric: per_mode.delay_to_final_query.accuracy
