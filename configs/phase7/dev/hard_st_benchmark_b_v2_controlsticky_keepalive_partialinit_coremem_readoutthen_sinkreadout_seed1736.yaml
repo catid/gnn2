@@ -1,0 +1,4 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_partialinit_coremem_readoutthen_sinkreadout.yaml
+
+experiment:
+  seed: 1736

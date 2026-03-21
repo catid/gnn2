@@ -1,0 +1,5 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_router2_setclear_base.yaml
+
+experiment:
+  seed: 1308
+  results_root: results/phase7_dev

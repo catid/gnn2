@@ -1,0 +1,5 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_partialinit_coremem_readoutthen_sinkreadout_seed1735.yaml
+
+training:
+  train_steps_delta: 320
+  selection_metric: accuracy

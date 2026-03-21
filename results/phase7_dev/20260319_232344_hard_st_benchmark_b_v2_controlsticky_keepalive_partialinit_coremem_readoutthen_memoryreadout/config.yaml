@@ -1,0 +1,16 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1730
+
+resume: results/phase7_dev/20260319_230610_hard_st_benchmark_b_v2_controlsticky_keepalive_partialinit_coremem_train_readoutonly/hard_st_best.pt
+
+training:
+  lr: 0.0001
+  controller_lr_scale: 1.0
+  train_steps_delta: 160
+  val_every: 20
+  selection_metric: per_mode.delay_to_final_query.accuracy
+  trainable_prefixes:
+    - memory_
+    - readout.

@@ -276,6 +276,55 @@ The phase-5 planning and writeups are
 [docs/phase5_report.md](docs/phase5_report.md), and
 [docs/phase5_lessons.md](docs/phase5_lessons.md).
 
+## Phase 7 Commands
+
+Phase 7 broadens the campaign into a balanced discovery / recovery / ES map and
+tracks the full run ledger in `docs/phase7_run_matrix.csv`.
+
+Anchor reproduction:
+
+```bash
+./scripts/run_phase7_cluster_scouts.sh anchors
+```
+
+Representative cluster runs:
+
+```bash
+./scripts/run_phase7_main.sh \
+  configs/phase7/dev/hard_st_benchmark_b_v2_forceoracle_release_longerstrong_refine_memoryreadout_seed1305.yaml \
+  results/phase7_dev/hard_st_b_v2_forceoracle_release_longerstrong_refine_memoryreadout_seed1305_p1
+
+./scripts/run_phase7_main.sh \
+  configs/phase7/dev/hybrid_es_benchmark_b_v2_controlsticky_keepalive_resume.yaml \
+  results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1 \
+  results/phase7_anchor/hard_st_b_v2_controlsticky_keepalive_seed989_rerun1/hard_st_best.pt \
+  2
+```
+
+Confirmation / verification:
+
+```bash
+./scripts/run_phase7_confirm.sh \
+  results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+```
+
+Seed panels:
+
+```bash
+./scripts/run_phase7_seed_panels.sh \
+  configs/phase7/dev/hard_st_benchmark_b_v2_forceoracle_release_longerstrong_refine_memoryreadout_seed1305.yaml \
+  results/phase7_panel/hard_st_b_v2_forceoracle_release_longerstrong_refine_memoryreadout \
+  '' \
+  1302 1303 1304 1305 1306
+```
+
+The phase-7 planning and final writeups are
+[docs/phase7_plan.md](docs/phase7_plan.md),
+[docs/phase7_report.md](docs/phase7_report.md),
+[docs/phase7_lessons.md](docs/phase7_lessons.md),
+[docs/phase7_cluster_scorecards.md](docs/phase7_cluster_scorecards.md), and
+[docs/phase7_run_matrix.csv](docs/phase7_run_matrix.csv).
+
 ## References
 
 The original paper and reference code used to keep the implementation honest are

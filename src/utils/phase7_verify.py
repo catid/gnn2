@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -41,10 +42,90 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def canonical_run_stem(run_name: str) -> str:
+    stem = re.sub(r"_reboot_partial$", "", run_name)
+    stem = re.sub(r"^\d{8}_\d{6}_", "", stem)
+    stem = re.sub(r"_seed\d+(?:_(?:p\d+|rerun\d+))?$", "", stem)
+    return stem
+
+
+def run_name_to_config_basename(run_name: str) -> str | None:
+    stem = canonical_run_stem(run_name)
+    direct_config_prefixes = (
+        "hard_st_benchmark_",
+        "hybrid_es_benchmark_",
+        "reinforce_benchmark_",
+        "soft_benchmark_",
+    )
+    if stem.startswith(direct_config_prefixes):
+        return f"{stem}.yaml"
+    prefix_map = {
+        "hard_st_b_v2_": "hard_st_benchmark_b_v2_",
+        "hybrid_es_b_v2_": "hybrid_es_benchmark_b_v2_",
+        "reinforce_b_v2_": "reinforce_benchmark_b_v2_",
+        "soft_b_v2_": "soft_benchmark_b_v2_",
+    }
+    for run_prefix, config_prefix in prefix_map.items():
+        if stem.startswith(run_prefix):
+            return f"{config_prefix}{stem[len(run_prefix):]}.yaml"
+    return None
+
+
+def find_repo_config_for_run(run_dir: Path) -> Path | None:
+    basename = run_name_to_config_basename(run_dir.name)
+    if basename is None:
+        return None
+    search_roots = [
+        repo_root() / "configs" / "phase7" / "dev",
+        repo_root() / "configs" / "phase7" / "main",
+        repo_root() / "configs",
+    ]
+    seen: set[Path] = set()
+    matches: list[Path] = []
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for candidate in root.rglob(basename):
+            resolved = candidate.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            matches.append(resolved)
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        preferred = [path for path in matches if "/phase7/dev/" in str(path)]
+        if len(preferred) == 1:
+            return preferred[0]
+        return sorted(matches)[0]
+    return None
+
+
+def resolve_config_path(run_dir: Path, config_hint: Path) -> Path:
+    if config_hint.exists():
+        try:
+            load_config(config_hint)
+            return config_hint
+        except FileNotFoundError:
+            pass
+    fallback = find_repo_config_for_run(run_dir)
+    if fallback is not None:
+        return fallback
+    if config_hint.exists():
+        return config_hint
+    raise FileNotFoundError(f"Could not resolve config for run {run_dir} from hint {config_hint}.")
+
+
 def resolve_run_config(run_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     summary_path = run_dir / "summary.json"
-    payload = json.loads(summary_path.read_text())
-    config_path = Path(payload.get("config_path") or run_dir / "config.yaml")
+    payload = json.loads(summary_path.read_text()) if summary_path.exists() else {}
+    config_hint = Path(payload.get("config_path") or run_dir / "config.yaml")
+    config_path = resolve_config_path(run_dir, config_hint)
+    payload.setdefault("config_path", str(config_path))
     return load_config(str(config_path)), payload
 
 
@@ -52,7 +133,7 @@ def resolve_checkpoint(run_dir: Path, method_name: str, explicit: str | None) ->
     if explicit is not None:
         return Path(explicit)
     candidates = []
-    if method_name in {"hard_st", "soft"}:
+    if method_name in {"hard_st", "soft", "reinforce"}:
         candidates.append(run_dir / f"{method_name}_best.pt")
     if method_name == "hybrid_es":
         candidates.append(run_dir / "hybrid_es_best.pt")
@@ -73,6 +154,11 @@ def infer_method_settings(cfg: dict[str, Any]) -> tuple[str, str, float, str, in
     elif method_name == "hard_st":
         route_mode = "hard_st"
         estimator = str(cfg["method"].get("estimator", "straight_through"))
+        section_cfg = cfg["training"]
+        total_steps = int(section_cfg["train_steps"])
+    elif method_name == "reinforce":
+        route_mode = "hard"
+        estimator = "straight_through"
         section_cfg = cfg["training"]
         total_steps = int(section_cfg["train_steps"])
     elif method_name == "hybrid_es":

@@ -1,0 +1,17 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1720
+
+partial_init:
+  run_dir: results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+  include_prefixes:
+    - core.router_
+    - memory_
+    - control_
+    - sink_proj
+    - readout.
+
+training:
+  train_steps_delta: 640
+  val_every: 24

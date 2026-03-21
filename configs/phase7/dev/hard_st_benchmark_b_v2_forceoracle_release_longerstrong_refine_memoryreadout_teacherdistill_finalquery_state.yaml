@@ -1,0 +1,21 @@
+_base_: ./hard_st_benchmark_b_v2_forceoracle_release_longerstrong_refine_memoryreadout.yaml
+
+experiment:
+  seed: 1705
+
+teacher:
+  run_dir: results/phase7_dev/hybrid_es_b_v2_forceoracle_longerstrong_resume_from1305_seed1605_p1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: final_query_only
+  logits_weight: 0.10
+  route_weight: 0.50
+  control_prob_weight: 0.10
+  release_prob_weight: 0.05
+  control_state_weight: 0.15
+  memory_read_weight: 0.20
+
+training:
+  train_steps_delta: 256
+  val_every: 24

@@ -1,0 +1,18 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1722
+
+partial_init:
+  run_dir: results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+  include_prefixes:
+    - core.
+    - memory_
+    - control_
+
+training:
+  lr: 0.0001
+  controller_lr_scale: 1.0
+  train_steps_delta: 384
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

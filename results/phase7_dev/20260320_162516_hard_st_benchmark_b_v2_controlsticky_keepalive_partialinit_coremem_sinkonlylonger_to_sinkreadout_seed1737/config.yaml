@@ -1,0 +1,16 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1737
+
+resume: results/phase7_dev/20260320_161511_hard_st_benchmark_b_v2_controlsticky_keepalive_partialinit_coremem_readoutthen_sinkonly_longer_seed1737/hard_st_best.pt
+
+training:
+  lr: 0.0001
+  controller_lr_scale: 1.0
+  train_steps_delta: 160
+  val_every: 20
+  selection_metric: accuracy
+  trainable_prefixes:
+    - sink_proj
+    - readout.

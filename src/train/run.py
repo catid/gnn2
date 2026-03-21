@@ -39,12 +39,36 @@ class DistContext:
     device: torch.device
 
 
+@dataclass
+class TeacherDistillation:
+    model: PacketRoutingModel
+    route_mode: str
+    temperature: float
+    estimator: str
+    distill_temperature: float
+    target_scope: str
+    logits_weight: float
+    route_weight: float
+    route_action_weight: float
+    control_prob_weight: float
+    release_prob_weight: float
+    wait_prob_weight: float
+    control_state_weight: float
+    memory_read_weight: float
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run packet-routing experiments.")
     parser.add_argument("--config", required=True, help="YAML config path.")
     parser.add_argument("--results-dir", default=None, help="Optional explicit output directory.")
     parser.add_argument("--resume", default=None, help="Optional checkpoint to resume.")
     return parser.parse_args()
+
+
+def apply_cli_overrides(cfg: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    if args.resume is not None:
+        cfg["resume"] = args.resume
+    return cfg
 
 
 def seed_everything(seed: int) -> None:
@@ -905,6 +929,59 @@ def configure_trainable_parameters(
     }
 
 
+def apply_partial_init(
+    model: PacketRoutingModel,
+    init_cfg: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not init_cfg:
+        return {}
+
+    run_dir_value = init_cfg.get("run_dir")
+    if not run_dir_value:
+        raise ValueError("partial_init.run_dir is required when partial_init is configured.")
+
+    checkpoint_path = resolve_checkpoint_from_run_dir(Path(run_dir_value), init_cfg.get("checkpoint"))
+    payload = torch.load(checkpoint_path, map_location="cpu")
+    source_state = payload["model"]
+    current_state = model.state_dict()
+
+    include_prefixes = tuple(init_cfg.get("include_prefixes", []))
+    exclude_prefixes = tuple(init_cfg.get("exclude_prefixes", []))
+    include_exact = set(init_cfg.get("include_exact_names", []))
+    exclude_exact = set(init_cfg.get("exclude_exact_names", []))
+
+    def matches(name: str, prefixes: tuple[str, ...], exact: set[str]) -> bool:
+        return name in exact or any(name.startswith(prefix) for prefix in prefixes)
+
+    use_allowlist = bool(include_prefixes or include_exact)
+    copied_names: list[str] = []
+    skipped_shape: list[str] = []
+    skipped_filter: list[str] = []
+    for name, tensor in source_state.items():
+        if name not in current_state or current_state[name].shape != tensor.shape:
+            skipped_shape.append(name)
+            continue
+        allow = matches(name, include_prefixes, include_exact) if use_allowlist else True
+        blocked = matches(name, exclude_prefixes, exclude_exact)
+        if not allow or blocked:
+            skipped_filter.append(name)
+            continue
+        current_state[name].copy_(tensor)
+        copied_names.append(name)
+
+    if not copied_names:
+        raise ValueError(f"partial_init copied zero parameters from {checkpoint_path}.")
+
+    model.load_state_dict(current_state, strict=False)
+    return {
+        "partial_init_checkpoint": str(checkpoint_path),
+        "partial_init_parameter_count": len(copied_names),
+        "partial_init_parameter_names": copied_names,
+        "partial_init_skipped_shape_count": len(skipped_shape),
+        "partial_init_skipped_filter_count": len(skipped_filter),
+    }
+
+
 def build_supervised_optimizer(
     model: PacketRoutingModel,
     train_cfg: dict[str, Any],
@@ -989,6 +1066,227 @@ def load_checkpoint(
     return payload
 
 
+def resolve_checkpoint_from_run_dir(run_dir: Path, explicit: str | None = None) -> Path:
+    if explicit is not None:
+        return Path(explicit)
+    candidates = [
+        run_dir / "hybrid_es_best.pt",
+        run_dir / "hard_st_best.pt",
+        run_dir / "reinforce_best.pt",
+        run_dir / "soft_best.pt",
+    ]
+    candidates.extend(sorted(run_dir.glob("*_best.pt")))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(f"No *_best checkpoint found in {run_dir}.")
+
+
+def benchmark_model_config(base_model_cfg: dict[str, Any], benchmark) -> dict[str, Any]:
+    return {
+        **base_model_cfg,
+        "num_nodes": benchmark.num_nodes,
+        "obs_dim": benchmark.obs_dim,
+        "num_classes": benchmark.num_classes,
+        "max_total_steps": benchmark.config.get(
+            "max_total_steps",
+            benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
+        ),
+    }
+
+
+def load_teacher_distillation(
+    cfg: dict[str, Any],
+    *,
+    benchmark,
+    device: torch.device,
+) -> TeacherDistillation | None:
+    teacher_cfg = dict(cfg.get("teacher", {}) or {})
+    weights = {
+        "logits_weight": float(teacher_cfg.get("logits_weight", 0.0)),
+        "route_weight": float(teacher_cfg.get("route_weight", 0.0)),
+        "route_action_weight": float(teacher_cfg.get("route_action_weight", 0.0)),
+        "control_prob_weight": float(teacher_cfg.get("control_prob_weight", 0.0)),
+        "release_prob_weight": float(teacher_cfg.get("release_prob_weight", 0.0)),
+        "wait_prob_weight": float(teacher_cfg.get("wait_prob_weight", 0.0)),
+        "control_state_weight": float(teacher_cfg.get("control_state_weight", 0.0)),
+        "memory_read_weight": float(teacher_cfg.get("memory_read_weight", 0.0)),
+    }
+    if max(weights.values(), default=0.0) <= 0.0:
+        return None
+
+    run_dir = teacher_cfg.get("run_dir")
+    if not run_dir:
+        raise ValueError("Teacher distillation requires teacher.run_dir when any teacher weight is positive.")
+    run_dir = Path(run_dir)
+    summary_path = run_dir / "summary.json"
+    if not summary_path.exists():
+        raise FileNotFoundError(f"Teacher run summary not found: {summary_path}")
+    summary_payload = json.loads(summary_path.read_text())
+    config_path = Path(teacher_cfg.get("config_path") or summary_payload.get("config_path") or (run_dir / "config.yaml"))
+    teacher_base_cfg = load_config(str(config_path))
+    teacher_model = PacketRoutingModel(
+        benchmark_model_config(teacher_base_cfg["model"], benchmark)
+    ).to(device)
+    checkpoint_path = resolve_checkpoint_from_run_dir(run_dir, teacher_cfg.get("checkpoint"))
+    load_checkpoint(
+        checkpoint_path,
+        teacher_model,
+        strict=bool(teacher_cfg.get("strict", teacher_base_cfg.get("resume_strict", True))),
+    )
+    teacher_model.eval()
+    for parameter in teacher_model.parameters():
+        parameter.requires_grad_(False)
+    return TeacherDistillation(
+        model=teacher_model,
+        route_mode=str(teacher_cfg.get("route_mode", "hard")),
+        temperature=float(teacher_cfg.get("temperature", 1.0)),
+        estimator=str(teacher_cfg.get("estimator", "straight_through")),
+        distill_temperature=float(teacher_cfg.get("distill_temperature", 1.0)),
+        target_scope=str(teacher_cfg.get("target_scope", "all")),
+        logits_weight=weights["logits_weight"],
+        route_weight=weights["route_weight"],
+        route_action_weight=weights["route_action_weight"],
+        control_prob_weight=weights["control_prob_weight"],
+        release_prob_weight=weights["release_prob_weight"],
+        wait_prob_weight=weights["wait_prob_weight"],
+        control_state_weight=weights["control_state_weight"],
+        memory_read_weight=weights["memory_read_weight"],
+    )
+
+
+def teacher_sample_weights(
+    batch: BenchmarkBatch,
+    target_scope: str,
+    *,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    weights = torch.ones(batch.labels.shape[0], device=device, dtype=dtype)
+    if target_scope == "all":
+        return weights
+    if target_scope == "final_query_only":
+        mask = batch.metadata.get("needs_final_query")
+        if mask is None:
+            return torch.zeros_like(weights)
+        return mask.to(device=device, dtype=dtype)
+    if target_scope == "delayed_only":
+        delayed = (
+            (batch.modes == LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT)
+            | (batch.modes == LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY)
+        )
+        return delayed.to(device=device, dtype=dtype)
+    raise ValueError(f"Unknown teacher.target_scope: {target_scope}")
+
+
+def _weighted_kl_from_probs(
+    student_probs: torch.Tensor,
+    teacher_probs: torch.Tensor,
+    sample_weights: torch.Tensor,
+) -> torch.Tensor:
+    eps = 1e-6
+    teacher_probs = teacher_probs.float().clamp_min(eps)
+    student_probs = student_probs.float().clamp_min(eps)
+    kl = (teacher_probs * (teacher_probs.log() - student_probs.log())).sum(dim=-1)
+    while sample_weights.dim() < kl.dim():
+        sample_weights = sample_weights.unsqueeze(-1)
+    return (kl * sample_weights).sum() / sample_weights.sum().clamp_min(1.0)
+
+
+def _weighted_mse(
+    student_value: torch.Tensor,
+    teacher_value: torch.Tensor,
+    sample_weights: torch.Tensor,
+) -> torch.Tensor:
+    diff = (student_value.float() - teacher_value.float()).pow(2)
+    while diff.dim() > sample_weights.dim():
+        sample_weights = sample_weights.unsqueeze(-1)
+    reduce_dims = tuple(range(sample_weights.dim(), diff.dim()))
+    if reduce_dims:
+        diff = diff.mean(dim=reduce_dims)
+    return (diff * sample_weights).sum() / sample_weights.sum().clamp_min(1.0)
+
+
+def _weighted_action_ce_from_probs(
+    student_probs: torch.Tensor,
+    teacher_probs: torch.Tensor,
+    sample_weights: torch.Tensor,
+) -> torch.Tensor:
+    eps = 1e-6
+    student_log_probs = student_probs.float().clamp_min(eps).log()
+    teacher_actions = teacher_probs.float().argmax(dim=-1)
+    nll = -student_log_probs.gather(-1, teacher_actions.unsqueeze(-1)).squeeze(-1)
+    while sample_weights.dim() < nll.dim():
+        sample_weights = sample_weights.unsqueeze(-1)
+    return (nll * sample_weights).sum() / sample_weights.sum().clamp_min(1.0)
+
+
+def compute_teacher_distillation_loss(
+    *,
+    batch: BenchmarkBatch,
+    student_output,
+    teacher_output,
+    teacher: TeacherDistillation,
+    device: torch.device,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    dtype = student_output.logits.dtype
+    sample_weights = teacher_sample_weights(batch, teacher.target_scope, device=device, dtype=dtype)
+    if float(sample_weights.sum().detach().item()) <= 0.0:
+        zero = torch.zeros((), device=device, dtype=dtype)
+        return zero, {"teacher_distill_loss": 0.0}
+
+    total_loss = torch.zeros((), device=device, dtype=dtype)
+    metrics: dict[str, float] = {}
+    distill_temperature = max(1e-3, teacher.distill_temperature)
+
+    if teacher.logits_weight > 0.0:
+        student_log_probs = F.log_softmax(student_output.logits.float() / distill_temperature, dim=-1)
+        teacher_probs = F.softmax(teacher_output.logits.float() / distill_temperature, dim=-1)
+        kl = F.kl_div(student_log_probs, teacher_probs, reduction="none").sum(dim=-1)
+        logits_loss = ((kl * sample_weights.float()).sum() / sample_weights.float().sum().clamp_min(1.0)) * (
+            distill_temperature**2
+        )
+        total_loss = total_loss + teacher.logits_weight * logits_loss.to(dtype)
+        metrics["teacher_logits_loss"] = float(logits_loss.detach().item())
+
+    student_trace = student_output.trace or {}
+    teacher_trace = teacher_output.trace or {}
+    if (
+        teacher.route_action_weight > 0.0
+        and "router_probs" in student_trace
+        and "router_probs" in teacher_trace
+        and student_trace["router_probs"].shape == teacher_trace["router_probs"].shape
+    ):
+        route_action_loss = _weighted_action_ce_from_probs(
+            student_trace["router_probs"],
+            teacher_trace["router_probs"],
+            sample_weights,
+        )
+        total_loss = total_loss + teacher.route_action_weight * route_action_loss.to(dtype)
+        metrics["teacher_route_action_loss"] = float(route_action_loss.detach().item())
+    trace_specs = [
+        ("router_probs", teacher.route_weight, "teacher_route_loss", _weighted_kl_from_probs),
+        ("control_prob", teacher.control_prob_weight, "teacher_control_prob_loss", _weighted_mse),
+        ("release_prob", teacher.release_prob_weight, "teacher_release_prob_loss", _weighted_mse),
+        ("wait_prob", teacher.wait_prob_weight, "teacher_wait_prob_loss", _weighted_mse),
+        ("control_state", teacher.control_state_weight, "teacher_control_state_loss", _weighted_mse),
+        ("memory_read_state", teacher.memory_read_weight, "teacher_memory_read_loss", _weighted_mse),
+    ]
+    for key, weight, metric_name, loss_fn in trace_specs:
+        if weight <= 0.0:
+            continue
+        if key not in student_trace or key not in teacher_trace:
+            continue
+        if student_trace[key].shape != teacher_trace[key].shape:
+            continue
+        trace_loss = loss_fn(student_trace[key], teacher_trace[key], sample_weights)
+        total_loss = total_loss + weight * trace_loss.to(dtype)
+        metrics[metric_name] = float(trace_loss.detach().item())
+
+    metrics["teacher_distill_loss"] = float(total_loss.detach().item())
+    return total_loss, metrics
+
+
 def reinforce_advantages(
     reward: torch.Tensor,
     method_cfg: dict[str, Any],
@@ -1034,6 +1332,8 @@ def run_supervised_phase(
     routing_cfg = cfg.get("routing", {})
     amp_enabled = bool(system_cfg.get("amp", False))
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
+    teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device)
+    partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
 
     trainable_summary = configure_trainable_parameters(model, train_cfg)
     optimizer = build_supervised_optimizer(model, train_cfg)
@@ -1102,13 +1402,9 @@ def run_supervised_phase(
             step_routing_cfg,
             split="train",
         )
-        release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
-            batch,
-            step_routing_cfg,
-            split="train",
-        )
         optimizer.zero_grad(set_to_none=True)
         start_time = time.time()
+        return_trace = teacher is not None
         with autocast_context(device, amp_enabled, amp_dtype):
             output = model(
                 observations=batch.observations,
@@ -1143,8 +1439,31 @@ def run_supervised_phase(
                 release_mask=release_mask,
                 release_weight=release_weight,
                 release_positive_weight=release_positive_weight,
+                return_trace=return_trace,
             )
-        scaler.scale(output.loss).backward()
+            teacher_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
+            teacher_metrics: dict[str, float] = {}
+            if teacher is not None:
+                with torch.no_grad():
+                    teacher_output = teacher.model(
+                        observations=batch.observations,
+                        labels=batch.labels,
+                        route_mode=teacher.route_mode,
+                        compute_penalties=compute_penalties,
+                        temperature=teacher.temperature,
+                        estimator=teacher.estimator,
+                        truncate_bptt_steps=0,
+                        return_trace=True,
+                    )
+                teacher_loss, teacher_metrics = compute_teacher_distillation_loss(
+                    batch=batch,
+                    student_output=output,
+                    teacher_output=teacher_output,
+                    teacher=teacher,
+                    device=device,
+                )
+            total_loss = output.loss + teacher_loss
+        scaler.scale(total_loss).backward()
         scaler.unscale_(optimizer)
         torch.nn.utils.clip_grad_norm_(
             model.parameters(),
@@ -1154,6 +1473,10 @@ def run_supervised_phase(
         scaler.update()
 
         batch_metrics = tensor_dict_mean([summarize_batch(batch, output, benchmark_name)])
+        batch_metrics["loss"] = float(total_loss.detach().item())
+        batch_metrics["model_loss"] = float(output.loss.detach().item())
+        if teacher is not None:
+            batch_metrics.update(teacher_metrics)
         batch_metrics.update(
             {
                 "phase": phase_name,
@@ -1240,6 +1563,7 @@ def run_supervised_phase(
         "phase_wall_time_sec": phase_wall_time_sec,
         "peak_train_memory_mb": peak_train_memory_mb,
         **trainable_summary,
+        **partial_init_summary,
     }
 
 
@@ -1801,7 +2125,7 @@ def run_hybrid_es(
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    cfg["resume"] = args.resume
+    cfg = apply_cli_overrides(cfg, args)
 
     system_cfg = cfg.get("system", {})
     cpu_threads = int(system_cfg.get("cpu_threads", 16))
