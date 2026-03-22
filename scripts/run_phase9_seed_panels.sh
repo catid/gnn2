@@ -21,11 +21,11 @@ mkdir -p "${results_root}"
 
 for seed in "$@"; do
   out="${results_root}/seed${seed}"
-  uv run python -m src.train.run \
-    --config "${config}" \
-    --resume "${resume}" \
-    --results-dir "${out}" \
-    >/tmp/phase8_seed_${seed}.log 2>&1 &
+  cmd=(uv run python -m src.train.run --config "${config}" --results-dir "${out}")
+  if [[ -n "${resume}" ]]; then
+    cmd+=(--resume "${resume}")
+  fi
+  "${cmd[@]}" >/tmp/phase9_seed_${seed}.log 2>&1 &
 done
 
 wait
