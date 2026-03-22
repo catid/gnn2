@@ -1,0 +1,8 @@
+_base_: ./hybrid_es_benchmark_b_v2_teacher1874_headonly_queryreadout_resume_from9122.yaml
+
+experiment:
+  seed: 9205
+
+es:
+  generations: 12
+  sigma: 0.015

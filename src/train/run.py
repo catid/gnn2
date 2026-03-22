@@ -965,6 +965,42 @@ def configure_trainable_parameters(
     }
 
 
+def configure_es_parameter_names(
+    model: PacketRoutingModel,
+    es_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    custom_filters = any(
+        es_cfg.get(key)
+        for key in (
+            "trainable_prefixes",
+            "freeze_prefixes",
+            "trainable_exact_names",
+            "freeze_exact_names",
+        )
+    )
+    if custom_filters:
+        info = configure_trainable_parameters(model, es_cfg)
+        return {
+            **info,
+            "es_parameter_names": list(info["trainable_parameter_names"]),
+        }
+
+    parameter_names = model.es_parameter_names(include_adapters=bool(es_cfg.get("evolve_adapters", False)))
+    total_params = 0
+    trainable_params = 0
+    for name, parameter in model.named_parameters():
+        total_params += parameter.numel()
+        parameter.requires_grad = name in parameter_names
+        if parameter.requires_grad:
+            trainable_params += parameter.numel()
+    return {
+        "total_parameter_count": total_params,
+        "trainable_parameter_count": trainable_params,
+        "trainable_parameter_names": list(parameter_names),
+        "es_parameter_names": list(parameter_names),
+    }
+
+
 def apply_partial_init(
     model: PacketRoutingModel,
     init_cfg: dict[str, Any] | None,
@@ -2009,9 +2045,8 @@ def run_hybrid_es(
         if warmstart_ckpt.exists():
             load_checkpoint(warmstart_ckpt, model)
 
-    parameter_names = model.es_parameter_names(include_adapters=bool(es_cfg.get("evolve_adapters", False)))
-    for name, parameter in model.named_parameters():
-        parameter.requires_grad = name in parameter_names
+    es_param_info = configure_es_parameter_names(model, es_cfg)
+    parameter_names = es_param_info["es_parameter_names"]
 
     es = LowRankEvolutionStrategy(
         model=model,

@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1821_refine_queryreadout_contentdistill_longer_lowlr.yaml
+
+experiment:
+  seed: 9145
+
+training:
+  final_query_weight: 3.0
+  non_final_query_weight: 0.5

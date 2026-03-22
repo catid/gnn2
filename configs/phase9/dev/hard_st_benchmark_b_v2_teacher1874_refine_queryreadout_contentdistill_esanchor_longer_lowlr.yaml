@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_queryreadout_contentdistill_longer_lowlr.yaml
+
+experiment:
+  seed: 9144
+
+teacher:
+  run_dir: results/phase9_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
