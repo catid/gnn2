@@ -1,0 +1,34 @@
+_base_: ../../phase7/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1805
+  results_root: results/phase8_dev
+
+teacher:
+  run_dir: results/phase7_dev/hybrid_es_b_v2_forceoracle_teacherdistill_resume_from1703_seed1711_rerun1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: final_query_only
+  route_action_weight: 0.60
+  control_prob_weight: 0.35
+  wait_prob_weight: 0.45
+  release_prob_weight: 0.20
+  control_state_weight: 0.20
+  scale_start: 1.0
+  scale_end: 0.0
+  scale_schedule_steps: 512
+  stop_step: 560
+
+routing:
+  control_state_weight_end: 0.70
+  control_state_weight_schedule_steps: 576
+  anti_exit_weight_start: 0.22
+  anti_exit_weight_end: 0.10
+  anti_exit_weight_schedule_steps: 512
+
+training:
+  train_steps_delta: 640
+  controller_lr_scale: 2.5
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

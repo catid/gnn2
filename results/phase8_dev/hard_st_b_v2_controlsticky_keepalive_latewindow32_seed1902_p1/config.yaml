@@ -1,0 +1,11 @@
+_base_: ../../phase7/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1906
+  results_root: results/phase8_dev
+
+training:
+  train_steps_delta: 512
+  val_every: 24
+  late_window_steps: 32
+  selection_metric: per_mode.delay_to_final_query.route_match

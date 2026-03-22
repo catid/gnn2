@@ -1,0 +1,4 @@
+_base_: ./hybrid_es_benchmark_b_v2_teacher1826_selectroute_resume_from1826.yaml
+
+es:
+  evolve_adapters: false

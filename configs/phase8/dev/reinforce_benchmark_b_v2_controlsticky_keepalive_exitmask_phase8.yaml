@@ -1,0 +1,5 @@
+_base_: ../../phase7/dev/reinforce_benchmark_b_v2_controlsticky_keepalive_exitmask.yaml
+
+experiment:
+  seed: 1961
+  results_root: results/phase8_dev

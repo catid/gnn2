@@ -119,34 +119,68 @@ The test suite covers:
 - reproducibility for fixed seeds
 - a tiny end-to-end CLI smoke run
 
-## Current Report
+## Current Scientific Summary
 
-The latest targeted long-horizon reports are at
-[docs/phase4_report.md](docs/phase4_report.md) and
-[docs/phase5_report.md](docs/phase5_report.md).
+The current long-horizon writeups are:
 
-Current headline outcome from the dev suite:
+- [docs/phase7_report.md](docs/phase7_report.md)
+- [docs/phase8_report.md](docs/phase8_report.md)
 
-- Benchmark A: the soft model wins raw accuracy, but hybrid ES beats hard ST on
-  both task quality and route optimality while using less compute than soft
-- Benchmark B phase 2: all methods collapse to early exit and near-chance
-  accuracy, and the initial hybrid setup does not rescue long-horizon
-  delay-memory behavior
-- Benchmark B phase 3: explicit packet memory plus oracle-route pretraining and
-  a no-mask hard-routing release improves the 3-seed hard-routing result from
-  `0.4446 +/- 0.0048` to `0.6110 +/- 0.0308`, with real delayed behavior
-  (`delay_rate ~= 0.69`), but the gain is concentrated in the
-  `delay_to_trigger_exit` mode while `delay_to_final_query` remains near chance
-- Benchmark B phase 4: explicit control-state interventions can produce real
-  single-seed final-query improvements, but the promoted hard-routing seed panel
-  still collapses back to premature exit, so the primary story is a stronger
-  negative result about robustness; the notable secondary result is that
-  resume-based hybrid ES can polish a working controller checkpoint much more
-  successfully than scratch hybrid warmstart can discover one
-- Benchmark B phase 5: medium-basin resumed hybrid ES is now confirmed by an
-  exact same-seed rerun and confirmation split, router-only ES is essentially as
-  good as router+adapter ES on that medium basin, and weak-basin ES can repair
-  routing completely while only partially recovering task accuracy
+Current headline state:
+
+- the benchmark is learnable
+- from-scratch hard-ST discovery is still the main bottleneck
+- weak-basin rescue remains strong once a real late-route source exists
+- phase 7 showed that route transfer and ES-assisted route preservation are much
+  easier than content recovery
+- phase 8 showed that teacher-guided **wait/release-only** supervision can
+  create a real **teacher-free** route-faithful basin-entry effect
+- phase 8 also showed the remaining failure more sharply: after route-faithful
+  teacher-free entry, reopening `memory_` destabilizes fragile basins while
+  head-only reopenings preserve routing but still do not recover content
+
+Best current single-run teacher-free basin-entry result from phase 8:
+
+- [seed1874](/home/catid/gnn2/results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_longrelease_delayed_dropout_selectacc_seed1874_p1)
+  base verify `0.7907 / 0.5702 / 0.9499 / 122.17`
+  for `overall / fq_acc / fq_route / fq_exit`
+
+Best current systematic teacher-seeded recovery result from phase 8:
+
+- `teacher1821 -> memoryreadout longer lowlr` five-seed panel:
+  base mean `0.6459 / 0.3085 / 0.9118 / 122.11`
+  and full-locked mean `0.5939 / 0.2578 / 0.8085 / 114.38`
+
+Best confirmed ES-assisted result still remains the phase-7 keepalive-anchor
+adapter branch:
+
+- [seed1201](/home/catid/gnn2/results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1)
+  base verify `0.9756 / 0.9500 / 1.0000 / 127.00`
+
+## Phase 7 Commands
+
+Phase 7 focused on keepalive-basin discovery, staged recovery, ES role mapping,
+and transfer/generalization stress.
+
+```bash
+./scripts/run_phase7_cluster_scouts.sh
+./scripts/run_phase7_main.sh <config> <results-dir> [resume] [nproc_per_node]
+./scripts/run_phase7_confirm.sh <run-dir> [extra-eval-config ...]
+./scripts/run_phase7_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
+```
+
+## Phase 8 Commands
+
+Phase 8 focuses on teacher-seeded direct basin entry, teacher
+source/channel/release mapping, post-entry recovery, and phase-8 confirmation.
+
+```bash
+./scripts/run_phase8_teacher_sweeps.sh [results-root] [initial|tuned|map]
+./scripts/run_phase8_cluster_scouts.sh [results-root] [explore|recover]
+./scripts/run_phase8_main.sh <config> <results-dir> [resume] [nproc_per_node]
+./scripts/run_phase8_confirm.sh <run-dir> [extra-eval-config ...]
+./scripts/run_phase8_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
+```
 
 ## Phase 2 Commands
 

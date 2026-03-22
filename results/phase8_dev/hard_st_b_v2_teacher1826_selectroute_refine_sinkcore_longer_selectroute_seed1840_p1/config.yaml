@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1826_selectroute_refine_sinkcore_longer.yaml
+
+experiment:
+  seed: 1840
+
+training:
+  selection_metric: per_mode.delay_to_final_query.route_match

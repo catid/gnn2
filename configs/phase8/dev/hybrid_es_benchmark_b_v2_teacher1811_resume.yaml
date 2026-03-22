@@ -1,0 +1,4 @@
+_base_: ./hybrid_es_benchmark_b_v2_teacher1802_resume.yaml
+
+experiment:
+  seed: 1822

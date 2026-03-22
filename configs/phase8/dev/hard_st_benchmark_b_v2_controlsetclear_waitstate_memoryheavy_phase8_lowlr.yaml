@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_controlsetclear_waitstate_memoryheavy_phase8.yaml
+
+experiment:
+  seed: 1953
+  results_root: results/phase8_dev
+
+training:
+  lr: 0.00005

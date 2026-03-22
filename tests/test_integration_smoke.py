@@ -138,3 +138,50 @@ def test_cli_phase7_reinforce_config_chain_smoke(tmp_path: Path) -> None:
     assert first_metric["phase"] == "reinforce"
     assert (results_dir / "config.yaml").exists()
     assert (results_dir / "reinforce_best.pt").exists()
+
+
+def test_cli_phase8_detach_window_config_chain_smoke(tmp_path: Path) -> None:
+    config = {
+        "_base_": "/home/catid/gnn2/configs/phase7/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_base.yaml",
+        "experiment": {"seed": 1809, "results_root": str(tmp_path / "root")},
+        "system": {"cpu_threads": 2, "amp": False, "amp_dtype": "bf16"},
+        "training": {
+            "batch_size": 8,
+            "val_batch_size": 8,
+            "train_steps": 2,
+            "train_steps_delta": 2,
+            "val_every": 1,
+            "val_batches": 1,
+            "test_batches": 1,
+            "confirm_batches": 1,
+            "truncate_bptt_steps": 0,
+            "detach_prefix_steps": 1,
+            "late_window_steps": 1,
+        },
+    }
+    config_path = tmp_path / "phase8_detach_smoke.yaml"
+    results_dir = tmp_path / "phase8_detach_results"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.train.run",
+            "--config",
+            str(config_path),
+            "--results-dir",
+            str(results_dir),
+        ],
+        check=True,
+        cwd="/home/catid/gnn2",
+    )
+
+    summary = json.loads((results_dir / "summary.json").read_text())
+    metrics = (results_dir / "metrics.jsonl").read_text().splitlines()
+    first_metric = json.loads(metrics[0])
+
+    assert summary["method"] == "hard_st"
+    assert first_metric["phase"] == "hard_st"
+    assert (results_dir / "config.yaml").exists()
+    assert (results_dir / "hard_st_best.pt").exists()

@@ -1,0 +1,34 @@
+_base_: ../../phase7/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_longerstrong.yaml
+
+experiment:
+  seed: 1876
+  results_root: results/phase8_dev
+
+resume:
+  checkpoint: results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_delayed_dropout_seed1865_p1/hard_st_best.pt
+  strict: false
+
+training:
+  train_steps_delta: 384
+  val_every: 24
+  lr: 0.00005
+  selection_metric: per_mode.delay_to_final_query.accuracy
+  freeze_prefixes:
+    - core.router_
+    - control_
+    - wait_
+    - release_
+  trainable_prefixes:
+    - memory_
+    - sink_proj
+    - readout
+    - core.packet_adapter
+
+routing:
+  oracle_route_weight: 0.0
+  control_state_weight: 0.0
+  anti_exit_weight: 0.0
+  wait_loss_weight: 0.0
+  release_loss_weight: 0.0
+  delay_write_weight: 0.25
+  memory_payload_weight: 0.75

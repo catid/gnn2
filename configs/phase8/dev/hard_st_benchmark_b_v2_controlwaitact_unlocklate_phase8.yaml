@@ -1,0 +1,9 @@
+_base_: ../../phase7/dev/hard_st_benchmark_b_v2_controlwaitact_unlocklate_phase7.yaml
+
+experiment:
+  seed: 1915
+  results_root: results/phase8_dev
+
+training:
+  train_steps_delta: 448
+  val_every: 24

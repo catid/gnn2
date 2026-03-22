@@ -1,0 +1,9 @@
+_base_: ../../phase7/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_setclearhybrid.yaml
+
+experiment:
+  seed: 1952
+  results_root: results/phase8_dev
+
+training:
+  train_steps_delta: 512
+  val_every: 24

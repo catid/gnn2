@@ -1,0 +1,9 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1826_selectroute_refine_memoryreadout.yaml
+
+experiment:
+  seed: 1843
+  results_root: results/phase8_dev
+
+training:
+  train_steps_delta: 384
+  lr: 0.00005

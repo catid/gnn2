@@ -55,6 +55,14 @@ class TeacherDistillation:
     wait_prob_weight: float
     control_state_weight: float
     memory_read_weight: float
+    start_step: int
+    stop_step: int
+    scale_start: float
+    scale_end: float
+    scale_schedule_steps: int
+    dropout_prob_start: float
+    dropout_prob_end: float
+    dropout_schedule_steps: int
 
 
 def parse_args() -> argparse.Namespace:
@@ -1066,6 +1074,19 @@ def load_checkpoint(
     return payload
 
 
+def resolve_resume_checkpoint(cfg: dict[str, Any]) -> tuple[str | Path | None, bool]:
+    resume_cfg = cfg.get("resume")
+    if not resume_cfg:
+        return None, bool(cfg.get("resume_strict", True))
+    if isinstance(resume_cfg, dict):
+        checkpoint = resume_cfg.get("checkpoint")
+        if checkpoint is None:
+            raise ValueError("resume.checkpoint must be set when resume is a mapping.")
+        strict = bool(resume_cfg.get("strict", cfg.get("resume_strict", True)))
+        return checkpoint, strict
+    return resume_cfg, bool(cfg.get("resume_strict", True))
+
+
 def resolve_checkpoint_from_run_dir(run_dir: Path, explicit: str | None = None) -> Path:
     if explicit is not None:
         return Path(explicit)
@@ -1152,7 +1173,37 @@ def load_teacher_distillation(
         wait_prob_weight=weights["wait_prob_weight"],
         control_state_weight=weights["control_state_weight"],
         memory_read_weight=weights["memory_read_weight"],
+        start_step=int(teacher_cfg.get("start_step", 0)),
+        stop_step=int(teacher_cfg.get("stop_step", -1)),
+        scale_start=float(teacher_cfg.get("scale_start", 1.0)),
+        scale_end=float(teacher_cfg.get("scale_end", 1.0)),
+        scale_schedule_steps=int(teacher_cfg.get("scale_schedule_steps", 0)),
+        dropout_prob_start=float(teacher_cfg.get("dropout_prob_start", teacher_cfg.get("dropout_prob", 0.0))),
+        dropout_prob_end=float(teacher_cfg.get("dropout_prob_end", teacher_cfg.get("dropout_prob", 0.0))),
+        dropout_schedule_steps=int(teacher_cfg.get("dropout_prob_schedule_steps", 0)),
     )
+
+
+def teacher_step_controls(teacher: TeacherDistillation, step: int) -> tuple[float, float]:
+    if step < teacher.start_step:
+        return 0.0, 0.0
+    if teacher.stop_step >= 0 and step >= teacher.stop_step:
+        return 0.0, 0.0
+
+    if teacher.scale_schedule_steps > 0:
+        frac = min(1.0, max(0.0, (step - teacher.start_step) / max(1, teacher.scale_schedule_steps)))
+        scale = teacher.scale_start + frac * (teacher.scale_end - teacher.scale_start)
+    else:
+        scale = teacher.scale_end
+
+    if teacher.dropout_schedule_steps > 0:
+        frac = min(1.0, max(0.0, (step - teacher.start_step) / max(1, teacher.dropout_schedule_steps)))
+        dropout_prob = teacher.dropout_prob_start + frac * (
+            teacher.dropout_prob_end - teacher.dropout_prob_start
+        )
+    else:
+        dropout_prob = teacher.dropout_prob_end
+    return float(scale), float(dropout_prob)
 
 
 def teacher_sample_weights(
@@ -1228,14 +1279,25 @@ def compute_teacher_distillation_loss(
     teacher_output,
     teacher: TeacherDistillation,
     device: torch.device,
+    scale: float = 1.0,
+    dropout_prob: float = 0.0,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     dtype = student_output.logits.dtype
     sample_weights = teacher_sample_weights(batch, teacher.target_scope, device=device, dtype=dtype)
+    if dropout_prob > 0.0:
+        keep_mask = (torch.rand_like(sample_weights) >= dropout_prob).to(sample_weights.dtype)
+        sample_weights = sample_weights * keep_mask
     if float(sample_weights.sum().detach().item()) <= 0.0:
         zero = torch.zeros((), device=device, dtype=dtype)
-        return zero, {"teacher_distill_loss": 0.0}
+        return zero, {
+            "teacher_distill_loss": 0.0,
+            "teacher_distill_loss_raw": 0.0,
+            "teacher_scale": float(scale),
+            "teacher_dropout_prob": float(dropout_prob),
+            "teacher_effective_weight_mean": 0.0,
+        }
 
-    total_loss = torch.zeros((), device=device, dtype=dtype)
+    raw_total_loss = torch.zeros((), device=device, dtype=dtype)
     metrics: dict[str, float] = {}
     distill_temperature = max(1e-3, teacher.distill_temperature)
 
@@ -1246,7 +1308,7 @@ def compute_teacher_distillation_loss(
         logits_loss = ((kl * sample_weights.float()).sum() / sample_weights.float().sum().clamp_min(1.0)) * (
             distill_temperature**2
         )
-        total_loss = total_loss + teacher.logits_weight * logits_loss.to(dtype)
+        raw_total_loss = raw_total_loss + teacher.logits_weight * logits_loss.to(dtype)
         metrics["teacher_logits_loss"] = float(logits_loss.detach().item())
 
     student_trace = student_output.trace or {}
@@ -1262,7 +1324,7 @@ def compute_teacher_distillation_loss(
             teacher_trace["router_probs"],
             sample_weights,
         )
-        total_loss = total_loss + teacher.route_action_weight * route_action_loss.to(dtype)
+        raw_total_loss = raw_total_loss + teacher.route_action_weight * route_action_loss.to(dtype)
         metrics["teacher_route_action_loss"] = float(route_action_loss.detach().item())
     trace_specs = [
         ("router_probs", teacher.route_weight, "teacher_route_loss", _weighted_kl_from_probs),
@@ -1280,10 +1342,15 @@ def compute_teacher_distillation_loss(
         if student_trace[key].shape != teacher_trace[key].shape:
             continue
         trace_loss = loss_fn(student_trace[key], teacher_trace[key], sample_weights)
-        total_loss = total_loss + weight * trace_loss.to(dtype)
+        raw_total_loss = raw_total_loss + weight * trace_loss.to(dtype)
         metrics[metric_name] = float(trace_loss.detach().item())
 
+    total_loss = raw_total_loss * float(scale)
+    metrics["teacher_distill_loss_raw"] = float(raw_total_loss.detach().item())
     metrics["teacher_distill_loss"] = float(total_loss.detach().item())
+    metrics["teacher_scale"] = float(scale)
+    metrics["teacher_dropout_prob"] = float(dropout_prob)
+    metrics["teacher_effective_weight_mean"] = float(sample_weights.detach().float().mean().item())
     return total_loss, metrics
 
 
@@ -1334,6 +1401,7 @@ def run_supervised_phase(
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
     teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device)
     partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
+    resume_path, resume_strict = resolve_resume_checkpoint(cfg)
 
     trainable_summary = configure_trainable_parameters(model, train_cfg)
     optimizer = build_supervised_optimizer(model, train_cfg)
@@ -1343,12 +1411,12 @@ def run_supervised_phase(
     best_path = results_dir / f"{phase_name}_best.pt"
     last_path = results_dir / f"{phase_name}_last.pt"
 
-    if cfg.get("resume"):
+    if resume_path:
         payload = load_checkpoint(
-            cfg["resume"],
+            resume_path,
             model,
             optimizer,
-            strict=bool(cfg.get("resume_strict", True)),
+            strict=resume_strict,
         )
         start_step = int(payload.get("step", 0))
 
@@ -1414,6 +1482,8 @@ def run_supervised_phase(
                 temperature=train_temperature,
                 estimator=estimator,
                 truncate_bptt_steps=int(train_cfg.get("truncate_bptt_steps", 0)),
+                detach_prefix_steps=int(train_cfg.get("detach_prefix_steps", 0)),
+                late_window_steps=int(train_cfg.get("late_window_steps", 0)),
                 forced_actions=forced_actions,
                 action_masks=action_masks,
                 oracle_actions=oracle_actions,
@@ -1444,6 +1514,7 @@ def run_supervised_phase(
             teacher_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
             teacher_metrics: dict[str, float] = {}
             if teacher is not None:
+                teacher_scale, teacher_dropout_prob = teacher_step_controls(teacher, step)
                 with torch.no_grad():
                     teacher_output = teacher.model(
                         observations=batch.observations,
@@ -1461,6 +1532,8 @@ def run_supervised_phase(
                     teacher_output=teacher_output,
                     teacher=teacher,
                     device=device,
+                    scale=teacher_scale,
+                    dropout_prob=teacher_dropout_prob,
                 )
             total_loss = output.loss + teacher_loss
         scaler.scale(total_loss).backward()
@@ -1599,12 +1672,13 @@ def run_reinforce_phase(
     best_path = results_dir / f"{phase_name}_best.pt"
     last_path = results_dir / f"{phase_name}_last.pt"
 
-    if cfg.get("resume"):
+    resume_path, resume_strict = resolve_resume_checkpoint(cfg)
+    if resume_path:
         payload = load_checkpoint(
-            cfg["resume"],
+            resume_path,
             model,
             optimizer,
-            strict=bool(cfg.get("resume_strict", True)),
+            strict=resume_strict,
         )
         start_step = int(payload.get("step", 0))
 
@@ -1669,6 +1743,8 @@ def run_reinforce_phase(
                 temperature=train_temperature,
                 estimator="straight_through",
                 truncate_bptt_steps=int(train_cfg.get("truncate_bptt_steps", 0)),
+                detach_prefix_steps=int(train_cfg.get("detach_prefix_steps", 0)),
+                late_window_steps=int(train_cfg.get("late_window_steps", 0)),
                 forced_actions=forced_actions,
                 action_masks=action_masks,
                 oracle_actions=oracle_actions,
@@ -1848,11 +1924,12 @@ def run_hybrid_es(
 
     warmstart_cfg = cfg.get("warmstart", {})
     warmstart_summary: dict[str, Any] | None = None
-    if cfg.get("resume"):
+    resume_path, resume_strict = resolve_resume_checkpoint(cfg)
+    if resume_path:
         load_checkpoint(
-            cfg["resume"],
+            resume_path,
             model,
-            strict=bool(cfg.get("resume_strict", True)),
+            strict=resume_strict,
         )
     if warmstart_cfg.get("enabled", False) and context.rank == 0:
         warmstart_summary = run_supervised_phase(

@@ -1,0 +1,5 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_teacher_medium_waitrelease_control_anneal.yaml
+
+experiment:
+  seed: 1864
+

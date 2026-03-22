@@ -1,0 +1,9 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1826_selectroute_refine_sinkcore.yaml
+
+experiment:
+  seed: 1837
+
+training:
+  train_steps_delta: 384
+  val_every: 48
+

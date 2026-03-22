@@ -1,0 +1,22 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_teacher_transfer_waitrelease_control_anneal.yaml
+
+experiment:
+  seed: 1822
+
+teacher:
+  route_action_weight: 0.45
+  control_prob_weight: 0.0
+  control_state_weight: 0.0
+  wait_prob_weight: 0.35
+  release_prob_weight: 0.15
+  scale_schedule_steps: 640
+  stop_step: 704
+
+routing:
+  anti_exit_weight_start: 0.22
+  anti_exit_weight_end: 0.10
+  anti_exit_weight_schedule_steps: 576
+
+training:
+  train_steps_delta: 704
+  selection_metric: per_mode.delay_to_final_query.accuracy

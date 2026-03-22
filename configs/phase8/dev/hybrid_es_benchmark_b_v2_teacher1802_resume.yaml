@@ -1,0 +1,15 @@
+_base_: ../../phase7/dev/hybrid_es_benchmark_b_v2_controlsticky_keepalive_resume.yaml
+
+experiment:
+  seed: 1821
+  results_root: results/phase8_dev
+
+es:
+  generations: 32
+  population: 64
+  rank: 4
+  sigma: 0.03
+  val_every: 4
+  val_batches: 10
+  test_batches: 16
+  selection_metric: per_mode.delay_to_final_query.accuracy

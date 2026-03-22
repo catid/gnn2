@@ -1,0 +1,8 @@
+_base_: ./hybrid_es_benchmark_b_v2_teacher1802_resume.yaml
+
+experiment:
+  seed: 1852
+
+resume:
+  checkpoint: results/phase8_dev/hard_st_b_v2_teacher1821_refine_memoryreadout_longer_lowlr_seed1842_rerun1/hard_st_best.pt
+  strict: false

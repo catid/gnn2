@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_latewindow64.yaml
+
+experiment:
+  seed: 1907
+  results_root: results/phase8_dev
+
+training:
+  lr: 0.00005

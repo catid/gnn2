@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_longrelease.yaml
+
+experiment:
+  seed: 1819
+
+training:
+  selection_metric: per_mode.delay_to_final_query.accuracy

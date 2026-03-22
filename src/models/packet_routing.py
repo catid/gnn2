@@ -352,6 +352,8 @@ class PacketRoutingModel(nn.Module):
         temperature: float = 1.0,
         estimator: str = "straight_through",
         truncate_bptt_steps: int = 0,
+        detach_prefix_steps: int = 0,
+        late_window_steps: int = 0,
         forced_actions: torch.Tensor | None = None,
         action_masks: torch.Tensor | None = None,
         oracle_actions: torch.Tensor | None = None,
@@ -539,6 +541,9 @@ class PacketRoutingModel(nn.Module):
             if self.release_head is not None:
                 trace["release_prob"] = torch.zeros(batch_size, seq_len, device=device, dtype=dtype)
 
+        late_window_boundary = seq_len - late_window_steps if late_window_steps > 0 else -1
+        prefix_detached = False
+        late_window_detached = False
         for time_index in range(seq_len):
             obs_t = observations[:, time_index]
             carry_mass = torch.zeros_like(packet_masses)
@@ -1099,7 +1104,16 @@ class PacketRoutingModel(nn.Module):
                 if "release_prob" in trace:
                     trace["release_prob"][:, time_index] = time_release_prob_sum / time_active_mass.clamp_min(float(eps))
 
+            should_detach = False
             if truncate_bptt_steps > 0 and (time_index + 1) % truncate_bptt_steps == 0:
+                should_detach = True
+            if detach_prefix_steps > 0 and not prefix_detached and (time_index + 1) >= detach_prefix_steps:
+                should_detach = True
+                prefix_detached = True
+            if late_window_steps > 0 and not late_window_detached and (time_index + 1) >= late_window_boundary:
+                should_detach = True
+                late_window_detached = True
+            if should_detach:
                 node_states = node_states.detach()
                 packet_states = packet_states.detach()
                 packet_masses = packet_masses.detach()

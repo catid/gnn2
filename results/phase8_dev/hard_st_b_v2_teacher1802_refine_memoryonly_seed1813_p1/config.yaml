@@ -1,0 +1,13 @@
+_base_: ../../phase6/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_refine_memoryonly.yaml
+
+experiment:
+  seed: 1813
+  results_root: results/phase8_dev
+
+resume:
+  checkpoint: results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_anneal_seed1802_p1/hard_st_best.pt
+  strict: true
+
+training:
+  train_steps_delta: 192
+  val_every: 24

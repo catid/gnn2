@@ -1,0 +1,43 @@
+_base_: ../../phase7/dev/hard_st_benchmark_b_v2_controlsticky_keepalive_finalquerywaitonly.yaml
+
+experiment:
+  seed: 1804
+  results_root: results/phase8_dev
+
+model:
+  control_input_scale: 3.0
+  control_router_scale: 2.75
+  control_write_bias: -1.5
+  packet_memory_slots: 6
+
+teacher:
+  run_dir: results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: delayed_only
+  route_action_weight: 0.75
+  control_prob_weight: 0.35
+  wait_prob_weight: 0.60
+  release_prob_weight: 0.20
+  control_state_weight: 0.25
+  scale_start: 1.0
+  scale_end: 0.0
+  scale_schedule_steps: 512
+  stop_step: 560
+  dropout_prob_start: 0.35
+  dropout_prob_end: 0.05
+  dropout_prob_schedule_steps: 384
+
+routing:
+  control_state_weight_end: 0.80
+  control_state_weight_schedule_steps: 576
+  anti_exit_weight_start: 0.28
+  anti_exit_weight_end: 0.10
+  anti_exit_weight_schedule_steps: 512
+
+training:
+  train_steps_delta: 640
+  controller_lr_scale: 2.25
+  val_every: 24
+  selection_metric: per_mode.delay_to_final_query.route_match

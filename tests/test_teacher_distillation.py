@@ -13,6 +13,7 @@ from src.data.benchmarks import (
 from src.train.run import (
     TeacherDistillation,
     compute_teacher_distillation_loss,
+    teacher_step_controls,
     teacher_sample_weights,
 )
 
@@ -102,6 +103,14 @@ def test_compute_teacher_distillation_loss_uses_matching_traces() -> None:
         wait_prob_weight=0.0,
         control_state_weight=0.0,
         memory_read_weight=0.1,
+        start_step=0,
+        stop_step=-1,
+        scale_start=1.0,
+        scale_end=1.0,
+        scale_schedule_steps=0,
+        dropout_prob_start=0.0,
+        dropout_prob_end=0.0,
+        dropout_schedule_steps=0,
     )
 
     loss, metrics = compute_teacher_distillation_loss(
@@ -120,3 +129,36 @@ def test_compute_teacher_distillation_loss_uses_matching_traces() -> None:
     assert metrics["teacher_control_prob_loss"] > 0.0
     assert metrics["teacher_release_prob_loss"] > 0.0
     assert metrics["teacher_memory_read_loss"] > 0.0
+
+
+def test_teacher_step_controls_support_schedule_and_stop() -> None:
+    teacher = TeacherDistillation(
+        model=None,  # type: ignore[arg-type]
+        route_mode="hard",
+        temperature=1.0,
+        estimator="straight_through",
+        distill_temperature=1.0,
+        target_scope="all",
+        logits_weight=0.1,
+        route_weight=0.0,
+        route_action_weight=0.0,
+        control_prob_weight=0.0,
+        release_prob_weight=0.0,
+        wait_prob_weight=0.0,
+        control_state_weight=0.0,
+        memory_read_weight=0.0,
+        start_step=10,
+        stop_step=20,
+        scale_start=1.0,
+        scale_end=0.2,
+        scale_schedule_steps=10,
+        dropout_prob_start=0.0,
+        dropout_prob_end=0.5,
+        dropout_schedule_steps=10,
+    )
+
+    assert teacher_step_controls(teacher, 0) == (0.0, 0.0)
+    scale_mid, drop_mid = teacher_step_controls(teacher, 15)
+    assert 0.2 < scale_mid < 1.0
+    assert 0.0 < drop_mid < 0.5
+    assert teacher_step_controls(teacher, 20) == (0.0, 0.0)

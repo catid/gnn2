@@ -1,0 +1,6 @@
+_base_: ../../phase7/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+
+benchmark:
+  confirm_seed: 23001
+  seq_len: 160
+  mode_probs: [0.15, 0.15, 0.7]

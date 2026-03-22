@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_teacher_keepalive_fullroute_upperbound_selectacc.yaml
+
+experiment:
+  seed: 1873
+
+teacher:
+  run_dir: results/phase7_dev/20260320_163404_hard_st_benchmark_b_v2_controlsticky_keepalive_partialinit_coremem_sinkonlylonger_to_sinkreadout_seed1735
+  route_mode: hard_st
+  route_action_weight: 0.85
+  wait_prob_weight: 0.35
+  release_prob_weight: 0.20
+  control_state_weight: 0.20

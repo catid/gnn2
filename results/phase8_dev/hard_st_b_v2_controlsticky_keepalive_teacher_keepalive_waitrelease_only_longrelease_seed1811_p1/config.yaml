@@ -1,0 +1,16 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_anneal.yaml
+
+experiment:
+  seed: 1811
+
+teacher:
+  scale_schedule_steps: 640
+  stop_step: 704
+
+routing:
+  anti_exit_weight_start: 0.26
+  anti_exit_weight_end: 0.12
+  anti_exit_weight_schedule_steps: 576
+
+training:
+  train_steps_delta: 704

@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1826_selectroute_refine_memoryonly.yaml
+
+experiment:
+  seed: 1838
+
+training:
+  train_steps_delta: 384
+  val_every: 48

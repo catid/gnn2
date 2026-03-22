@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_controlsticky_memoryheavy.yaml
+
+experiment:
+  seed: 989
+
+model:
+  control_state_dim: 8
+  control_input_scale: 2.5
+  control_write_bias: -2.0
+  packet_memory_slots: 4
+
+routing:
+  control_state_weight_start: 1.0
+  control_state_weight_end: 0.4
+  control_state_weight_schedule_steps: 320
+
+training:
+  train_steps_delta: 320
+  val_every: 20

@@ -1,0 +1,8 @@
+_base_: ./hybrid_es_benchmark_b_v2_teacher1802_resume.yaml
+
+experiment:
+  seed: 1851
+
+resume:
+  checkpoint: results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_medium_waitrelease_only_longrelease_selectacc_seed1821_rerun1/hard_st_best.pt
+  strict: false
