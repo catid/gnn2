@@ -10,6 +10,7 @@ from src.data.benchmarks import (
 )
 from src.models import PacketRoutingModel
 from src.train.run import (
+    build_task_sample_weights,
     build_control_controls,
     configure_trainable_parameters,
     current_routing_cfg,
@@ -337,6 +338,31 @@ def test_configure_trainable_parameters_respects_allowlist_and_freeze_rules() ->
     assert "memory_read_gate.weight" not in enabled
     assert "core.router_mlp.1.weight" not in enabled
     assert summary["trainable_parameter_count"] < summary["total_parameter_count"]
+
+
+def test_build_task_sample_weights_can_upweight_final_query_examples() -> None:
+    batch = BenchmarkBatch(
+        observations=torch.zeros(3, 4, 2, 4),
+        labels=torch.zeros(3, dtype=torch.long),
+        modes=torch.tensor([LONG_MEMORY_MODE_DELAY_TO_FINAL_QUERY, LONG_MEMORY_MODE_DELAY_TO_TRIGGER_EXIT, 0], dtype=torch.long),
+        oracle_hops=torch.zeros(3, dtype=torch.long),
+        oracle_delays=torch.zeros(3, dtype=torch.long),
+        oracle_exit_time=torch.zeros(3, dtype=torch.long),
+        oracle_depth=torch.zeros(3, dtype=torch.long),
+        metadata={
+            "needs_final_query": torch.tensor([1, 0, 0], dtype=torch.long),
+        },
+    )
+
+    weights = build_task_sample_weights(
+        batch,
+        {"final_query_weight": 3.0, "non_final_query_weight": 0.5},
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+
+    assert weights is not None
+    assert torch.equal(weights, torch.tensor([3.0, 0.5, 0.5]))
 
 
 def test_load_checkpoint_strict_false_skips_shape_mismatches(tmp_path) -> None:

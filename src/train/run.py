@@ -562,6 +562,34 @@ def build_release_controls(
     return targets, target_mask, release_weight, release_positive_weight
 
 
+def build_task_sample_weights(
+    batch: BenchmarkBatch,
+    train_cfg: dict[str, Any] | None,
+    *,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor | None:
+    train_cfg = train_cfg or {}
+    final_query_weight = float(train_cfg.get("final_query_weight", 1.0))
+    non_final_query_weight = float(train_cfg.get("non_final_query_weight", 1.0))
+    if final_query_weight == 1.0 and non_final_query_weight == 1.0:
+        return None
+    sample_weights = torch.full(
+        (batch.labels.shape[0],),
+        non_final_query_weight,
+        device=device,
+        dtype=dtype,
+    )
+    final_query_mask = batch.metadata.get("needs_final_query")
+    if final_query_mask is not None:
+        sample_weights = torch.where(
+            final_query_mask.to(device=device, dtype=torch.bool),
+            torch.full_like(sample_weights, final_query_weight),
+            sample_weights,
+        )
+    return sample_weights
+
+
 def build_reward(
     logits: torch.Tensor,
     labels: torch.Tensor,
@@ -1470,6 +1498,12 @@ def run_supervised_phase(
             step_routing_cfg,
             split="train",
         )
+        task_sample_weights = build_task_sample_weights(
+            batch,
+            train_cfg,
+            device=batch.labels.device,
+            dtype=batch.observations.dtype,
+        )
         optimizer.zero_grad(set_to_none=True)
         start_time = time.time()
         return_trace = teacher is not None
@@ -1509,6 +1543,7 @@ def run_supervised_phase(
                 release_mask=release_mask,
                 release_weight=release_weight,
                 release_positive_weight=release_positive_weight,
+                task_sample_weights=task_sample_weights,
                 return_trace=return_trace,
             )
             teacher_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
@@ -1732,6 +1767,12 @@ def run_reinforce_phase(
             step_routing_cfg,
             split="train",
         )
+        task_sample_weights = build_task_sample_weights(
+            batch,
+            train_cfg,
+            device=batch.labels.device,
+            dtype=batch.observations.dtype,
+        )
         optimizer.zero_grad(set_to_none=True)
         start_time = time.time()
         with autocast_context(device, amp_enabled, amp_dtype):
@@ -1770,6 +1811,7 @@ def run_reinforce_phase(
                 release_mask=release_mask,
                 release_weight=release_weight,
                 release_positive_weight=release_positive_weight,
+                task_sample_weights=task_sample_weights,
             )
             reward = build_reward(
                 output.logits,

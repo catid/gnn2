@@ -109,6 +109,92 @@ def test_delay_mailbox_reappears_next_external_step() -> None:
     assert output.stats["early_exit_mass"].tolist() == [0.0]
 
 
+def test_return_trace_includes_sink_state_views() -> None:
+    model = make_model(num_nodes=2, max_internal_steps=1)
+    observations = torch.zeros(1, 2, 2, 16)
+    observations[:, 0, :, 2] = 5.0
+    observations[:, 1, :, 1] = 5.0
+    labels = torch.zeros(1, dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert output.trace is not None
+    assert output.trace["sink_state"].shape == (1, 2, 8)
+    assert output.trace["final_sink_state"].shape == (1, 8)
+    assert output.trace["final_readout_input"].shape == (1, 8)
+    assert torch.allclose(output.trace["final_sink_state"], output.sink_state)
+
+
+def test_query_conditioned_readout_constructs_and_runs() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "query_conditioned",
+        }
+    )
+    observations = torch.zeros(2, 3, 2, 8)
+    observations[:, -1, 0, 1] = 1.0
+    labels = torch.zeros(2, dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert output.logits.shape == (2, 3)
+    assert output.sink_state.shape == (2, 4)
+    assert output.trace is not None
+    assert output.trace["final_sink_state"].shape == (2, 4)
+    assert output.trace["final_readout_input"].shape == (2, 8)
+
+
+def test_query_gated_and_film_readouts_construct_and_run() -> None:
+    for mode in ("query_gated", "query_film"):
+        model = PacketRoutingModel(
+            {
+                "num_nodes": 2,
+                "obs_dim": 8,
+                "hidden_dim": 4,
+                "num_classes": 3,
+                "max_internal_steps": 1,
+                "max_total_steps": 8,
+                "adapter_rank": 0,
+                "readout_mode": mode,
+            }
+        )
+        observations = torch.zeros(2, 3, 2, 8)
+        observations[:, -1, 0, 1] = 1.0
+        labels = torch.zeros(2, dtype=torch.long)
+
+        output = model(
+            observations=observations,
+            labels=labels,
+            route_mode="hard",
+            compute_penalties={},
+            return_trace=True,
+        )
+
+        assert output.logits.shape == (2, 3)
+        assert output.trace is not None
+        assert output.trace["final_sink_state"].shape == (2, 4)
+        assert output.trace["final_readout_input"].shape == (2, 4)
+
+
 def test_delay_hold_mode_preserves_packet_state() -> None:
     model = PacketRoutingModel(
         {

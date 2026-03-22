@@ -1,0 +1,16 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_queryreadout_longer_lowlr.yaml
+
+experiment:
+  seed: 9123
+
+training:
+  freeze_prefixes:
+    - core.
+    - control_
+    - wait_
+    - release_
+    - memory_
+  trainable_prefixes:
+    - sink_proj
+    - readout
+    - query_readout_proj

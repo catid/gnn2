@@ -209,6 +209,7 @@ class PacketRoutingModel(nn.Module):
         self.release_scale = float(config.get("release_scale", 0.0))
         self.release_gate_mode = str(config.get("release_gate_mode", "bias"))
         self.release_gate_scale = float(config.get("release_gate_scale", 1.0))
+        self.readout_mode = str(config.get("readout_mode", "plain"))
         self.core = NodeCore(
             obs_dim=self.obs_dim,
             hidden_dim=self.hidden_dim,
@@ -310,9 +311,33 @@ class PacketRoutingModel(nn.Module):
         else:
             self.release_head = None
         self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.query_readout_proj = None
+        if self.readout_mode == "plain":
+            readout_input_dim = self.hidden_dim
+        elif self.readout_mode == "query_conditioned":
+            readout_input_dim = self.hidden_dim * 2
+            self.query_readout_proj = nn.Sequential(
+                nn.LayerNorm(self.obs_dim),
+                nn.Linear(self.obs_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+        elif self.readout_mode == "query_gated":
+            readout_input_dim = self.hidden_dim
+            self.query_readout_proj = nn.Sequential(
+                nn.LayerNorm(self.obs_dim),
+                nn.Linear(self.obs_dim, self.hidden_dim),
+            )
+        elif self.readout_mode == "query_film":
+            readout_input_dim = self.hidden_dim
+            self.query_readout_proj = nn.Sequential(
+                nn.LayerNorm(self.obs_dim),
+                nn.Linear(self.obs_dim, self.hidden_dim * 2),
+            )
+        else:
+            raise ValueError(f"Unknown readout_mode: {self.readout_mode}")
         self.readout = nn.Sequential(
-            nn.LayerNorm(self.hidden_dim),
-            nn.Linear(self.hidden_dim, self.num_classes),
+            nn.LayerNorm(readout_input_dim),
+            nn.Linear(readout_input_dim, self.num_classes),
         )
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
@@ -379,6 +404,7 @@ class PacketRoutingModel(nn.Module):
         release_mask: torch.Tensor | None = None,
         release_weight: float = 0.0,
         release_positive_weight: float = 1.0,
+        task_sample_weights: torch.Tensor | None = None,
         return_trace: bool = False,
     ) -> RoutingForwardOutput:
         batch_size, seq_len, num_nodes, _ = observations.shape
@@ -492,10 +518,12 @@ class PacketRoutingModel(nn.Module):
                 "router_logits": torch.zeros(batch_size, seq_len, 3, device=device, dtype=dtype),
                 "router_probs": torch.zeros(batch_size, seq_len, 3, device=device, dtype=dtype),
                 "packet_state": torch.zeros(batch_size, seq_len, self.hidden_dim, device=device, dtype=dtype),
+                "sink_state": torch.zeros(batch_size, seq_len, self.hidden_dim, device=device, dtype=dtype),
                 "memory_read_gate": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
                 "memory_write_gate": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
                 "memory_read_entropy": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
                 "memory_write_entropy": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
+                "final_sink_state": torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype),
             }
             if self.packet_memory_slots > 0:
                 trace["memory_read_state"] = torch.zeros(
@@ -1086,6 +1114,7 @@ class PacketRoutingModel(nn.Module):
                 trace["router_logits"][:, time_index, :] = time_router_logits_sum / time_router_mass.clamp_min(float(eps)).unsqueeze(-1)
                 trace["router_probs"][:, time_index, :] = time_router_probs_sum / time_router_mass.clamp_min(float(eps)).unsqueeze(-1)
                 trace["packet_state"][:, time_index, :] = time_packet_state_sum / time_active_mass.clamp_min(float(eps)).unsqueeze(-1)
+                trace["sink_state"][:, time_index, :] = sink_state
                 trace["memory_read_gate"][:, time_index] = time_memory_read_gate_sum / time_active_mass.clamp_min(float(eps))
                 trace["memory_write_gate"][:, time_index] = time_memory_write_gate_sum / time_active_mass.clamp_min(float(eps))
                 trace["memory_read_entropy"][:, time_index] = time_memory_read_entropy_sum / time_active_mass.clamp_min(float(eps))
@@ -1137,9 +1166,29 @@ class PacketRoutingModel(nn.Module):
                 first_exit_time,
             )
             exit_mass_so_far = exit_mass_so_far + residual_mass
+        if trace is not None:
+            trace["final_sink_state"] = sink_state
 
-        logits = self.readout(sink_state)
-        task_loss = F.cross_entropy(logits, labels)
+        readout_input = sink_state
+        if self.readout_mode == "query_conditioned":
+            query_context = self.query_readout_proj(observations[:, -1, 0])
+            readout_input = torch.cat([sink_state, query_context], dim=-1)
+        elif self.readout_mode == "query_gated":
+            query_gate = torch.sigmoid(self.query_readout_proj(observations[:, -1, 0]))
+            readout_input = sink_state * query_gate
+        elif self.readout_mode == "query_film":
+            film_params = self.query_readout_proj(observations[:, -1, 0])
+            gamma, beta = torch.chunk(film_params, 2, dim=-1)
+            readout_input = sink_state * (1.0 + torch.tanh(gamma)) + beta
+        if trace is not None:
+            trace["final_readout_input"] = readout_input
+        logits = self.readout(readout_input)
+        if task_sample_weights is None:
+            task_loss = F.cross_entropy(logits, labels)
+        else:
+            per_sample_task_loss = F.cross_entropy(logits, labels, reduction="none")
+            weights = task_sample_weights.to(device=device, dtype=per_sample_task_loss.dtype)
+            task_loss = (per_sample_task_loss * weights).sum() / weights.sum().clamp_min(float(eps))
         penalty_hops = float(compute_penalties.get("hops", 0.0)) * hops.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_delays = float(compute_penalties.get("delays", 0.0)) * delays.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_ttl = float(compute_penalties.get("ttl_fail", 0.0)) * ttl_fail.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)

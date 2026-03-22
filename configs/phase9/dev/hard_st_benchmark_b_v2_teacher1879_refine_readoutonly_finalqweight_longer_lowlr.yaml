@@ -1,0 +1,9 @@
+_base_: ../../phase8/dev/hard_st_benchmark_b_v2_teacher1879_refine_readoutonly_longer_lowlr.yaml
+
+experiment:
+  seed: 9105
+  results_root: results/phase9_dev
+
+training:
+  final_query_weight: 3.0
+  non_final_query_weight: 0.5
