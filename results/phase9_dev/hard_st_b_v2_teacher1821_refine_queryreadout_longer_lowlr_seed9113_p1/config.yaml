@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1821_refine_readoutonly_longer_lowlr.yaml
+
+experiment:
+  seed: 9113
+
+model:
+  readout_mode: query_conditioned
+
+training:
+  trainable_prefixes:
+    - readout
+    - query_readout_proj

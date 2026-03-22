@@ -1,0 +1,173 @@
+{
+  "answer_summary": {
+    "chance_accuracy": 0.25,
+    "count": 1637,
+    "label_histogram": [
+      432,
+      414,
+      401,
+      390
+    ],
+    "num_classes": 4
+  },
+  "best_probe": {
+    "best_accuracy": 1.0,
+    "best_conditioned_accuracy": 1.0,
+    "best_linear_accuracy": 1.0,
+    "best_probe_variant": "mlp_query_conditioned",
+    "best_representation": "packet_state_query",
+    "conditioning_gain": 0.0,
+    "head_only_go_signal": true,
+    "nonlinear_gain": 0.0
+  },
+  "checkpoint": "results/phase9_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1/hybrid_es_best.pt",
+  "eval_config": "configs/phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml",
+  "probe_tables": {
+    "control_state_query": {
+      "linear": {
+        "accuracy": 0.2480146586894989,
+        "ce": 1.3913441896438599
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.3970678150653839,
+        "ce": 1.3968085050582886
+      },
+      "mlp": {
+        "accuracy": 0.24190592765808105,
+        "ce": 1.4194352626800537
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.00077146285912022
+      }
+    },
+    "final_readout_input": {
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 2.2185088255355367e-06
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 8.367555892618839e-07
+      },
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 4.201751835353207e-08
+      }
+    },
+    "final_sink_state": {
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 8.095266821328551e-07
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 9.643890734878369e-07
+      },
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 2.505485463188961e-05
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      }
+    },
+    "memory_read_state_query": {
+      "linear": {
+        "accuracy": 0.25045815110206604,
+        "ce": 1.3919336795806885
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.37202200293540955,
+        "ce": 1.3962606191635132
+      },
+      "mlp": {
+        "accuracy": 0.2480146586894989,
+        "ce": 1.3942710161209106
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.3511054021364544e-05
+      }
+    },
+    "packet_state_query": {
+      "linear": {
+        "accuracy": 0.2907758057117462,
+        "ce": 1.3874744176864624
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.36469149589538574,
+        "ce": 1.3898932933807373
+      },
+      "mlp": {
+        "accuracy": 0.5681123733520508,
+        "ce": 0.9239358305931091
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 6.876962288515642e-05
+      }
+    },
+    "router_logits_query": {
+      "linear": {
+        "accuracy": 0.26572999358177185,
+        "ce": 1.3766595125198364
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.35552841424942017,
+        "ce": 1.3641011714935303
+      },
+      "mlp": {
+        "accuracy": 0.9700672030448914,
+        "ce": 0.06411884725093842
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9932804107666016,
+        "ce": 0.01358507014811039
+      }
+    },
+    "router_probs_query": {
+      "linear": {
+        "accuracy": 0.18570555746555328,
+        "ce": 1.3631260395050049
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.33720219135284424,
+        "ce": 1.3448988199234009
+      },
+      "mlp": {
+        "accuracy": 0.7501527070999146,
+        "ce": 0.5864556431770325
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9034819602966309,
+        "ce": 0.21365386247634888
+      }
+    },
+    "sink_state_query": {
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 4.0248096411232837e-07
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.5328954816595797e-07
+      },
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 1.4564358052915338e-10
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      }
+    }
+  },
+  "run_dir": "results/phase9_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1",
+  "split": "test"
+}

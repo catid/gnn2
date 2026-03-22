@@ -1,0 +1,10 @@
+_base_: ./hybrid_es_benchmark_b_v2_teacher1874_headonly_queryreadout_resume_from9122.yaml
+
+experiment:
+  seed: 9202
+
+es:
+  trainable_prefixes:
+    - sink_proj
+    - readout
+    - query_readout_proj

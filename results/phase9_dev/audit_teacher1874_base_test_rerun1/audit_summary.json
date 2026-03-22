@@ -1,0 +1,173 @@
+{
+  "answer_summary": {
+    "chance_accuracy": 0.25,
+    "count": 991,
+    "label_histogram": [
+      264,
+      264,
+      238,
+      225
+    ],
+    "num_classes": 4
+  },
+  "best_probe": {
+    "best_accuracy": 0.9969727396965027,
+    "best_conditioned_accuracy": 0.9969727396965027,
+    "best_linear_accuracy": 0.9475277662277222,
+    "best_probe_variant": "mlp_query_conditioned",
+    "best_representation": "sink_state_query",
+    "conditioning_gain": 0.04944497346878052,
+    "head_only_go_signal": true,
+    "nonlinear_gain": 0.04944497346878052
+  },
+  "checkpoint": "results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_longrelease_delayed_dropout_selectacc_seed1874_p1/hard_st_best.pt",
+  "eval_config": null,
+  "probe_tables": {
+    "control_state_query": {
+      "linear": {
+        "accuracy": 0.24621593952178955,
+        "ce": 1.3884344100952148
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.328960657119751,
+        "ce": 1.3903288841247559
+      },
+      "mlp": {
+        "accuracy": 0.2401614487171173,
+        "ce": 1.4058822393417358
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9656912088394165,
+        "ce": 0.07082124799489975
+      }
+    },
+    "final_readout_input": {
+      "linear": {
+        "accuracy": 0.9455096125602722,
+        "ce": 0.30822643637657166
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.9576185941696167,
+        "ce": 0.275468111038208
+      },
+      "mlp": {
+        "accuracy": 0.9586276412010193,
+        "ce": 0.1122618317604065
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9969727396965027,
+        "ce": 0.018790366128087044
+      }
+    },
+    "final_sink_state": {
+      "linear": {
+        "accuracy": 0.9475277662277222,
+        "ce": 0.29958921670913696
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.9596367478370667,
+        "ce": 0.2634471654891968
+      },
+      "mlp": {
+        "accuracy": 0.955600380897522,
+        "ce": 0.11341877281665802
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9969727396965027,
+        "ce": 0.013526462018489838
+      }
+    },
+    "memory_read_state_query": {
+      "linear": {
+        "accuracy": 0.2643794119358063,
+        "ce": 1.0947235822677612
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.29263371229171753,
+        "ce": 1.0999534130096436
+      },
+      "mlp": {
+        "accuracy": 0.565085768699646,
+        "ce": 0.7300205230712891
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9717457294464111,
+        "ce": 0.07015623897314072
+      }
+    },
+    "packet_state_query": {
+      "linear": {
+        "accuracy": 0.7144298553466797,
+        "ce": 0.4963669180870056
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.7073662877082825,
+        "ce": 0.49913927912712097
+      },
+      "mlp": {
+        "accuracy": 0.7214934229850769,
+        "ce": 0.40991196036338806
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9747729301452637,
+        "ce": 0.06909558176994324
+      }
+    },
+    "router_logits_query": {
+      "linear": {
+        "accuracy": 0.36024218797683716,
+        "ce": 1.3549870252609253
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.40665993094444275,
+        "ce": 1.3364450931549072
+      },
+      "mlp": {
+        "accuracy": 0.8385469317436218,
+        "ce": 0.41981711983680725
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9717457294464111,
+        "ce": 0.06912531703710556
+      }
+    },
+    "router_probs_query": {
+      "linear": {
+        "accuracy": 0.2744702398777008,
+        "ce": 1.320887565612793
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.39051464200019836,
+        "ce": 1.2579220533370972
+      },
+      "mlp": {
+        "accuracy": 0.33400604128837585,
+        "ce": 1.2512426376342773
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.5590313076972961,
+        "ce": 1.0751219987869263
+      }
+    },
+    "sink_state_query": {
+      "linear": {
+        "accuracy": 0.9445005059242249,
+        "ce": 0.30568069219589233
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.9545913338661194,
+        "ce": 0.2943528890609741
+      },
+      "mlp": {
+        "accuracy": 0.9566094875335693,
+        "ce": 0.11319153010845184
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9969727396965027,
+        "ce": 0.02011263743042946
+      }
+    }
+  },
+  "run_dir": "results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_longrelease_delayed_dropout_selectacc_seed1874_p1",
+  "split": "test"
+}

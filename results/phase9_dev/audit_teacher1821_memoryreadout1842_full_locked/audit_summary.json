@@ -1,0 +1,155 @@
+{
+  "answer_summary": {
+    "chance_accuracy": 0.25,
+    "count": 134,
+    "label_histogram": [
+      29,
+      36,
+      37,
+      32
+    ],
+    "num_classes": 4
+  },
+  "best_probe": {
+    "best_accuracy": 0.9104477763175964,
+    "best_conditioned_accuracy": 0.9104477763175964,
+    "best_linear_accuracy": 0.3955223858356476,
+    "best_probe_variant": "mlp_query_conditioned",
+    "best_representation": "memory_read_state_query",
+    "conditioning_gain": 0.5149253904819489,
+    "head_only_go_signal": true,
+    "nonlinear_gain": 0.5149253904819489
+  },
+  "checkpoint": "results/phase8_dev/hard_st_b_v2_teacher1821_refine_memoryreadout_longer_lowlr_seed1842_p1/hard_st_best.pt",
+  "eval_config": "configs/phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml",
+  "probe_tables": {
+    "control_state_query": {
+      "linear": {
+        "accuracy": 0.23134328424930573,
+        "ce": 1.4309170246124268
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.26865673065185547,
+        "ce": 1.4388256072998047
+      },
+      "mlp": {
+        "accuracy": 0.2537313401699066,
+        "ce": 1.4959040880203247
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.8059701323509216,
+        "ce": 1.6750892400741577
+      }
+    },
+    "final_sink_state": {
+      "linear": {
+        "accuracy": 0.3955223858356476,
+        "ce": 1.9381868839263916
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.38805970549583435,
+        "ce": 2.2634329795837402
+      },
+      "mlp": {
+        "accuracy": 0.89552241563797,
+        "ce": 2.84740948677063
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.89552241563797,
+        "ce": 4.991705417633057
+      }
+    },
+    "memory_read_state_query": {
+      "linear": {
+        "accuracy": 0.23880596458911896,
+        "ce": 1.524918556213379
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.21641790866851807,
+        "ce": 1.5097763538360596
+      },
+      "mlp": {
+        "accuracy": 0.23880596458911896,
+        "ce": 2.0380420684814453
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9104477763175964,
+        "ce": 0.6838430166244507
+      }
+    },
+    "packet_state_query": {
+      "linear": {
+        "accuracy": 0.23134328424930573,
+        "ce": 1.5148168802261353
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.24626865983009338,
+        "ce": 1.5083249807357788
+      },
+      "mlp": {
+        "accuracy": 0.26865673065185547,
+        "ce": 1.9714478254318237
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9029850959777832,
+        "ce": 0.4160469174385071
+      }
+    },
+    "router_logits_query": {
+      "linear": {
+        "accuracy": 0.2537313401699066,
+        "ce": 1.4041075706481934
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.305970162153244,
+        "ce": 1.42899751663208
+      },
+      "mlp": {
+        "accuracy": 0.3283582031726837,
+        "ce": 1.7595843076705933
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.447761207818985,
+        "ce": 2.811668634414673
+      }
+    },
+    "router_probs_query": {
+      "linear": {
+        "accuracy": 0.24626865983009338,
+        "ce": 1.4130358695983887
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.24626865983009338,
+        "ce": 1.4178794622421265
+      },
+      "mlp": {
+        "accuracy": 0.2238806039094925,
+        "ce": 1.8105131387710571
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.36567163467407227,
+        "ce": 4.08856201171875
+      }
+    },
+    "sink_state_query": {
+      "linear": {
+        "accuracy": 0.3955223858356476,
+        "ce": 1.9792728424072266
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.4029850661754608,
+        "ce": 2.282634973526001
+      },
+      "mlp": {
+        "accuracy": 0.8805969953536987,
+        "ce": 6.582920074462891
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.89552241563797,
+        "ce": 5.087368011474609
+      }
+    }
+  },
+  "run_dir": "results/phase8_dev/hard_st_b_v2_teacher1821_refine_memoryreadout_longer_lowlr_seed1842_p1",
+  "split": "confirm"
+}

@@ -1,0 +1,173 @@
+{
+  "answer_summary": {
+    "chance_accuracy": 0.25,
+    "count": 200,
+    "label_histogram": [
+      47,
+      47,
+      51,
+      55
+    ],
+    "num_classes": 4
+  },
+  "best_probe": {
+    "best_accuracy": 0.3149999976158142,
+    "best_conditioned_accuracy": 0.29499998688697815,
+    "best_linear_accuracy": 0.25999999046325684,
+    "best_probe_variant": "mlp",
+    "best_representation": "final_readout_input",
+    "conditioning_gain": 0.034999996423721313,
+    "head_only_go_signal": false,
+    "nonlinear_gain": 0.05500000715255737
+  },
+  "checkpoint": "results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_longrelease_delayed_dropout_selectacc_seed1879_p1/hard_st_best.pt",
+  "eval_config": "configs/phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml",
+  "probe_tables": {
+    "control_state_query": {
+      "linear": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.3976387977600098
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.27000001072883606,
+        "ce": 1.4094440937042236
+      },
+      "mlp": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.4011187553405762
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.25999999046325684,
+        "ce": 1.6650956869125366
+      }
+    },
+    "final_readout_input": {
+      "linear": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.5637290477752686
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.2549999952316284,
+        "ce": 1.6779786348342896
+      },
+      "mlp": {
+        "accuracy": 0.3149999976158142,
+        "ce": 2.8846471309661865
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.29499998688697815,
+        "ce": 2.7422547340393066
+      }
+    },
+    "final_sink_state": {
+      "linear": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.5615462064743042
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.23999999463558197,
+        "ce": 1.697826862335205
+      },
+      "mlp": {
+        "accuracy": 0.30000001192092896,
+        "ce": 1.972112774848938
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.23499999940395355,
+        "ce": 2.378514289855957
+      }
+    },
+    "memory_read_state_query": {
+      "linear": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.3980692625045776
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.27000001072883606,
+        "ce": 1.410161018371582
+      },
+      "mlp": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.6969531774520874
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.25,
+        "ce": 1.8526451587677002
+      }
+    },
+    "packet_state_query": {
+      "linear": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.4144738912582397
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.26499998569488525,
+        "ce": 1.4515477418899536
+      },
+      "mlp": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.4276983737945557
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.23999999463558197,
+        "ce": 1.5159574747085571
+      }
+    },
+    "router_logits_query": {
+      "linear": {
+        "accuracy": 0.23999999463558197,
+        "ce": 1.4039978981018066
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.27000001072883606,
+        "ce": 1.4200546741485596
+      },
+      "mlp": {
+        "accuracy": 0.2750000059604645,
+        "ce": 1.4086722135543823
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.24500000476837158,
+        "ce": 1.7252802848815918
+      }
+    },
+    "router_probs_query": {
+      "linear": {
+        "accuracy": 0.25999999046325684,
+        "ce": 1.4054912328720093
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.2750000059604645,
+        "ce": 1.4281437397003174
+      },
+      "mlp": {
+        "accuracy": 0.23499999940395355,
+        "ce": 1.4254461526870728
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.25999999046325684,
+        "ce": 1.7398005723953247
+      }
+    },
+    "sink_state_query": {
+      "linear": {
+        "accuracy": 0.2199999988079071,
+        "ce": 1.564804196357727
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.23000000417232513,
+        "ce": 1.6711806058883667
+      },
+      "mlp": {
+        "accuracy": 0.29499998688697815,
+        "ce": 1.9506837129592896
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.28999999165534973,
+        "ce": 2.722275495529175
+      }
+    }
+  },
+  "run_dir": "results/phase8_dev/hard_st_b_v2_controlsticky_keepalive_teacher_keepalive_waitrelease_only_longrelease_delayed_dropout_selectacc_seed1879_p1",
+  "split": "confirm"
+}

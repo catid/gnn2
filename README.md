@@ -125,6 +125,7 @@ The current long-horizon writeups are:
 
 - [docs/phase7_report.md](docs/phase7_report.md)
 - [docs/phase8_report.md](docs/phase8_report.md)
+- [docs/phase9_report.md](docs/phase9_report.md)
 
 Current headline state:
 
@@ -138,6 +139,16 @@ Current headline state:
 - phase 8 also showed the remaining failure more sharply: after route-faithful
   teacher-free entry, reopening `memory_` destabilizes fragile basins while
   head-only reopenings preserve routing but still do not recover content
+- phase 9 showed that frozen-state content is **not** uniform across sources:
+  strong direct-entry `1874` and medium teacher-shaped `1842` are strongly
+  decodable, while fragile route-faithful `1879` is weak-content even under
+  query-conditioned probes
+- phase 9 also showed that on decodable sources, stronger frozen-head readers
+  can recover substantial **base** content without touching memory, but held
+  confirmations still plateau well below the desired final-query accuracy
+- within that phase-9 map, the strongest aggregate confirmed family is the
+  strong-source query-gated final-query-weighted branch, while query-FILM is
+  the strongest alternative-reader family and a near-tie on held confirms
 
 Best current single-run teacher-free basin-entry result from phase 8:
 
@@ -156,6 +167,14 @@ adapter branch:
 
 - [seed1201](/home/catid/gnn2/results/phase7_dev/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1)
   base verify `0.9756 / 0.9500 / 1.0000 / 127.00`
+
+Best current confirmed frozen-head content-recovery branch from phase 9:
+
+- [query-gated finalqweight 9142 family](/home/catid/gnn2/results/phase9_dev/hard_st_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr_seed9142_p1)
+  five-seed base mean `0.8488 / 0.7004 / 0.9416 / 121.49`
+  and five-seed full-locked mean
+  `0.6534 / 0.3237 / 0.8771 / 115.49`
+  for `overall / fq_acc / fq_route / fq_exit`
 
 ## Phase 7 Commands
 
@@ -180,6 +199,20 @@ source/channel/release mapping, post-entry recovery, and phase-8 confirmation.
 ./scripts/run_phase8_main.sh <config> <results-dir> [resume] [nproc_per_node]
 ./scripts/run_phase8_confirm.sh <run-dir> [extra-eval-config ...]
 ./scripts/run_phase8_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
+```
+
+## Phase 9 Commands
+
+Phase 9 focuses on frozen-state content audits, strict head-only content
+shaping, content-transfer readers, gated minimal-safe touches, and head-level
+confirmation.
+
+```bash
+./scripts/run_phase9_source_audits.sh [results-root]
+./scripts/run_phase9_cluster_scouts.sh [results-root] [fragile|medium|strong|es]
+./scripts/run_phase9_main.sh <config> <results-dir> [resume] [nproc_per_node]
+./scripts/run_phase9_confirm.sh <run-dir> [extra-eval-config ...]
+./scripts/run_phase9_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
 ```
 
 ## Phase 2 Commands

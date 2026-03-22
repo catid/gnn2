@@ -1,0 +1,23 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1879_refine_queryreadout_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 9303
+
+training:
+  train_steps_delta: 256
+  lr: 0.00002
+  freeze_prefixes:
+    - core.
+    - control_
+    - wait_
+    - release_
+    - sink_proj
+  trainable_prefixes:
+    - readout
+    - query_readout_proj
+  trainable_exact_names:
+    - memory_input_proj.bias
+    - memory_read_gate.bias
+    - memory_read_slots.bias
+    - memory_read_mlp.0.bias
+    - memory_read_mlp.1.bias

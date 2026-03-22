@@ -1,0 +1,23 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_sinkqueryreadout_longer_lowlr.yaml
+
+experiment:
+  seed: 9141
+
+teacher:
+  run_dir: results/phase8_anchor/hard_st_b_v2_weak_es_content_refine_sinkcore_seed973_rerun1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: final_query_only
+  logits_weight: 1.0
+  route_weight: 0.0
+  route_action_weight: 0.0
+  control_prob_weight: 0.0
+  release_prob_weight: 0.0
+  wait_prob_weight: 0.0
+  control_state_weight: 0.0
+  memory_read_weight: 0.0
+  start_step: 0
+  stop_step: 384
+  scale_start: 1.0
+  scale_end: 1.0

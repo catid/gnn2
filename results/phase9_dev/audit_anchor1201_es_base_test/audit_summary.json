@@ -1,0 +1,155 @@
+{
+  "answer_summary": {
+    "chance_accuracy": 0.25,
+    "count": 108,
+    "label_histogram": [
+      32,
+      25,
+      28,
+      23
+    ],
+    "num_classes": 4
+  },
+  "best_probe": {
+    "best_accuracy": 1.0,
+    "best_conditioned_accuracy": 1.0,
+    "best_linear_accuracy": 1.0,
+    "best_probe_variant": "mlp_query_conditioned",
+    "best_representation": "packet_state_query",
+    "conditioning_gain": 0.0,
+    "head_only_go_signal": true,
+    "nonlinear_gain": 0.0
+  },
+  "checkpoint": "results/phase8_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1/hybrid_es_best.pt",
+  "eval_config": null,
+  "probe_tables": {
+    "control_state_query": {
+      "linear": {
+        "accuracy": 0.25,
+        "ce": 1.4345942735671997
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.23148147761821747,
+        "ce": 1.4315897226333618
+      },
+      "mlp": {
+        "accuracy": 0.29629629850387573,
+        "ce": 2.6901276111602783
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0006595951854251325
+      }
+    },
+    "final_sink_state": {
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 1.688795379095609e-07
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 3.114974970230833e-05
+      },
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 1.1037896152643611e-09
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      }
+    },
+    "memory_read_state_query": {
+      "linear": {
+        "accuracy": 0.32407405972480774,
+        "ce": 1.392425298690796
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.28703704476356506,
+        "ce": 1.4013335704803467
+      },
+      "mlp": {
+        "accuracy": 0.29629629850387573,
+        "ce": 1.4447674751281738
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.4505752915283665e-05
+      }
+    },
+    "packet_state_query": {
+      "linear": {
+        "accuracy": 0.3333333432674408,
+        "ce": 1.401879906654358
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.31481480598449707,
+        "ce": 1.4190396070480347
+      },
+      "mlp": {
+        "accuracy": 0.5648148059844971,
+        "ce": 1.052498698234558
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 9.717333159642294e-05
+      }
+    },
+    "router_logits_query": {
+      "linear": {
+        "accuracy": 0.24074074625968933,
+        "ce": 1.4031018018722534
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.2777777910232544,
+        "ce": 1.4286000728607178
+      },
+      "mlp": {
+        "accuracy": 0.9074074029922485,
+        "ce": 0.34292393922805786
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9814814925193787,
+        "ce": 0.05625048279762268
+      }
+    },
+    "router_probs_query": {
+      "linear": {
+        "accuracy": 0.29629629850387573,
+        "ce": 1.3833959102630615
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.37037035822868347,
+        "ce": 1.3710014820098877
+      },
+      "mlp": {
+        "accuracy": 0.6388888955116272,
+        "ce": 0.8220980763435364
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.8425925970077515,
+        "ce": 0.7236934304237366
+      }
+    },
+    "sink_state_query": {
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 1.1909419299627189e-06
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.4922323998689535e-06
+      },
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      }
+    }
+  },
+  "run_dir": "results/phase8_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1",
+  "split": "test"
+}
