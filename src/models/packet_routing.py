@@ -42,6 +42,16 @@ class LowRankAdapter(nn.Module):
         return self.up(self.down(x))
 
 
+class AffineAdapter(nn.Module):
+    def __init__(self, hidden_dim: int):
+        super().__init__()
+        self.scale = nn.Parameter(torch.zeros(hidden_dim))
+        self.bias = nn.Parameter(torch.zeros(hidden_dim))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x * (1.0 + self.scale) + self.bias
+
+
 class NodeCore(nn.Module):
     def __init__(
         self,
@@ -210,6 +220,28 @@ class PacketRoutingModel(nn.Module):
         self.release_gate_mode = str(config.get("release_gate_mode", "bias"))
         self.release_gate_scale = float(config.get("release_gate_scale", 1.0))
         self.readout_mode = str(config.get("readout_mode", "plain"))
+        self.readout_base_mode = str(config.get("readout_base_mode", "plain"))
+        self.readout_views = tuple(
+            str(name)
+            for name in config.get(
+                "readout_views",
+                ["final_sink_state", "packet_state_query"],
+            )
+        )
+        self.readout_iter_steps = int(config.get("readout_iter_steps", 1))
+        self.readout_view_dropout = float(config.get("readout_view_dropout", 0.0))
+        self.readout_attention_heads = int(config.get("readout_attention_heads", 1))
+        self.readout_adapter_mode = str(config.get("readout_adapter_mode", "none"))
+        self.readout_adapter_rank = int(config.get("readout_adapter_rank", 0))
+        self.readout_adapter_hidden_dim = int(
+            config.get("readout_adapter_hidden_dim", self.hidden_dim)
+        )
+        self.multiview_readout_modes = {
+            "multiview_concat",
+            "multiview_query_gated",
+            "multiview_query_film",
+            "multiview_cross_attention",
+        }
         self.core = NodeCore(
             obs_dim=self.obs_dim,
             hidden_dim=self.hidden_dim,
@@ -312,6 +344,23 @@ class PacketRoutingModel(nn.Module):
             self.release_head = None
         self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.query_readout_proj = None
+        self.multiview_baseline_proj = None
+        self.multiview_query_proj = None
+        self.multiview_fusion = None
+        self.multiview_attention = None
+        self.multiview_attention_norm = None
+        self.multiview_ff = None
+        self.multiview_view_dropout = (
+            nn.Dropout(self.readout_view_dropout)
+            if self.readout_view_dropout > 0.0
+            else nn.Identity()
+        )
+        self.readout_adapter = None
+        effective_base_mode = (
+            self.readout_mode
+            if self.readout_mode not in self.multiview_readout_modes
+            else self.readout_base_mode
+        )
         if self.readout_mode == "plain":
             readout_input_dim = self.hidden_dim
         elif self.readout_mode == "query_conditioned":
@@ -333,12 +382,132 @@ class PacketRoutingModel(nn.Module):
                 nn.LayerNorm(self.obs_dim),
                 nn.Linear(self.obs_dim, self.hidden_dim * 2),
             )
+        elif self.readout_mode in self.multiview_readout_modes:
+            if effective_base_mode == "query_conditioned":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+                self.multiview_baseline_proj = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim * 2),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                    nn.GELU(),
+                )
+            elif effective_base_mode == "query_gated":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                )
+            elif effective_base_mode == "query_film":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim * 2),
+                )
+            elif effective_base_mode != "plain":
+                raise ValueError(f"Unknown readout_base_mode: {effective_base_mode}")
+
+            if self.readout_mode == "multiview_cross_attention":
+                self.multiview_query_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                )
+                self.multiview_attention = nn.MultiheadAttention(
+                    self.hidden_dim,
+                    self.readout_attention_heads,
+                    batch_first=True,
+                )
+                self.multiview_attention_norm = nn.LayerNorm(self.hidden_dim)
+                self.multiview_ff = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim),
+                    nn.Linear(self.hidden_dim, self.hidden_dim * 2),
+                    nn.GELU(),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                )
+            else:
+                self.multiview_fusion = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim * len(self.readout_views)),
+                    nn.Linear(self.hidden_dim * len(self.readout_views), self.hidden_dim),
+                    nn.GELU(),
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+                if self.readout_mode == "multiview_query_gated":
+                    self.multiview_query_proj = nn.Sequential(
+                        nn.LayerNorm(self.obs_dim),
+                        nn.Linear(self.obs_dim, self.hidden_dim),
+                    )
+                elif self.readout_mode == "multiview_query_film":
+                    self.multiview_query_proj = nn.Sequential(
+                        nn.LayerNorm(self.obs_dim),
+                        nn.Linear(self.obs_dim, self.hidden_dim * 2),
+                    )
+            readout_input_dim = self.hidden_dim
         else:
             raise ValueError(f"Unknown readout_mode: {self.readout_mode}")
+
+        if self.readout_adapter_mode == "none":
+            self.readout_adapter = None
+        elif self.readout_adapter_mode == "low_rank":
+            rank = max(1, self.readout_adapter_rank)
+            self.readout_adapter = LowRankAdapter(self.hidden_dim, rank)
+        elif self.readout_adapter_mode == "residual_mlp":
+            hidden = max(1, self.readout_adapter_hidden_dim)
+            self.readout_adapter = nn.Sequential(
+                nn.LayerNorm(self.hidden_dim),
+                nn.Linear(self.hidden_dim, hidden),
+                nn.GELU(),
+                nn.Linear(hidden, self.hidden_dim),
+            )
+            nn.init.zeros_(self.readout_adapter[-1].weight)
+            nn.init.zeros_(self.readout_adapter[-1].bias)
+        elif self.readout_adapter_mode == "affine":
+            self.readout_adapter = AffineAdapter(self.hidden_dim)
+        else:
+            raise ValueError(f"Unknown readout_adapter_mode: {self.readout_adapter_mode}")
         self.readout = nn.Sequential(
             nn.LayerNorm(readout_input_dim),
             nn.Linear(readout_input_dim, self.num_classes),
         )
+
+    def _baseline_readout_input(
+        self,
+        sink_state: torch.Tensor,
+        observations: torch.Tensor,
+        *,
+        for_multiview: bool = False,
+    ) -> torch.Tensor:
+        query_obs = observations[:, -1, 0]
+        mode = (
+            self.readout_mode
+            if self.readout_mode not in self.multiview_readout_modes
+            else self.readout_base_mode
+        )
+        if mode == "plain":
+            return sink_state
+        if mode == "query_conditioned":
+            query_context = self.query_readout_proj(query_obs)
+            conditioned = torch.cat([sink_state, query_context], dim=-1)
+            if for_multiview:
+                if self.multiview_baseline_proj is None:
+                    raise RuntimeError(
+                        "multiview_baseline_proj must be configured for multiview query_conditioned."
+                    )
+                return self.multiview_baseline_proj(conditioned)
+            return conditioned
+        if mode == "query_gated":
+            query_gate = torch.sigmoid(self.query_readout_proj(query_obs))
+            return sink_state * query_gate
+        if mode == "query_film":
+            film_params = self.query_readout_proj(query_obs)
+            gamma, beta = torch.chunk(film_params, 2, dim=-1)
+            return sink_state * (1.0 + torch.tanh(gamma)) + beta
+        raise ValueError(f"Unknown baseline readout mode: {mode}")
+
+    def _apply_readout_adapter(self, fused: torch.Tensor) -> torch.Tensor:
+        if self.readout_adapter is None or fused.shape[-1] != self.hidden_dim:
+            return fused
+        return fused + self.readout_adapter(fused)
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
         allowed = [
@@ -446,6 +615,7 @@ class PacketRoutingModel(nn.Module):
             dtype=dtype,
         )
         sink_state = torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype)
+        packet_state_query = torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype)
 
         hops = torch.zeros(batch_size, device=device, dtype=dtype)
         delays = torch.zeros(batch_size, device=device, dtype=dtype)
@@ -524,6 +694,9 @@ class PacketRoutingModel(nn.Module):
                 "memory_read_entropy": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
                 "memory_write_entropy": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
                 "final_sink_state": torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype),
+                "sink_state_query": torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype),
+                "packet_state_query": torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype),
+                "baseline_readout_input": torch.zeros(batch_size, self.hidden_dim, device=device, dtype=dtype),
             }
             if self.packet_memory_slots > 0:
                 trace["memory_read_state"] = torch.zeros(
@@ -1104,6 +1277,7 @@ class PacketRoutingModel(nn.Module):
             mailbox_mass_sum = mailbox_mass_sum + mailbox_load
             mailbox_peak = torch.maximum(mailbox_peak, mailbox_load)
             mailbox_steps = mailbox_steps + (mailbox_load >= 0.0).float()
+            packet_state_query = (packet_masses.unsqueeze(-1) * packet_states).sum(dim=1) / packet_masses.sum(dim=1).clamp_min(float(eps)).unsqueeze(-1)
 
             if trace is not None:
                 trace["active_mass"][:, time_index] = time_active_mass
@@ -1113,7 +1287,7 @@ class PacketRoutingModel(nn.Module):
                 trace["action_mass"][:, time_index, :] = time_action_sum
                 trace["router_logits"][:, time_index, :] = time_router_logits_sum / time_router_mass.clamp_min(float(eps)).unsqueeze(-1)
                 trace["router_probs"][:, time_index, :] = time_router_probs_sum / time_router_mass.clamp_min(float(eps)).unsqueeze(-1)
-                trace["packet_state"][:, time_index, :] = time_packet_state_sum / time_active_mass.clamp_min(float(eps)).unsqueeze(-1)
+                trace["packet_state"][:, time_index, :] = packet_state_query
                 trace["sink_state"][:, time_index, :] = sink_state
                 trace["memory_read_gate"][:, time_index] = time_memory_read_gate_sum / time_active_mass.clamp_min(float(eps))
                 trace["memory_write_gate"][:, time_index] = time_memory_write_gate_sum / time_active_mass.clamp_min(float(eps))
@@ -1152,6 +1326,7 @@ class PacketRoutingModel(nn.Module):
                 wait_state = wait_state.detach()
                 sink_state = sink_state.detach()
 
+        sink_state_query = sink_state
         residual_mass = packet_masses.sum(dim=1)
         if float(residual_mass.max().detach().cpu()) > 0.0:
             sink_state = sink_state + (packet_masses.unsqueeze(-1) * self.sink_proj(packet_states)).sum(dim=1)
@@ -1169,18 +1344,62 @@ class PacketRoutingModel(nn.Module):
         if trace is not None:
             trace["final_sink_state"] = sink_state
 
-        readout_input = sink_state
-        if self.readout_mode == "query_conditioned":
-            query_context = self.query_readout_proj(observations[:, -1, 0])
-            readout_input = torch.cat([sink_state, query_context], dim=-1)
-        elif self.readout_mode == "query_gated":
-            query_gate = torch.sigmoid(self.query_readout_proj(observations[:, -1, 0]))
-            readout_input = sink_state * query_gate
-        elif self.readout_mode == "query_film":
-            film_params = self.query_readout_proj(observations[:, -1, 0])
-            gamma, beta = torch.chunk(film_params, 2, dim=-1)
-            readout_input = sink_state * (1.0 + torch.tanh(gamma)) + beta
+        if self.readout_mode in self.multiview_readout_modes:
+            baseline_view = self._baseline_readout_input(
+                sink_state,
+                observations,
+                for_multiview=True,
+            )
+            view_map = {
+                "final_sink_state": sink_state,
+                "sink_state_query": sink_state_query,
+                "packet_state_query": packet_state_query,
+                "baseline_readout_input": baseline_view,
+            }
+            view_tensors = [view_map[name] for name in self.readout_views]
+            if self.readout_mode == "multiview_cross_attention":
+                view_bank = self.multiview_view_dropout(torch.stack(view_tensors, dim=1))
+                latent = self.multiview_query_proj(observations[:, -1, 0])
+                for _ in range(max(1, self.readout_iter_steps)):
+                    attended, _ = self.multiview_attention(
+                        latent.unsqueeze(1),
+                        view_bank,
+                        view_bank,
+                        need_weights=False,
+                    )
+                    latent = self.multiview_attention_norm(latent + attended.squeeze(1))
+                    latent = latent + self.multiview_ff(latent)
+                readout_input = latent
+            else:
+                fused = self.multiview_fusion(
+                    torch.cat(
+                        [self.multiview_view_dropout(view) for view in view_tensors],
+                        dim=-1,
+                    )
+                )
+                if self.readout_mode == "multiview_query_gated":
+                    query_gate = torch.sigmoid(self.multiview_query_proj(observations[:, -1, 0]))
+                    fused = fused * query_gate
+                elif self.readout_mode == "multiview_query_film":
+                    film_params = self.multiview_query_proj(observations[:, -1, 0])
+                    gamma, beta = torch.chunk(film_params, 2, dim=-1)
+                    fused = fused * (1.0 + torch.tanh(gamma)) + beta
+                readout_input = fused
+            readout_input = self._apply_readout_adapter(readout_input)
+        else:
+            baseline_view = self._baseline_readout_input(
+                sink_state,
+                observations,
+                for_multiview=False,
+            )
+            readout_input = baseline_view
+        if self.readout_mode not in self.multiview_readout_modes:
+            readout_input = self._apply_readout_adapter(readout_input)
         if trace is not None:
+            trace["sink_state_query"] = sink_state_query
+            trace["packet_state_query"] = packet_state_query
+            if baseline_view.shape[-1] == self.hidden_dim:
+                trace["baseline_readout_input"] = baseline_view
             trace["final_readout_input"] = readout_input
         logits = self.readout(readout_input)
         if task_sample_weights is None:

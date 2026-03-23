@@ -1,0 +1,14 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_queryfilm_longer_lowlr.yaml
+
+experiment:
+  seed: 10024
+  results_root: results/phase10_dev
+
+model:
+  readout_adapter_mode: low_rank
+  readout_adapter_rank: 8
+
+training:
+  trainable_prefixes:
+    - readout
+    - query_readout_proj

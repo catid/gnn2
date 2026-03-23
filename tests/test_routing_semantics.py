@@ -195,6 +195,44 @@ def test_query_gated_and_film_readouts_construct_and_run() -> None:
         assert output.trace["final_readout_input"].shape == (2, 4)
 
 
+def test_multiview_readouts_construct_and_run() -> None:
+    for mode in ("multiview_concat", "multiview_query_gated", "multiview_cross_attention"):
+        model = PacketRoutingModel(
+            {
+                "num_nodes": 2,
+                "obs_dim": 8,
+                "hidden_dim": 4,
+                "num_classes": 3,
+                "max_internal_steps": 1,
+                "max_total_steps": 8,
+                "adapter_rank": 0,
+                "readout_mode": mode,
+                "readout_base_mode": "query_gated",
+                "readout_views": ["final_sink_state", "packet_state_query", "baseline_readout_input"],
+                "readout_iter_steps": 2,
+                "readout_adapter_mode": "affine",
+            }
+        )
+        observations = torch.zeros(2, 3, 2, 8)
+        observations[:, -1, 0, 1] = 1.0
+        labels = torch.zeros(2, dtype=torch.long)
+
+        output = model(
+            observations=observations,
+            labels=labels,
+            route_mode="hard",
+            compute_penalties={},
+            return_trace=True,
+        )
+
+        assert output.logits.shape == (2, 3)
+        assert output.trace is not None
+        assert output.trace["sink_state_query"].shape == (2, 4)
+        assert output.trace["packet_state_query"].shape == (2, 4)
+        assert output.trace["baseline_readout_input"].shape == (2, 4)
+        assert output.trace["final_readout_input"].shape == (2, 4)
+
+
 def test_delay_hold_mode_preserves_packet_state() -> None:
     model = PacketRoutingModel(
         {

@@ -1,0 +1,17 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 10016
+  results_root: results/phase10_dev
+
+model:
+  readout_mode: multiview_concat
+  readout_base_mode: query_gated
+  readout_views:
+    - packet_state_query
+
+training:
+  trainable_prefixes:
+    - readout
+    - query_readout_proj
+    - multiview_
