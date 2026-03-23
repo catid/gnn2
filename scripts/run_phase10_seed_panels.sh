@@ -28,11 +28,9 @@ for seed in "$@"; do
     echo "refusing non-empty output dir: ${out}" >&2
     exit 1
   fi
-  cmd=(uv run python -m src.train.run --config "${config}" --results-dir "${out}")
+  cmd=(uv run python -m src.train.run --config "${config}" --results-dir "${out}" --seed "${seed}")
   if [[ -n "${resume}" ]]; then
     cmd+=(--resume "${resume}")
   fi
-  "${cmd[@]}" >/tmp/phase10_seed_${seed}.log 2>&1 &
+  "${cmd[@]}" >/tmp/phase10_seed_${seed}.log 2>&1
 done
-
-wait

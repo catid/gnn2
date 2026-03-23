@@ -70,12 +70,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", required=True, help="YAML config path.")
     parser.add_argument("--results-dir", default=None, help="Optional explicit output directory.")
     parser.add_argument("--resume", default=None, help="Optional checkpoint to resume.")
+    parser.add_argument("--seed", type=int, default=None, help="Optional override for experiment.seed.")
     return parser.parse_args()
 
 
 def apply_cli_overrides(cfg: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     if args.resume is not None:
         cfg["resume"] = args.resume
+    if args.seed is not None:
+        experiment_cfg = cfg.setdefault("experiment", {})
+        experiment_cfg["seed"] = int(args.seed)
     return cfg
 
 
