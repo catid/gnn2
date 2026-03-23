@@ -1,0 +1,5 @@
+_base_: ../../phase7/dev/hybrid_es_benchmark_b_v2_controlsticky_keepalive_resume.yaml
+
+experiment:
+  seed: 1201
+  results_root: results/phase10_anchor

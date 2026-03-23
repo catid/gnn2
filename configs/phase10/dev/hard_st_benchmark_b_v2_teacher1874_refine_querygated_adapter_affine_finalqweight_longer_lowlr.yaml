@@ -11,3 +11,4 @@ training:
   trainable_prefixes:
     - readout
     - query_readout_proj
+    - readout_adapter

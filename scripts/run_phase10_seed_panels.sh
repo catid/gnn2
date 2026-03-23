@@ -21,11 +21,18 @@ mkdir -p "${results_root}"
 
 for seed in "$@"; do
   out="${results_root}/seed${seed}"
+  if [[ -f "${out}/summary.json" ]]; then
+    echo "skip existing completed run: ${out}"
+    continue
+  elif [[ -d "${out}" ]] && find "${out}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "refusing non-empty output dir: ${out}" >&2
+    exit 1
+  fi
   cmd=(uv run python -m src.train.run --config "${config}" --results-dir "${out}")
   if [[ -n "${resume}" ]]; then
     cmd+=(--resume "${resume}")
   fi
-  "${cmd[@]}" >/tmp/phase9_seed_${seed}.log 2>&1 &
+  "${cmd[@]}" >/tmp/phase10_seed_${seed}.log 2>&1 &
 done
 
 wait

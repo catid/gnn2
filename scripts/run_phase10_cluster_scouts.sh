@@ -69,6 +69,31 @@ run_pair() {
   local out_b
   out_a="$(results_dir_for_config "${path_a}")"
   out_b="$(results_dir_for_config "${path_b}")"
+  if [[ -f "${out_a}/summary.json" ]]; then
+    echo "skip existing completed run: ${out_a}"
+    path_a=""
+  elif [[ -d "${out_a}" ]] && find "${out_a}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "refusing non-empty output dir: ${out_a}" >&2
+    return 1
+  fi
+  if [[ -f "${out_b}/summary.json" ]]; then
+    echo "skip existing completed run: ${out_b}"
+    path_b=""
+  elif [[ -d "${out_b}" ]] && find "${out_b}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "refusing non-empty output dir: ${out_b}" >&2
+    return 1
+  fi
+  if [[ -z "${path_a}" && -z "${path_b}" ]]; then
+    return 0
+  fi
+  if [[ -z "${path_a}" ]]; then
+    CUDA_VISIBLE_DEVICES=1 ./scripts/run_phase10_main.sh "${path_b}" "${out_b}"
+    return 0
+  fi
+  if [[ -z "${path_b}" ]]; then
+    CUDA_VISIBLE_DEVICES=0 ./scripts/run_phase10_main.sh "${path_a}" "${out_a}"
+    return 0
+  fi
   CUDA_VISIBLE_DEVICES=0 ./scripts/run_phase10_main.sh "${path_a}" "${out_a}" &
   local pid_a=$!
   CUDA_VISIBLE_DEVICES=1 ./scripts/run_phase10_main.sh "${path_b}" "${out_b}" &
@@ -82,6 +107,13 @@ for ((i = 0; i < ${#configs[@]}; i += 2)); do
   else
     path="configs/phase10/dev/${configs[i]}"
     out="$(results_dir_for_config "${path}")"
+    if [[ -f "${out}/summary.json" ]]; then
+      echo "skip existing completed run: ${out}"
+      continue
+    elif [[ -d "${out}" ]] && find "${out}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+      echo "refusing non-empty output dir: ${out}" >&2
+      exit 1
+    fi
     CUDA_VISIBLE_DEVICES=0 ./scripts/run_phase10_main.sh "${path}" "${out}"
   fi
 done

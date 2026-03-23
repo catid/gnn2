@@ -1,7 +1,7 @@
 _base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr.yaml
 
 experiment:
-  seed: 10022
+  seed: 10032
   results_root: results/phase10_dev
 
 model:
@@ -12,3 +12,4 @@ training:
   trainable_prefixes:
     - readout
     - query_readout_proj
+    - readout_adapter

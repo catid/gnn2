@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1842_refine_multiview_sinkpacketbaseline_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 10142
+
+training:
+  final_query_weight: 5.0
+  non_final_query_weight: 0.25
