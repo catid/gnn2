@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import torch
@@ -13,6 +14,7 @@ from src.data.benchmarks import (
 from src.train.run import (
     TeacherDistillation,
     compute_teacher_distillation_loss,
+    load_teacher_distillation,
     teacher_step_controls,
     teacher_sample_weights,
 )
@@ -162,3 +164,46 @@ def test_teacher_step_controls_support_schedule_and_stop() -> None:
     assert 0.2 < scale_mid < 1.0
     assert 0.0 < drop_mid < 0.5
     assert teacher_step_controls(teacher, 20) == (0.0, 0.0)
+
+
+def test_load_teacher_distillation_falls_back_to_config_yaml_when_summary_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    run_dir = tmp_path / "teacher_run"
+    run_dir.mkdir()
+    (run_dir / "config.yaml").write_text("model: {}\n")
+    torch.save({"model": {}}, run_dir / "hard_st_best.pt")
+
+    class DummyModel:
+        def to(self, device):
+            return self
+
+        def eval(self) -> None:
+            return None
+
+        def parameters(self):
+            return []
+
+    monkeypatch.setattr("src.train.run.load_config", lambda _: {"model": {}})
+    monkeypatch.setattr("src.train.run.benchmark_model_config", lambda model_cfg, benchmark: {})
+    monkeypatch.setattr("src.train.run.PacketRoutingModel", lambda cfg: DummyModel())
+    monkeypatch.setattr(
+        "src.train.run.resolve_checkpoint_from_run_dir",
+        lambda run_dir, checkpoint: Path(run_dir) / "hard_st_best.pt",
+    )
+    monkeypatch.setattr("src.train.run.load_checkpoint", lambda *args, **kwargs: None)
+
+    teacher = load_teacher_distillation(
+        {
+            "teacher": {
+                "run_dir": str(run_dir),
+                "logits_weight": 0.1,
+            }
+        },
+        benchmark=SimpleNamespace(),
+        device=torch.device("cpu"),
+    )
+
+    assert teacher is not None
+    assert teacher.logits_weight == 0.1

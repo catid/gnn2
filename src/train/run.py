@@ -1671,10 +1671,16 @@ def load_teacher_distillation(
         raise ValueError(f"{section} distillation requires {section}.run_dir when any teacher weight is positive.")
     run_dir = Path(run_dir)
     summary_path = run_dir / "summary.json"
-    if not summary_path.exists():
-        raise FileNotFoundError(f"Teacher run summary not found: {summary_path}")
-    summary_payload = json.loads(summary_path.read_text())
+    summary_payload: dict[str, Any] = {}
+    if summary_path.exists():
+        summary_payload = json.loads(summary_path.read_text())
     config_path = Path(teacher_cfg.get("config_path") or summary_payload.get("config_path") or (run_dir / "config.yaml"))
+    if not config_path.exists():
+        if summary_path.exists():
+            raise FileNotFoundError(f"Teacher config not found: {config_path}")
+        raise FileNotFoundError(
+            f"Teacher run requires either {summary_path} or {run_dir / 'config.yaml'}"
+        )
     teacher_base_cfg = load_config(str(config_path))
     teacher_model = PacketRoutingModel(
         benchmark_model_config(teacher_base_cfg["model"], benchmark)
