@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_pinit_prefix_12713_13111_readout9505_cmix_fq4_selectproxy_src13111_delayed_lw01375_start024_stop072_llr.yaml
+
+experiment:
+  seed: 14411
+
+training:
+  selection_metric_mode: lexicographic
+  selection_metric_terms:
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      minimum: 0.795
+    - path: per_mode.delay_to_final_query.accuracy
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+    - path: accuracy
