@@ -1,0 +1,26 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_sinknative_multiview_sinkbaseline_querygated_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 12811
+
+resume:
+  checkpoint: results/phase11_init/placeholder/init.pt
+  strict: true
+
+partial_init: null
+
+training:
+  final_query_weight: 4.0
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.05
+    - name: finalqueryheavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.05
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      loss_weight: 0.05

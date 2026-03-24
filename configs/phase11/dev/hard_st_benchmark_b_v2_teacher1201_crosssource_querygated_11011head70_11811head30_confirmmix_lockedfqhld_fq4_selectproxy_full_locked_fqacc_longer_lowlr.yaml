@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_crosssource_querygated_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 12814
+
+resume:
+  checkpoint: results/phase11_init/j61_teacher1201core_native11811sink_11011head70_11811head30/init.pt
+  strict: true
