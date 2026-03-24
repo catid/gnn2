@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 11714
+
+model:
+  multiview_adapter_mode: low_rank
+  multiview_adapter_rank: 4
+
+training:
+  trainable_prefixes:
+    - multiview_adapter
+    - multiview_query_proj

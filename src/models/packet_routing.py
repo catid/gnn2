@@ -446,6 +446,11 @@ class PacketRoutingModel(nn.Module):
         self.readout_iter_steps = int(config.get("readout_iter_steps", 1))
         self.readout_view_dropout = float(config.get("readout_view_dropout", 0.0))
         self.readout_attention_heads = int(config.get("readout_attention_heads", 1))
+        self.multiview_adapter_mode = str(config.get("multiview_adapter_mode", "none"))
+        self.multiview_adapter_rank = int(config.get("multiview_adapter_rank", 0))
+        self.multiview_adapter_hidden_dim = int(
+            config.get("multiview_adapter_hidden_dim", self.hidden_dim)
+        )
         self.readout_adapter_mode = str(config.get("readout_adapter_mode", "none"))
         self.readout_adapter_rank = int(config.get("readout_adapter_rank", 0))
         self.readout_adapter_hidden_dim = int(
@@ -569,6 +574,7 @@ class PacketRoutingModel(nn.Module):
         self.multiview_attention = None
         self.multiview_attention_norm = None
         self.multiview_ff = None
+        self.multiview_adapter = None
         self.multiview_view_dropout = (
             nn.Dropout(self.readout_view_dropout)
             if self.readout_view_dropout > 0.0
@@ -665,6 +671,26 @@ class PacketRoutingModel(nn.Module):
         else:
             raise ValueError(f"Unknown readout_mode: {self.readout_mode}")
 
+        if self.multiview_adapter_mode == "none":
+            self.multiview_adapter = None
+        elif self.multiview_adapter_mode == "low_rank":
+            rank = max(1, self.multiview_adapter_rank)
+            self.multiview_adapter = LowRankAdapter(self.hidden_dim, rank)
+        elif self.multiview_adapter_mode == "residual_mlp":
+            hidden = max(1, self.multiview_adapter_hidden_dim)
+            self.multiview_adapter = nn.Sequential(
+                nn.LayerNorm(self.hidden_dim),
+                nn.Linear(self.hidden_dim, hidden),
+                nn.GELU(),
+                nn.Linear(hidden, self.hidden_dim),
+            )
+            nn.init.zeros_(self.multiview_adapter[-1].weight)
+            nn.init.zeros_(self.multiview_adapter[-1].bias)
+        elif self.multiview_adapter_mode == "affine":
+            self.multiview_adapter = AffineAdapter(self.hidden_dim)
+        else:
+            raise ValueError(f"Unknown multiview_adapter_mode: {self.multiview_adapter_mode}")
+
         if self.readout_adapter_mode == "none":
             self.readout_adapter = None
         elif self.readout_adapter_mode == "low_rank":
@@ -744,6 +770,11 @@ class PacketRoutingModel(nn.Module):
             gamma, beta = torch.chunk(film_params, 2, dim=-1)
             return sink_state * (1.0 + torch.tanh(gamma)) + beta
         raise ValueError(f"Unknown baseline readout mode: {mode}")
+
+    def _apply_multiview_adapter(self, fused: torch.Tensor) -> torch.Tensor:
+        if self.multiview_adapter is None or fused.shape[-1] != self.hidden_dim:
+            return fused
+        return fused + self.multiview_adapter(fused)
 
     def _apply_readout_adapter(self, fused: torch.Tensor) -> torch.Tensor:
         if self.readout_adapter is None or fused.shape[-1] != self.hidden_dim:
@@ -1611,7 +1642,7 @@ class PacketRoutingModel(nn.Module):
                     )
                     latent = self.multiview_attention_norm(latent + attended.squeeze(1))
                     latent = latent + self.multiview_ff(latent)
-                readout_input = latent
+                readout_input = self._apply_multiview_adapter(latent)
             else:
                 fused = self.multiview_fusion(
                     torch.cat(
@@ -1619,6 +1650,7 @@ class PacketRoutingModel(nn.Module):
                         dim=-1,
                     )
                 )
+                fused = self._apply_multiview_adapter(fused)
                 if self.readout_mode == "multiview_query_gated":
                     query_gate = torch.sigmoid(self.multiview_query_proj(observations[:, -1, 0]))
                     fused = fused * query_gate
