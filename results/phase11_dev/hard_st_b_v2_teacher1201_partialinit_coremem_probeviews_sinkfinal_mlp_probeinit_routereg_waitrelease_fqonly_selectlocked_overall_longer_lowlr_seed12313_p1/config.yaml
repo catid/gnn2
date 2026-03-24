@@ -1,0 +1,25 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_probeinit_selectlocked_overall_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 12313
+
+proxy_teacher:
+  run_dir: results/phase10_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+  target_scope: final_query_only
+  distill_temperature: 1.0
+  logits_weight: 0.0
+  route_weight: 0.0
+  route_action_weight: 0.0
+  control_prob_weight: 0.0
+  release_prob_weight: 0.4
+  wait_prob_weight: 1.0
+  control_state_weight: 0.0
+  memory_read_weight: 0.0
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.0
+      agreement_weight: 0.05
