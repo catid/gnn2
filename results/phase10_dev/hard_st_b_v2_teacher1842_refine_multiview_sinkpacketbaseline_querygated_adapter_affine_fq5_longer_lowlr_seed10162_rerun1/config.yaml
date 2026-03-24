@@ -1,0 +1,14 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1842_refine_multiview_sinkpacketbaseline_querygated_fq5_longer_lowlr.yaml
+
+experiment:
+  seed: 10162
+
+model:
+  readout_adapter_mode: affine
+
+training:
+  trainable_prefixes:
+    - readout
+    - query_readout_proj
+    - multiview_
+    - readout_adapter

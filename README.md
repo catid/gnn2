@@ -126,6 +126,7 @@ The current long-horizon writeups are:
 - [docs/phase7_report.md](docs/phase7_report.md)
 - [docs/phase8_report.md](docs/phase8_report.md)
 - [docs/phase9_report.md](docs/phase9_report.md)
+- [docs/phase10_report.md](docs/phase10_report.md)
 
 Current headline state:
 
@@ -149,6 +150,14 @@ Current headline state:
 - within that phase-9 map, the strongest aggregate confirmed family is the
   strong-source query-gated final-query-weighted branch, while query-FILM is
   the strongest alternative-reader family and a near-tie on held confirms
+- phase 10 showed that `final_sink_state` is the decisive frozen content view
+  on strong decodable sources
+- phase 10 also showed that multi-view readers, iterative readers, and most
+  strict route-preserving read-path adapters mostly improve **base** behavior
+  while leaving the same held-confirm ceiling
+- the strongest phase-10 adapter outlier reproduced exactly as a single seed
+  but failed its five-seed panel, so the next disciplined move is a
+  confirmation-aware objective on the best frozen strong-source baseline
 
 Best current single-run teacher-free basin-entry result from phase 8:
 
@@ -175,6 +184,21 @@ Best current confirmed frozen-head content-recovery branch from phase 9:
   and five-seed full-locked mean
   `0.6534 / 0.3237 / 0.8771 / 115.49`
   for `overall / fq_acc / fq_route / fq_exit`
+
+Best current phase-10 strong-source multi-view reader family:
+
+- [multiview query-gated 10012 family](/home/catid/gnn2/results/phase10_dev/hard_st_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_finalqweight_longer_lowlr_seed10012_p1)
+  five-seed base mean `0.9891 / 0.9775 / 0.9445 / 121.99`
+  and five-seed full-locked mean
+  `0.6589 / 0.2996 / 0.8797 / 116.14`
+  for `overall / fq_acc / fq_route / fq_exit`
+
+Best current phase-10 strict read-path adapter boundary:
+
+- [query-FILM low-rank adapter 10024 family](/home/catid/gnn2/results/phase10_dev/hard_st_b_v2_teacher1874_refine_queryfilm_adapter_lowrank_longer_lowlr_seed10024_p1)
+  exact rerun-clean but five-seed full-locked mean only
+  `0.6568 / 0.2957 / 0.8840 / 116.21`, so not a robust improvement over the
+  phase-9 strong-source baseline
 
 ## Phase 7 Commands
 
@@ -213,6 +237,21 @@ confirmation.
 ./scripts/run_phase9_main.sh <config> <results-dir> [resume] [nproc_per_node]
 ./scripts/run_phase9_confirm.sh <run-dir> [extra-eval-config ...]
 ./scripts/run_phase9_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
+```
+
+## Phase 10 Commands
+
+Phase 10 focuses on multi-view frozen-state readers, route-preserving
+read-path adapters, portability across decodable sources, and read-path
+confirmation.
+
+```bash
+./scripts/run_phase10_cluster_scouts.sh [results-root] [anchor|multiview|adapter|iterative|es]
+./scripts/run_phase10_reader_sweeps.sh [results-root] [initial|adapter|iterative|es|tuned]
+./scripts/run_phase10_main.sh <config> <results-dir> [resume] [nproc_per_node]
+./scripts/run_phase10_confirm.sh <run-dir> [extra-eval-config ...]
+./scripts/run_phase10_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
+./scripts/run_phase10_source_audits.sh [results-root]
 ```
 
 ## Phase 2 Commands

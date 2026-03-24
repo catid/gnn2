@@ -1,0 +1,5 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_queryfilm_longer_lowlr.yaml
+
+experiment:
+  seed: 9132
+  results_root: results/phase10_anchor

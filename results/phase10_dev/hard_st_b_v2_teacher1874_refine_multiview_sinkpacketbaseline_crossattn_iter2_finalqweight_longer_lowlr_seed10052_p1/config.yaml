@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 10052
+
+model:
+  readout_iter_steps: 2
