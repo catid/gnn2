@@ -18,6 +18,7 @@ from src.train.run import (
     build_release_controls,
     build_wait_controls,
     load_checkpoint,
+    load_auxiliary_eval_benchmarks,
     load_auxiliary_train_benchmarks,
     seed_everything,
 )
@@ -400,6 +401,45 @@ def test_load_auxiliary_train_benchmarks_resolves_relative_configs_and_weight_ov
     assert source.batch_size == 8
     assert source.loss_weight == 0.75
     assert source.task_weight_cfg == {"final_query_weight": 5.0, "non_final_query_weight": 0.5}
+
+    confirm_a = source.benchmark.sample_batch(batch_size=4, split="confirm", step=1, device="cpu")
+    confirm_b = source.benchmark.sample_batch(batch_size=4, split="confirm", step=1, device="cpu")
+    assert torch.equal(confirm_a.observations, confirm_b.observations)
+
+
+def test_load_auxiliary_eval_benchmarks_resolves_relative_configs_and_batch_overrides(tmp_path) -> None:
+    aux_path = tmp_path / "confirm_locked.yaml"
+    aux_path.write_text(yaml.safe_dump({"benchmark": benchmark_config()}))
+    main_path = tmp_path / "main.yaml"
+    main_path.write_text("training: {}\n")
+
+    sources = load_auxiliary_eval_benchmarks(
+        {
+            "config_path": str(main_path),
+            "training": {
+                "batch_size": 8,
+                "val_batch_size": 16,
+                "val_batches": 6,
+                "selection_eval_benchmarks": [
+                    {
+                        "name": "full_locked",
+                        "config": "confirm_locked.yaml",
+                        "split": "confirm",
+                        "batch_size": 12,
+                        "num_batches": 4,
+                    }
+                ],
+            },
+        }
+    )
+
+    assert len(sources) == 1
+    source = sources[0]
+    assert source.name == "full_locked"
+    assert source.benchmark_name == "mixed_oracle_routing"
+    assert source.split == "confirm"
+    assert source.batch_size == 12
+    assert source.num_batches == 4
 
     confirm_a = source.benchmark.sample_batch(batch_size=4, split="confirm", step=1, device="cpu")
     confirm_b = source.benchmark.sample_batch(batch_size=4, split="confirm", step=1, device="cpu")

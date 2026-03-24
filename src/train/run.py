@@ -75,6 +75,16 @@ class AuxiliaryTrainBenchmark:
     task_weight_cfg: dict[str, float]
 
 
+@dataclass
+class AuxiliaryEvalBenchmark:
+    name: str
+    benchmark: Any
+    benchmark_name: str
+    split: str
+    batch_size: int
+    num_batches: int
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run packet-routing experiments.")
     parser.add_argument("--config", required=True, help="YAML config path.")
@@ -645,6 +655,61 @@ def load_auxiliary_train_benchmarks(cfg: dict[str, Any]) -> list[AuxiliaryTrainB
                 batch_size=int(spec.get("batch_size", train_cfg["batch_size"])),
                 loss_weight=float(spec.get("loss_weight", 1.0)),
                 task_weight_cfg=task_weight_cfg,
+            )
+        )
+    return sources
+
+
+def load_auxiliary_eval_benchmarks(
+    cfg: dict[str, Any],
+    *,
+    section: str = "training",
+) -> list[AuxiliaryEvalBenchmark]:
+    section_cfg = cfg.get(section, {})
+    train_cfg = cfg.get("training", {})
+    specs = section_cfg.get("selection_eval_benchmarks", [])
+    if not specs:
+        return []
+
+    config_base = Path(str(cfg.get("config_path", "."))).resolve().parent
+    default_batch_size = int(
+        section_cfg.get(
+            "eval_batch_size",
+            section_cfg.get(
+                "val_batch_size",
+                train_cfg.get("val_batch_size", train_cfg.get("batch_size", 1)),
+            ),
+        )
+    )
+    default_num_batches = int(section_cfg.get("val_batches", train_cfg.get("val_batches", 8)))
+
+    sources: list[AuxiliaryEvalBenchmark] = []
+    for index, spec in enumerate(specs):
+        if not isinstance(spec, dict):
+            raise ValueError(f"{section}.selection_eval_benchmarks entries must be mappings.")
+        config_ref = spec.get("config")
+        if not config_ref:
+            raise ValueError(f"{section}.selection_eval_benchmarks requires a config field per entry.")
+        config_path = Path(str(config_ref))
+        if not config_path.is_absolute():
+            config_path = (config_base / config_path).resolve()
+        aux_cfg = load_config(config_path)
+        benchmark_cfg = aux_cfg.get("benchmark")
+        if not isinstance(benchmark_cfg, dict):
+            raise ValueError(f"Selection eval benchmark config {config_path} must define a benchmark section.")
+
+        benchmark_name = str(benchmark_cfg.get("name", ""))
+        if not benchmark_name:
+            raise ValueError(f"Selection eval benchmark config {config_path} must define benchmark.name.")
+
+        sources.append(
+            AuxiliaryEvalBenchmark(
+                name=str(spec.get("name", f"proxy_{index}")),
+                benchmark=build_benchmark(benchmark_cfg),
+                benchmark_name=benchmark_name,
+                split=str(spec.get("split", "confirm")),
+                batch_size=int(spec.get("batch_size", default_batch_size)),
+                num_batches=int(spec.get("num_batches", default_num_batches)),
             )
         )
     return sources
@@ -1525,6 +1590,7 @@ def run_supervised_phase(
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
     teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device)
     auxiliary_train_benchmarks = load_auxiliary_train_benchmarks(cfg)
+    auxiliary_eval_benchmarks = load_auxiliary_eval_benchmarks(cfg, section="training")
     partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
     resume_path, resume_strict = resolve_resume_checkpoint(cfg)
 
@@ -1816,6 +1882,30 @@ def run_supervised_phase(
                 amp_dtype=amp_dtype,
                 routing_cfg=None,
             )
+            selection_eval_metrics: dict[str, Any] = {}
+            for eval_source in auxiliary_eval_benchmarks:
+                eval_metrics = evaluate_model(
+                    model=model,
+                    benchmark=eval_source.benchmark,
+                    device=device,
+                    benchmark_name=eval_source.benchmark_name,
+                    split=eval_source.split,
+                    num_batches=eval_source.num_batches,
+                    batch_size=eval_source.batch_size,
+                    route_mode=route_mode,
+                    compute_penalties=eval_compute_penalties,
+                    temperature=temperature,
+                    estimator=estimator,
+                    amp_enabled=amp_enabled,
+                    amp_dtype=amp_dtype,
+                    routing_cfg=None,
+                )
+                eval_metrics.update({"phase": phase_name, "split": f"val_proxy_{eval_source.name}", "step": step})
+                peak_train_memory_mb = max(peak_train_memory_mb, float(eval_metrics["peak_memory_mb"]))
+                logger.write(eval_metrics)
+                selection_eval_metrics[eval_source.name] = eval_metrics
+            if selection_eval_metrics:
+                val_metrics["selection_eval"] = selection_eval_metrics
             val_metrics.update({"phase": phase_name, "split": "val", "step": step})
             peak_train_memory_mb = max(peak_train_memory_mb, float(val_metrics["peak_memory_mb"]))
             logger.write(val_metrics)
@@ -1854,6 +1944,29 @@ def run_supervised_phase(
         split_metrics.update({"phase": phase_name, "split": split_name, "step": total_steps})
         logger.write(split_metrics)
         final_evals[split_name] = split_metrics
+    if auxiliary_eval_benchmarks:
+        selection_eval_final: dict[str, Any] = {}
+        for eval_source in auxiliary_eval_benchmarks:
+            eval_metrics = evaluate_model(
+                model=model,
+                benchmark=eval_source.benchmark,
+                device=device,
+                benchmark_name=eval_source.benchmark_name,
+                split=eval_source.split,
+                num_batches=eval_source.num_batches,
+                batch_size=eval_source.batch_size,
+                route_mode=route_mode,
+                compute_penalties=eval_compute_penalties,
+                temperature=temperature,
+                estimator=estimator,
+                amp_enabled=amp_enabled,
+                amp_dtype=amp_dtype,
+                routing_cfg=None,
+            )
+            eval_metrics.update({"phase": phase_name, "split": f"selection_eval_{eval_source.name}", "step": total_steps})
+            logger.write(eval_metrics)
+            selection_eval_final[eval_source.name] = eval_metrics
+        final_evals["selection_eval"] = selection_eval_final
     return {
         "best_val_accuracy": best_val,
         "best_val_score": best_val_score,
