@@ -1,0 +1,13 @@
+_base_: ../../phase10/dev/hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 11011
+  results_root: results/phase11_dev
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.5
+

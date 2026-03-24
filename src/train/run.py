@@ -65,6 +65,16 @@ class TeacherDistillation:
     dropout_schedule_steps: int
 
 
+@dataclass
+class AuxiliaryTrainBenchmark:
+    name: str
+    benchmark: Any
+    split: str
+    batch_size: int
+    loss_weight: float
+    task_weight_cfg: dict[str, float]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run packet-routing experiments.")
     parser.add_argument("--config", required=True, help="YAML config path.")
@@ -592,6 +602,52 @@ def build_task_sample_weights(
             sample_weights,
         )
     return sample_weights
+
+
+def load_auxiliary_train_benchmarks(cfg: dict[str, Any]) -> list[AuxiliaryTrainBenchmark]:
+    train_cfg = cfg.get("training", {})
+    specs = train_cfg.get("auxiliary_train_benchmarks", [])
+    if not specs:
+        return []
+
+    config_base = Path(str(cfg.get("config_path", "."))).resolve().parent
+    default_task_weight_cfg = {
+        "final_query_weight": float(train_cfg.get("final_query_weight", 1.0)),
+        "non_final_query_weight": float(train_cfg.get("non_final_query_weight", 1.0)),
+    }
+
+    sources: list[AuxiliaryTrainBenchmark] = []
+    for index, spec in enumerate(specs):
+        if not isinstance(spec, dict):
+            raise ValueError("training.auxiliary_train_benchmarks entries must be mappings.")
+        config_ref = spec.get("config")
+        if not config_ref:
+            raise ValueError("training.auxiliary_train_benchmarks requires a config field per entry.")
+        config_path = Path(str(config_ref))
+        if not config_path.is_absolute():
+            config_path = (config_base / config_path).resolve()
+        aux_cfg = load_config(config_path)
+        benchmark_cfg = aux_cfg.get("benchmark")
+        if not isinstance(benchmark_cfg, dict):
+            raise ValueError(f"Auxiliary benchmark config {config_path} must define a benchmark section.")
+
+        task_weight_cfg = dict(default_task_weight_cfg)
+        if "final_query_weight" in spec:
+            task_weight_cfg["final_query_weight"] = float(spec["final_query_weight"])
+        if "non_final_query_weight" in spec:
+            task_weight_cfg["non_final_query_weight"] = float(spec["non_final_query_weight"])
+
+        sources.append(
+            AuxiliaryTrainBenchmark(
+                name=str(spec.get("name", f"aux_{index}")),
+                benchmark=build_benchmark(benchmark_cfg),
+                split=str(spec.get("split", "confirm")),
+                batch_size=int(spec.get("batch_size", train_cfg["batch_size"])),
+                loss_weight=float(spec.get("loss_weight", 1.0)),
+                task_weight_cfg=task_weight_cfg,
+            )
+        )
+    return sources
 
 
 def build_reward(
@@ -1468,6 +1524,7 @@ def run_supervised_phase(
     amp_enabled = bool(system_cfg.get("amp", False))
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
     teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device)
+    auxiliary_train_benchmarks = load_auxiliary_train_benchmarks(cfg)
     partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
     resume_path, resume_strict = resolve_resume_checkpoint(cfg)
 
@@ -1610,7 +1667,100 @@ def run_supervised_phase(
                     scale=teacher_scale,
                     dropout_prob=teacher_dropout_prob,
                 )
-            total_loss = output.loss + teacher_loss
+            auxiliary_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
+            auxiliary_metrics: dict[str, float] = {}
+            for aux_source in auxiliary_train_benchmarks:
+                if aux_source.loss_weight <= 0.0:
+                    continue
+                aux_batch = aux_source.benchmark.sample_batch(
+                    batch_size=aux_source.batch_size,
+                    split=aux_source.split,
+                    step=step,
+                    device=device,
+                )
+                aux_forced_actions, aux_action_masks, aux_oracle_actions, aux_oracle_action_mask, aux_oracle_route_weight, aux_delay_write_weight = build_routing_controls(
+                    aux_batch,
+                    step_routing_cfg,
+                    split="train",
+                )
+                aux_memory_payload_targets, aux_memory_payload_mask, aux_memory_payload_weight = build_memory_controls(
+                    aux_batch,
+                    step_routing_cfg,
+                    split="train",
+                )
+                aux_control_targets, aux_control_mask, aux_control_weight, aux_anti_exit_mask, aux_anti_exit_weight = build_control_controls(
+                    aux_batch,
+                    step_routing_cfg,
+                    split="train",
+                )
+                aux_wait_targets, aux_wait_mask, aux_wait_weight, aux_wait_positive_weight, aux_wait_negative_weight = build_wait_controls(
+                    aux_batch,
+                    step_routing_cfg,
+                    split="train",
+                )
+                aux_release_targets, aux_release_mask, aux_release_weight, aux_release_positive_weight = build_release_controls(
+                    aux_batch,
+                    step_routing_cfg,
+                    split="train",
+                )
+                aux_task_sample_weights = build_task_sample_weights(
+                    aux_batch,
+                    aux_source.task_weight_cfg,
+                    device=aux_batch.labels.device,
+                    dtype=aux_batch.observations.dtype,
+                )
+                aux_output = model(
+                    observations=aux_batch.observations,
+                    labels=aux_batch.labels,
+                    route_mode=route_mode,
+                    compute_penalties=compute_penalties,
+                    temperature=train_temperature,
+                    estimator=estimator,
+                    truncate_bptt_steps=int(train_cfg.get("truncate_bptt_steps", 0)),
+                    detach_prefix_steps=int(train_cfg.get("detach_prefix_steps", 0)),
+                    late_window_steps=int(train_cfg.get("late_window_steps", 0)),
+                    forced_actions=aux_forced_actions,
+                    action_masks=aux_action_masks,
+                    oracle_actions=aux_oracle_actions,
+                    oracle_action_mask=aux_oracle_action_mask,
+                    oracle_route_weight=aux_oracle_route_weight,
+                    delay_write_targets=aux_batch.delay_write_targets,
+                    delay_write_mask=aux_batch.delay_write_mask,
+                    delay_write_weight=aux_delay_write_weight,
+                    memory_payload_targets=aux_memory_payload_targets,
+                    memory_payload_mask=aux_memory_payload_mask,
+                    memory_payload_weight=aux_memory_payload_weight,
+                    control_targets=aux_control_targets,
+                    control_mask=aux_control_mask,
+                    control_weight=aux_control_weight,
+                    anti_exit_mask=aux_anti_exit_mask,
+                    anti_exit_weight=aux_anti_exit_weight,
+                    wait_targets=aux_wait_targets,
+                    wait_mask=aux_wait_mask,
+                    wait_weight=aux_wait_weight,
+                    wait_positive_weight=aux_wait_positive_weight,
+                    wait_negative_weight=aux_wait_negative_weight,
+                    release_targets=aux_release_targets,
+                    release_mask=aux_release_mask,
+                    release_weight=aux_release_weight,
+                    release_positive_weight=aux_release_positive_weight,
+                    task_sample_weights=aux_task_sample_weights,
+                    return_trace=False,
+                )
+                auxiliary_loss = auxiliary_loss + (aux_output.loss * aux_source.loss_weight)
+                aux_prefix = f"aux_{aux_source.name}"
+                auxiliary_metrics[f"{aux_prefix}_loss"] = float(aux_output.loss.detach().item())
+                auxiliary_metrics[f"{aux_prefix}_loss_weight"] = float(aux_source.loss_weight)
+                auxiliary_metrics[f"{aux_prefix}_accuracy"] = float(aux_output.stats["accuracy"].detach().float().mean().item())
+                final_query_mask = aux_batch.metadata.get("needs_final_query")
+                if final_query_mask is not None:
+                    final_query_mask = final_query_mask.to(device=device, dtype=torch.bool)
+                    if bool(final_query_mask.any().item()):
+                        predictions = aux_output.logits.argmax(dim=-1)
+                        auxiliary_metrics[f"{aux_prefix}_final_query_accuracy"] = float(
+                            (predictions[final_query_mask] == aux_batch.labels[final_query_mask]).float().mean().item()
+                        )
+            total_loss = output.loss + teacher_loss + auxiliary_loss
         scaler.scale(total_loss).backward()
         scaler.unscale_(optimizer)
         torch.nn.utils.clip_grad_norm_(
@@ -1625,6 +1775,9 @@ def run_supervised_phase(
         batch_metrics["model_loss"] = float(output.loss.detach().item())
         if teacher is not None:
             batch_metrics.update(teacher_metrics)
+        if auxiliary_train_benchmarks:
+            batch_metrics["auxiliary_loss"] = float(auxiliary_loss.detach().item())
+            batch_metrics.update(auxiliary_metrics)
         batch_metrics.update(
             {
                 "phase": phase_name,
