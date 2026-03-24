@@ -1233,13 +1233,34 @@ def apply_partial_init(
     if not init_cfg:
         return {}
 
-    run_dir_value = init_cfg.get("run_dir")
-    if not run_dir_value:
-        raise ValueError("partial_init.run_dir is required when partial_init is configured.")
+    source_cfgs = list(init_cfg.get("sources", []) or [])
+    if source_cfgs:
+        resolved_checkpoints: list[Path] = []
+        source_states: list[dict[str, Any]] = []
+        source_weights: list[float] = []
+        for source_cfg in source_cfgs:
+            run_dir_value = source_cfg.get("run_dir")
+            if not run_dir_value:
+                raise ValueError("partial_init.sources[].run_dir is required when partial_init.sources is configured.")
+            checkpoint_path = resolve_checkpoint_from_run_dir(Path(run_dir_value), source_cfg.get("checkpoint"))
+            payload = torch.load(checkpoint_path, map_location="cpu")
+            resolved_checkpoints.append(checkpoint_path)
+            source_states.append(payload["model"])
+            source_weights.append(float(source_cfg.get("weight", 1.0)))
+        total_weight = sum(source_weights)
+        if total_weight <= 0.0:
+            raise ValueError("partial_init.sources weights must sum to a positive value.")
+        source_weights = [weight / total_weight for weight in source_weights]
+    else:
+        run_dir_value = init_cfg.get("run_dir")
+        if not run_dir_value:
+            raise ValueError("partial_init.run_dir is required when partial_init is configured.")
+        checkpoint_path = resolve_checkpoint_from_run_dir(Path(run_dir_value), init_cfg.get("checkpoint"))
+        payload = torch.load(checkpoint_path, map_location="cpu")
+        resolved_checkpoints = [checkpoint_path]
+        source_states = [payload["model"]]
+        source_weights = [1.0]
 
-    checkpoint_path = resolve_checkpoint_from_run_dir(Path(run_dir_value), init_cfg.get("checkpoint"))
-    payload = torch.load(checkpoint_path, map_location="cpu")
-    source_state = payload["model"]
     current_state = model.state_dict()
 
     include_prefixes = tuple(init_cfg.get("include_prefixes", []))
@@ -1254,8 +1275,20 @@ def apply_partial_init(
     copied_names: list[str] = []
     skipped_shape: list[str] = []
     skipped_filter: list[str] = []
-    for name, tensor in source_state.items():
-        if name not in current_state or current_state[name].shape != tensor.shape:
+    for name in source_states[0]:
+        if name not in current_state:
+            skipped_shape.append(name)
+            continue
+        tensors: list[torch.Tensor] = []
+        expected_shape = current_state[name].shape
+        shape_mismatch = False
+        for source_state in source_states:
+            tensor = source_state.get(name)
+            if tensor is None or tensor.shape != expected_shape:
+                shape_mismatch = True
+                break
+            tensors.append(tensor)
+        if shape_mismatch:
             skipped_shape.append(name)
             continue
         allow = matches(name, include_prefixes, include_exact) if use_allowlist else True
@@ -1263,20 +1296,29 @@ def apply_partial_init(
         if not allow or blocked:
             skipped_filter.append(name)
             continue
-        current_state[name].copy_(tensor)
+        blended = torch.zeros_like(current_state[name])
+        for tensor, weight in zip(tensors, source_weights):
+            blended.add_(tensor.to(device=blended.device, dtype=blended.dtype), alpha=weight)
+        current_state[name].copy_(blended)
         copied_names.append(name)
 
     if not copied_names:
-        raise ValueError(f"partial_init copied zero parameters from {checkpoint_path}.")
+        joined = ", ".join(str(path) for path in resolved_checkpoints)
+        raise ValueError(f"partial_init copied zero parameters from {joined}.")
 
     model.load_state_dict(current_state, strict=False)
-    return {
-        "partial_init_checkpoint": str(checkpoint_path),
+    summary = {
+        "partial_init_checkpoint": str(resolved_checkpoints[0]),
         "partial_init_parameter_count": len(copied_names),
         "partial_init_parameter_names": copied_names,
         "partial_init_skipped_shape_count": len(skipped_shape),
         "partial_init_skipped_filter_count": len(skipped_filter),
     }
+    if len(resolved_checkpoints) > 1:
+        summary["partial_init_checkpoint"] = ",".join(str(path) for path in resolved_checkpoints)
+        summary["partial_init_checkpoints"] = [str(path) for path in resolved_checkpoints]
+        summary["partial_init_weights"] = list(source_weights)
+    return summary
 
 
 def apply_probe_warmstart(

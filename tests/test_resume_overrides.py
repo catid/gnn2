@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from pathlib import Path
 
 import math
+import torch
 
-from src.train.run import apply_cli_overrides, initial_selection_score, resolve_resume_checkpoint, validation_score
+from src.train.run import (
+    apply_cli_overrides,
+    apply_partial_init,
+    initial_selection_score,
+    resolve_resume_checkpoint,
+    validation_score,
+)
 
 
 def test_apply_cli_overrides_preserves_config_resume_when_flag_missing() -> None:
@@ -200,3 +208,49 @@ def test_validation_score_supports_lexicographic_floor_selector() -> None:
         "selection_eval.full_locked.per_mode.delay_to_final_query.route_match > "
         "selection_eval.full_locked.accuracy)"
     )
+
+
+def test_apply_partial_init_supports_weighted_source_interpolation(tmp_path: Path) -> None:
+    model = torch.nn.Sequential(torch.nn.Linear(2, 2), torch.nn.Linear(2, 1))
+    current_state = model.state_dict()
+    original_second_weight = current_state["1.weight"].clone()
+    original_second_bias = current_state["1.bias"].clone()
+
+    source_a = {
+        "0.weight": torch.full_like(current_state["0.weight"], 2.0),
+        "0.bias": torch.full_like(current_state["0.bias"], 1.0),
+        "1.weight": torch.full_like(current_state["1.weight"], 9.0),
+        "1.bias": torch.full_like(current_state["1.bias"], 9.0),
+    }
+    source_b = {
+        "0.weight": torch.full_like(current_state["0.weight"], 6.0),
+        "0.bias": torch.full_like(current_state["0.bias"], 5.0),
+        "1.weight": torch.full_like(current_state["1.weight"], 3.0),
+        "1.bias": torch.full_like(current_state["1.bias"], 3.0),
+    }
+
+    run_a = tmp_path / "run_a"
+    run_b = tmp_path / "run_b"
+    run_a.mkdir()
+    run_b.mkdir()
+    torch.save({"model": source_a}, run_a / "hard_st_best.pt")
+    torch.save({"model": source_b}, run_b / "hard_st_best.pt")
+
+    summary = apply_partial_init(
+        model,
+        {
+            "sources": [
+                {"run_dir": str(run_a), "weight": 0.25},
+                {"run_dir": str(run_b), "weight": 0.75},
+            ],
+            "include_prefixes": ["0."],
+        },
+    )
+
+    updated = model.state_dict()
+    assert torch.allclose(updated["0.weight"], torch.full_like(updated["0.weight"], 5.0))
+    assert torch.allclose(updated["0.bias"], torch.full_like(updated["0.bias"], 4.0))
+    assert torch.allclose(updated["1.weight"], original_second_weight)
+    assert torch.allclose(updated["1.bias"], original_second_bias)
+    assert summary["partial_init_parameter_count"] == 2
+    assert summary["partial_init_weights"] == [0.25, 0.75]
