@@ -1,0 +1,9 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_probeinit_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 12013
+
+training:
+  final_query_weight: 2.0
+  non_final_query_weight: 1.0
+  selection_metric: selection_eval.full_locked.accuracy
