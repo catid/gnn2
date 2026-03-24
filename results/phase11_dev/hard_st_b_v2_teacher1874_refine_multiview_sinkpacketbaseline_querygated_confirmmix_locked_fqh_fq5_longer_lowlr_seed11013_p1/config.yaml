@@ -1,0 +1,20 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_confirmmix_locked_fq5_longer_lowlr.yaml
+
+experiment:
+  seed: 11013
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+    - name: finalqueryheavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+
