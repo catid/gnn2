@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: $0 {round1|round2}" >&2
+  echo "usage: $0 {round1|round2|round3|round4}" >&2
   exit 1
 fi
 
@@ -33,6 +33,28 @@ case "$1" in
     run 1 \
       configs/phase11/dev/hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal50_route50_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr.yaml \
       results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal50_route50_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr_seed12414_p1 &
+    pid1=$!
+    wait "$pid0" "$pid1"
+    ;;
+  round3)
+    run 0 \
+      configs/phase11/dev/hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal60_route40_selectlocked_overall_finalqweight_longer_lowlr.yaml \
+      results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal60_route40_selectlocked_overall_finalqweight_longer_lowlr_seed12421_p1 &
+    pid0=$!
+    run 1 \
+      configs/phase11/dev/hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal55_route45_selectlocked_overall_finalqweight_longer_lowlr.yaml \
+      results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal55_route45_selectlocked_overall_finalqweight_longer_lowlr_seed12422_p1 &
+    pid1=$!
+    wait "$pid0" "$pid1"
+    ;;
+  round4)
+    run 0 \
+      configs/phase11/dev/hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal45_route55_selectlocked_overall_finalqweight_longer_lowlr.yaml \
+      results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal45_route55_selectlocked_overall_finalqweight_longer_lowlr_seed12423_p1 &
+    pid0=$!
+    run 1 \
+      configs/phase11/dev/hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal40_route60_selectlocked_overall_finalqweight_longer_lowlr.yaml \
+      results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal40_route60_selectlocked_overall_finalqweight_longer_lowlr_seed12424_p1 &
     pid1=$!
     wait "$pid0" "$pid1"
     ;;
