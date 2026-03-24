@@ -1,0 +1,191 @@
+{
+  "run_dir": "results/phase10_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1",
+  "checkpoint": "results/phase10_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1/hybrid_es_best.pt",
+  "split": "test",
+  "representations": {
+    "packet_state_query": {
+      "mlp": {
+        "accuracy": 0.2529016435146332,
+        "ce": 1.3861788511276245
+      },
+      "linear": {
+        "accuracy": 0.2529016435146332,
+        "ce": 1.3861792087554932
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.23824068903923035,
+        "ce": 1.3944439888000488
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.23824068903923035,
+        "ce": 1.393883228302002
+      }
+    },
+    "memory_read_state_query": {
+      "mlp": {
+        "accuracy": 0.24618203938007355,
+        "ce": 1.400937557220459
+      },
+      "linear": {
+        "accuracy": 0.2327428162097931,
+        "ce": 1.3951866626739502
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.192022318718955e-05
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.3927916884422302,
+        "ce": 1.4031645059585571
+      }
+    },
+    "router_logits_query": {
+      "mlp": {
+        "accuracy": 0.9664019346237183,
+        "ce": 0.06955678761005402
+      },
+      "linear": {
+        "accuracy": 0.26634088158607483,
+        "ce": 1.378052830696106
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9926695227622986,
+        "ce": 0.014776197262108326
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.2046426385641098,
+        "ce": 1.3692041635513306
+      }
+    },
+    "router_probs_query": {
+      "mlp": {
+        "accuracy": 0.7611484527587891,
+        "ce": 0.5780337452888489
+      },
+      "linear": {
+        "accuracy": 0.18020769953727722,
+        "ce": 1.3635649681091309
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 0.9010384678840637,
+        "ce": 0.21548114717006683
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.31643250584602356,
+        "ce": 1.3489097356796265
+      }
+    },
+    "control_state_query": {
+      "mlp": {
+        "accuracy": 0.25045815110206604,
+        "ce": 1.4186750650405884
+      },
+      "linear": {
+        "accuracy": 0.23091019690036774,
+        "ce": 1.3957666158676147
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0001233331859111786
+      },
+      "linear_query_conditioned": {
+        "accuracy": 0.425778865814209,
+        "ce": 1.4038519859313965
+      }
+    },
+    "wait_state_query": {
+      "mlp": {
+        "accuracy": NaN,
+        "ce": NaN
+      },
+      "linear": {
+        "accuracy": NaN,
+        "ce": NaN
+      },
+      "mlp_query_conditioned": {
+        "accuracy": NaN,
+        "ce": NaN
+      },
+      "linear_query_conditioned": {
+        "accuracy": NaN,
+        "ce": NaN
+      }
+    },
+    "sink_state_query": {
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 2.912871888138824e-10
+      },
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 4.168935902271187e-06
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.3181251006244565e-06
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 2.5050562726391945e-06
+      }
+    },
+    "final_sink_state": {
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 4.3693074158746015e-10
+      },
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 1.582637651154073e-06
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 2.3302964002880344e-09
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 3.592984967326629e-07
+      }
+    },
+    "baseline_readout_input": {
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      },
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 1.6118586927404976e-06
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 0.0
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 4.926359906676225e-07
+      }
+    },
+    "final_readout_input": {
+      "mlp": {
+        "accuracy": 1.0,
+        "ce": 2.6433905730982588e-08
+      },
+      "linear": {
+        "accuracy": 1.0,
+        "ce": 1.4982485936343437e-06
+      },
+      "mlp_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 1.1293617774299491e-07
+      },
+      "linear_query_conditioned": {
+        "accuracy": 1.0,
+        "ce": 2.5336996714031557e-06
+      }
+    }
+  },
+  "best_representation": "memory_read_state_query",
+  "best_probe": "mlp_query_conditioned",
+  "best_accuracy": 1.0,
+  "head_only_go_signal": true
+}

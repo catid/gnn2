@@ -94,6 +94,19 @@ def infer_route_settings(cfg: dict[str, Any]) -> tuple[str, float, str]:
     raise ValueError(f"Unknown method: {method_name}")
 
 
+def build_model_cfg(model_cfg: dict[str, Any], benchmark) -> dict[str, Any]:
+    return {
+        **model_cfg,
+        "num_nodes": benchmark.num_nodes,
+        "obs_dim": benchmark.obs_dim,
+        "num_classes": benchmark.num_classes,
+        "max_total_steps": benchmark.config.get(
+            "max_total_steps",
+            benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
+        ),
+    }
+
+
 def fit_answer_probe(
     train_x: torch.Tensor,
     train_y: torch.Tensor,
@@ -259,39 +272,46 @@ def final_query_dataset(
     if not final_mask.any():
         return torch.zeros(0, 1), torch.zeros(0, dtype=torch.long)
 
-    labels = metadata["labels"][final_mask]
+    labels = metadata["labels"][final_mask].long()
+    queries = metadata["query"][final_mask].long()
     features = trace[trace_key]
-    if time_key is not None:
-        query_time = metadata[time_key]
-        batch_index = torch.arange(features.shape[0])
-        features = features[batch_index, query_time]
-    features = features[final_mask]
-
+    if time_key is None:
+        features = features[final_mask]
+    else:
+        query_time = metadata[time_key][final_mask].long()
+        features = features[final_mask, query_time]
+    if features.ndim == 1:
+        features = features.unsqueeze(-1)
+    features = features.float()
     if conditioned:
-        query_obs = metadata["query_observation"][final_mask]
-        features = torch.cat([features, query_obs], dim=-1)
-    return features.float(), labels.long()
+        query_one_hot = F.one_hot(queries, num_classes=int(benchmark.query_cardinality)).float()
+        features = torch.cat([features, query_one_hot], dim=-1)
+    return features, labels
 
 
 def main() -> None:
     args = parse_args()
     run_dir = Path(args.run_dir)
     cfg = resolve_run_config(run_dir)
+    if args.eval_config:
+        eval_cfg = load_config(args.eval_config)
+        cfg["benchmark"] = eval_cfg["benchmark"]
     method_name = str(cfg["method"]["name"])
     checkpoint_path = resolve_checkpoint(run_dir, method_name, args.checkpoint)
 
     seed_everything(int(cfg["experiment"]["seed"]))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = PacketRoutingModel(cfg["model"]).to(device)
-    load_checkpoint(model, checkpoint_path, strict=False)
+    benchmark = build_benchmark(cfg["benchmark"])
+    model = PacketRoutingModel(build_model_cfg(cfg["model"], benchmark)).to(device)
+    load_checkpoint(checkpoint_path, model, strict=False)
 
-    benchmark_cfg = dict(cfg["benchmark"])
-    if args.eval_config:
-        eval_cfg = load_config(args.eval_config)
-        benchmark_cfg.update(eval_cfg.get("benchmark", {}))
-    benchmark = build_benchmark(benchmark_cfg)
-
-    batch_size = int(args.batch_size or cfg["training"].get("batch_size", 32))
+    default_batch_size = int(
+        cfg.get("es", {}).get(
+            "eval_batch_size",
+            cfg.get("training", {}).get("val_batch_size", cfg.get("training", {}).get("batch_size", 64)),
+        )
+    )
+    batch_size = int(args.batch_size or default_batch_size)
     main_audit = collect_split(
         cfg=cfg,
         model=model,
@@ -320,7 +340,7 @@ def main() -> None:
         batch_size=batch_size,
     )
 
-    num_classes = int(cfg["model"]["num_classes"])
+    num_classes = int(benchmark.num_classes)
     representations: dict[str, Any] = {}
     best_accuracy = float("-inf")
     best_name = ""
