@@ -164,6 +164,98 @@ class CosineReadoutHead(nn.Module):
         return (per_sample * weights).sum() / weights.sum().clamp_min(1e-8)
 
 
+class MixtureReadoutHead(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        *,
+        query_dim: int,
+        num_heads: int = 2,
+        branch_hidden_dim: int = 0,
+        gate_source: str = "input",
+        gate_hidden_dim: int = 0,
+        temperature: float = 1.0,
+    ):
+        super().__init__()
+        if num_heads < 2:
+            raise ValueError("MixtureReadoutHead requires at least 2 heads.")
+        if gate_source not in {"input", "query", "input_query"}:
+            raise ValueError(f"Unknown gate_source: {gate_source}")
+        self.num_heads = num_heads
+        self.gate_source = gate_source
+        self.temperature = max(float(temperature), 1e-3)
+        self.readout_norm = nn.LayerNorm(input_dim)
+        self.gate_query_proj = None
+        gate_input_dim = 0
+        if gate_source in {"input", "input_query"}:
+            gate_input_dim += input_dim
+        if gate_source in {"query", "input_query"}:
+            self.gate_query_proj = nn.Sequential(
+                nn.LayerNorm(query_dim),
+                nn.Linear(query_dim, input_dim),
+                nn.GELU(),
+            )
+            gate_input_dim += input_dim
+        if gate_hidden_dim > 0:
+            self.gate = nn.Sequential(
+                nn.LayerNorm(gate_input_dim),
+                nn.Linear(gate_input_dim, gate_hidden_dim),
+                nn.GELU(),
+                nn.Linear(gate_hidden_dim, num_heads),
+            )
+        else:
+            self.gate = nn.Sequential(
+                nn.LayerNorm(gate_input_dim),
+                nn.Linear(gate_input_dim, num_heads),
+            )
+        self.experts = nn.ModuleList()
+        for _ in range(num_heads):
+            if branch_hidden_dim > 0:
+                self.experts.append(
+                    nn.Sequential(
+                        nn.Linear(input_dim, branch_hidden_dim),
+                        nn.GELU(),
+                        nn.Linear(branch_hidden_dim, num_classes),
+                    )
+                )
+            else:
+                self.experts.append(nn.Linear(input_dim, num_classes))
+        self.last_mixture_weights: torch.Tensor | None = None
+
+    def _gate_input(self, x: torch.Tensor, query_obs: torch.Tensor | None) -> torch.Tensor:
+        parts = []
+        normalized = self.readout_norm(x)
+        if self.gate_source in {"input", "input_query"}:
+            parts.append(normalized)
+        if self.gate_source in {"query", "input_query"}:
+            if query_obs is None or self.gate_query_proj is None:
+                raise ValueError("query_obs is required for query-conditioned mixture gating.")
+            parts.append(self.gate_query_proj(query_obs))
+        return torch.cat(parts, dim=-1)
+
+    def forward(self, x: torch.Tensor, *, query_obs: torch.Tensor | None = None) -> torch.Tensor:
+        normalized = self.readout_norm(x)
+        gate_logits = self.gate(self._gate_input(x, query_obs)) / self.temperature
+        mixture_weights = torch.softmax(gate_logits, dim=-1)
+        expert_logits = torch.stack([expert(normalized) for expert in self.experts], dim=1)
+        self.last_mixture_weights = mixture_weights.detach()
+        return (mixture_weights.unsqueeze(-1) * expert_logits).sum(dim=1)
+
+    def balance_loss(self) -> torch.Tensor:
+        if self.last_mixture_weights is None:
+            raise RuntimeError("balance_loss called before forward.")
+        mean_weights = self.last_mixture_weights.mean(dim=0)
+        target = torch.full_like(mean_weights, 1.0 / self.num_heads)
+        return ((mean_weights - target) ** 2).mean()
+
+    def entropy(self) -> torch.Tensor:
+        if self.last_mixture_weights is None:
+            raise RuntimeError("entropy called before forward.")
+        weights = self.last_mixture_weights.clamp_min(1e-8)
+        return -(weights * weights.log()).sum(dim=-1).mean()
+
+
 class NodeCore(nn.Module):
     def __init__(
         self,
@@ -338,6 +430,12 @@ class PacketRoutingModel(nn.Module):
         self.readout_logit_scale_init = float(config.get("readout_logit_scale_init", 10.0))
         self.readout_learnable_scale = bool(config.get("readout_learnable_scale", True))
         self.readout_prototype_pull_weight = float(config.get("readout_prototype_pull_weight", 0.0))
+        self.readout_mixture_num_heads = int(config.get("readout_mixture_num_heads", 2))
+        self.readout_mixture_branch_hidden_dim = int(config.get("readout_mixture_branch_hidden_dim", 0))
+        self.readout_mixture_gate_source = str(config.get("readout_mixture_gate_source", "input"))
+        self.readout_mixture_gate_hidden_dim = int(config.get("readout_mixture_gate_hidden_dim", 0))
+        self.readout_mixture_temperature = float(config.get("readout_mixture_temperature", 1.0))
+        self.readout_mixture_balance_weight = float(config.get("readout_mixture_balance_weight", 0.0))
         self.readout_views = tuple(
             str(name)
             for name in config.get(
@@ -598,6 +696,17 @@ class PacketRoutingModel(nn.Module):
                 metric_dim=self.readout_metric_dim,
                 init_scale=self.readout_logit_scale_init,
                 learnable_scale=self.readout_learnable_scale,
+            )
+        elif self.readout_head_mode == "mixture":
+            self.readout = MixtureReadoutHead(
+                readout_input_dim,
+                self.num_classes,
+                query_dim=self.obs_dim,
+                num_heads=self.readout_mixture_num_heads,
+                branch_hidden_dim=self.readout_mixture_branch_hidden_dim,
+                gate_source=self.readout_mixture_gate_source,
+                gate_hidden_dim=self.readout_mixture_gate_hidden_dim,
+                temperature=self.readout_mixture_temperature,
             )
         else:
             raise ValueError(f"Unknown readout_head_mode: {self.readout_head_mode}")
@@ -1534,7 +1643,10 @@ class PacketRoutingModel(nn.Module):
             if baseline_view.shape[-1] == self.hidden_dim:
                 trace["baseline_readout_input"] = baseline_view
             trace["final_readout_input"] = readout_input
-        logits = self.readout(readout_input)
+        if self.readout_head_mode == "mixture":
+            logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
+        else:
+            logits = self.readout(readout_input)
         task_loss, task_shaping_loss = compute_task_classification_loss(
             logits,
             labels,
@@ -1553,6 +1665,18 @@ class PacketRoutingModel(nn.Module):
                 sample_weights=task_sample_weights,
             ).to(dtype)
             task_loss = task_loss + (self.readout_prototype_pull_weight * prototype_pull_loss)
+        mixture_balance_loss = torch.zeros((), device=device, dtype=dtype)
+        mixture_gate_entropy = torch.zeros((), device=device, dtype=dtype)
+        mixture_top1_weight = torch.zeros((), device=device, dtype=dtype)
+        if self.readout_mixture_balance_weight > 0.0 and hasattr(self.readout, "balance_loss"):
+            mixture_balance_loss = self.readout.balance_loss().to(device=device, dtype=dtype)
+            task_loss = task_loss + (self.readout_mixture_balance_weight * mixture_balance_loss)
+        if hasattr(self.readout, "entropy"):
+            mixture_gate_entropy = self.readout.entropy().to(device=device, dtype=dtype)
+        if getattr(self.readout, "last_mixture_weights", None) is not None:
+            mixture_top1_weight = (
+                self.readout.last_mixture_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
+            )
         penalty_hops = float(compute_penalties.get("hops", 0.0)) * hops.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_delays = float(compute_penalties.get("delays", 0.0)) * delays.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_ttl = float(compute_penalties.get("ttl_fail", 0.0)) * ttl_fail.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
@@ -1647,6 +1771,9 @@ class PacketRoutingModel(nn.Module):
             "release_loss": torch.full_like(accuracy, float(release_term.detach().item())),
             "task_shaping_loss": torch.full_like(accuracy, float(task_shaping_loss.detach().item())),
             "prototype_pull_loss": torch.full_like(accuracy, float(prototype_pull_loss.detach().item())),
+            "mixture_balance_loss": torch.full_like(accuracy, float(mixture_balance_loss.detach().item())),
+            "mixture_gate_entropy": torch.full_like(accuracy, float(mixture_gate_entropy.detach().item())),
+            "mixture_top1_weight": torch.full_like(accuracy, float(mixture_top1_weight.detach().item())),
         }
         for src_index, src_name in ACTION_NAMES.items():
             for dst_index, dst_name in ACTION_NAMES.items():

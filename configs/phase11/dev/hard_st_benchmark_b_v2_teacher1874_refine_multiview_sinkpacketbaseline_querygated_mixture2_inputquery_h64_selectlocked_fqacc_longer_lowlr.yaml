@@ -1,0 +1,11 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 11613
+
+model:
+  readout_head_mode: mixture
+  readout_mixture_num_heads: 2
+  readout_mixture_gate_source: input_query
+  readout_mixture_gate_hidden_dim: 64
+  readout_mixture_branch_hidden_dim: 64

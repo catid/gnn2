@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.models.packet_routing import CosineReadoutHead, PacketRoutingModel, compute_task_classification_loss
+from src.models.packet_routing import CosineReadoutHead, MixtureReadoutHead, PacketRoutingModel, compute_task_classification_loss
 
 
 class StubCore(nn.Module):
@@ -610,3 +610,67 @@ def test_cosine_readout_prototype_pull_loss_respects_sample_weights() -> None:
 
     assert torch.isclose(loss, single_loss, atol=1e-6)
     assert not torch.isclose(full_loss, single_loss, atol=1e-6)
+
+
+def test_mixture_readout_head_constructs_and_runs() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "multiview_query_gated",
+            "readout_base_mode": "query_gated",
+            "readout_views": ["final_sink_state", "packet_state_query", "baseline_readout_input"],
+            "readout_head_mode": "mixture",
+            "readout_mixture_num_heads": 3,
+            "readout_mixture_gate_source": "input_query",
+            "readout_mixture_gate_hidden_dim": 5,
+            "readout_mixture_branch_hidden_dim": 6,
+            "readout_mixture_balance_weight": 0.1,
+        }
+    )
+    observations = torch.zeros(2, 3, 2, 8)
+    observations[:, -1, 0, 1] = 1.0
+    labels = torch.tensor([0, 1], dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert output.logits.shape == (2, 3)
+    assert output.trace is not None
+    assert output.trace["final_readout_input"].shape == (2, 4)
+    assert "mixture_balance_loss" in output.stats
+    assert "mixture_gate_entropy" in output.stats
+    assert "mixture_top1_weight" in output.stats
+    assert output.stats["mixture_balance_loss"].shape == (2,)
+
+
+def test_mixture_readout_head_weights_form_distribution() -> None:
+    head = MixtureReadoutHead(
+        input_dim=4,
+        num_classes=3,
+        query_dim=6,
+        num_heads=3,
+        branch_hidden_dim=5,
+        gate_source="input_query",
+        gate_hidden_dim=7,
+    )
+    features = torch.randn(2, 4)
+    query = torch.randn(2, 6)
+
+    logits = head(features, query_obs=query)
+
+    assert logits.shape == (2, 3)
+    assert head.last_mixture_weights is not None
+    assert torch.allclose(head.last_mixture_weights.sum(dim=-1), torch.ones(2), atol=1e-6)
+    assert head.balance_loss().item() >= 0.0
+    assert head.entropy().item() >= 0.0
