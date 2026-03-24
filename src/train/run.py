@@ -208,6 +208,44 @@ def resolve_metric_path(metrics: dict[str, Any], path: str) -> float:
     return float("nan")
 
 
+def composite_metric_score(section_cfg: dict[str, Any], metrics: dict[str, Any]) -> tuple[float, str] | None:
+    terms_cfg = section_cfg.get("selection_metric_terms")
+    if not terms_cfg:
+        return None
+    if not isinstance(terms_cfg, list):
+        raise ValueError("selection_metric_terms must be a list of term mappings.")
+    mode = str(section_cfg.get("selection_metric_mode", "weighted_sum"))
+    if mode not in {"weighted_sum", "weighted_geomean"}:
+        raise ValueError("selection_metric_mode must be one of: weighted_sum, weighted_geomean")
+    terms: list[tuple[str, float, float]] = []
+    for item in terms_cfg:
+        if not isinstance(item, dict):
+            raise ValueError("selection_metric_terms entries must be mappings.")
+        path = item.get("path")
+        if path is None:
+            raise ValueError("selection_metric_terms entries require a path.")
+        weight = float(item.get("weight", 1.0))
+        value = resolve_metric_path(metrics, str(path))
+        if math.isnan(value):
+            return float("nan"), f"{mode}(" + " + ".join(
+                f"{float(term.get('weight', 1.0)):g}*{term['path']}" for term in terms_cfg if isinstance(term, dict) and "path" in term
+            ) + ")"
+        terms.append((str(path), weight, value))
+    if not terms:
+        raise ValueError("selection_metric_terms must not be empty.")
+    if mode == "weighted_sum":
+        score = sum(weight * value for _, weight, value in terms)
+    else:
+        total_weight = sum(abs(weight) for _, weight, _ in terms)
+        if total_weight <= 0.0:
+            raise ValueError("weighted_geomean requires at least one non-zero weight.")
+        score = math.exp(
+            sum(weight * math.log(max(1e-12, value)) for _, weight, value in terms) / total_weight
+        )
+    metric_name = f"{mode}(" + " + ".join(f"{weight:g}*{path}" for path, weight, _ in terms) + ")"
+    return score, metric_name
+
+
 def centered_rank_fitness(rewards: torch.Tensor) -> torch.Tensor:
     rewards = rewards.float()
     order = torch.argsort(rewards)
@@ -1024,6 +1062,9 @@ def evaluate_model(
 
 def validation_score(metrics: dict[str, Any], cfg: dict[str, Any], section: str = "training") -> tuple[float, str]:
     section_cfg = cfg.get(section, {})
+    composite = composite_metric_score(section_cfg, metrics)
+    if composite is not None:
+        return composite
     metric_path = str(section_cfg.get("selection_metric", "accuracy"))
     score = resolve_metric_path(metrics, metric_path)
     return score, metric_path
