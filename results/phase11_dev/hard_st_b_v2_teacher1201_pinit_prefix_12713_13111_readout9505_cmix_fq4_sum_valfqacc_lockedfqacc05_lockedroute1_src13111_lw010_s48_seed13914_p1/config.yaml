@@ -1,0 +1,14 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headprefixblend_12713_13111_readout_bal95_route05_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_srcdistill_13111_delayed_lw010_stop048_longer_lowlr.yaml
+
+experiment:
+  seed: 13914
+
+training:
+  selection_metric_mode: weighted_sum
+  selection_metric_terms:
+    - path: per_mode.delay_to_final_query.accuracy
+      weight: 1.0
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+      weight: 0.5
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      weight: 1.0
