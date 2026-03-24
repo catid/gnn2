@@ -254,3 +254,47 @@ def test_apply_partial_init_supports_weighted_source_interpolation(tmp_path: Pat
     assert torch.allclose(updated["1.bias"], original_second_bias)
     assert summary["partial_init_parameter_count"] == 2
     assert summary["partial_init_weights"] == [0.25, 0.75]
+
+
+def test_apply_partial_init_supports_source_specific_filters(tmp_path: Path) -> None:
+    model = torch.nn.Sequential(torch.nn.Linear(2, 2), torch.nn.Linear(2, 1))
+    current_state = model.state_dict()
+
+    source_a = {
+        "0.weight": torch.full_like(current_state["0.weight"], 2.0),
+        "0.bias": torch.full_like(current_state["0.bias"], 1.0),
+        "1.weight": torch.full_like(current_state["1.weight"], 9.0),
+        "1.bias": torch.full_like(current_state["1.bias"], 9.0),
+    }
+    source_b = {
+        "0.weight": torch.full_like(current_state["0.weight"], 6.0),
+        "0.bias": torch.full_like(current_state["0.bias"], 5.0),
+        "1.weight": torch.full_like(current_state["1.weight"], 3.0),
+        "1.bias": torch.full_like(current_state["1.bias"], 3.0),
+    }
+
+    run_a = tmp_path / "run_a"
+    run_b = tmp_path / "run_b"
+    run_a.mkdir()
+    run_b.mkdir()
+    torch.save({"model": source_a}, run_a / "hard_st_best.pt")
+    torch.save({"model": source_b}, run_b / "hard_st_best.pt")
+
+    summary = apply_partial_init(
+        model,
+        {
+            "sources": [
+                {"run_dir": str(run_a), "weight": 0.25},
+                {"run_dir": str(run_b), "weight": 0.75, "include_prefixes": ["0."]},
+            ],
+            "include_prefixes": ["0.", "1."],
+        },
+    )
+
+    updated = model.state_dict()
+    assert torch.allclose(updated["0.weight"], torch.full_like(updated["0.weight"], 5.0))
+    assert torch.allclose(updated["0.bias"], torch.full_like(updated["0.bias"], 4.0))
+    assert torch.allclose(updated["1.weight"], torch.full_like(updated["1.weight"], 9.0))
+    assert torch.allclose(updated["1.bias"], torch.full_like(updated["1.bias"], 9.0))
+    assert summary["partial_init_parameter_count"] == 4
+    assert summary["partial_init_weights"] == [0.25, 0.75]

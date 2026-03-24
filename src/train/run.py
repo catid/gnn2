@@ -1234,6 +1234,7 @@ def apply_partial_init(
         return {}
 
     source_cfgs = list(init_cfg.get("sources", []) or [])
+    source_filter_cfgs: list[dict[str, Any]] = []
     if source_cfgs:
         resolved_checkpoints: list[Path] = []
         source_states: list[dict[str, Any]] = []
@@ -1247,6 +1248,14 @@ def apply_partial_init(
             resolved_checkpoints.append(checkpoint_path)
             source_states.append(payload["model"])
             source_weights.append(float(source_cfg.get("weight", 1.0)))
+            source_filter_cfgs.append(
+                {
+                    "include_prefixes": tuple(source_cfg.get("include_prefixes", [])),
+                    "exclude_prefixes": tuple(source_cfg.get("exclude_prefixes", [])),
+                    "include_exact_names": set(source_cfg.get("include_exact_names", [])),
+                    "exclude_exact_names": set(source_cfg.get("exclude_exact_names", [])),
+                }
+            )
         total_weight = sum(source_weights)
         if total_weight <= 0.0:
             raise ValueError("partial_init.sources weights must sum to a positive value.")
@@ -1260,6 +1269,14 @@ def apply_partial_init(
         resolved_checkpoints = [checkpoint_path]
         source_states = [payload["model"]]
         source_weights = [1.0]
+        source_filter_cfgs = [
+            {
+                "include_prefixes": tuple(),
+                "exclude_prefixes": tuple(),
+                "include_exact_names": set(),
+                "exclude_exact_names": set(),
+            }
+        ]
 
     current_state = model.state_dict()
 
@@ -1297,8 +1314,25 @@ def apply_partial_init(
             skipped_filter.append(name)
             continue
         blended = torch.zeros_like(current_state[name])
-        for tensor, weight in zip(tensors, source_weights):
+        participating: list[tuple[torch.Tensor, float]] = []
+        for tensor, weight, filter_cfg in zip(tensors, source_weights, source_filter_cfgs):
+            source_allow_prefixes = filter_cfg["include_prefixes"]
+            source_allow_exact = filter_cfg["include_exact_names"]
+            source_block_prefixes = filter_cfg["exclude_prefixes"]
+            source_block_exact = filter_cfg["exclude_exact_names"]
+            source_use_allowlist = bool(source_allow_prefixes or source_allow_exact)
+            source_allow = matches(name, source_allow_prefixes, source_allow_exact) if source_use_allowlist else True
+            source_blocked = matches(name, source_block_prefixes, source_block_exact)
+            if source_allow and not source_blocked:
+                participating.append((tensor, weight))
+        if not participating:
+            skipped_filter.append(name)
+            continue
+        active_weight = sum(weight for _, weight in participating)
+        for tensor, weight in participating:
             blended.add_(tensor.to(device=blended.device, dtype=blended.dtype), alpha=weight)
+        if active_weight != 1.0:
+            blended.div_(active_weight)
         current_state[name].copy_(blended)
         copied_names.append(name)
 
