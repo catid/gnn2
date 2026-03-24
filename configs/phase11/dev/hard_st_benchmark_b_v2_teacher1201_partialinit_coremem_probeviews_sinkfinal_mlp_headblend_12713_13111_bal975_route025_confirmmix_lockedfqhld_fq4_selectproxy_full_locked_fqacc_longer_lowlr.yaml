@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headblend_12514_12424_bal85_route15_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 13311
+
+partial_init:
+  sources:
+    - run_dir: results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headblend_12514_12424_bal85_route15_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_longer_lowlr_seed12713_p1
+      weight: 0.975
+    - run_dir: results/phase11_dev/20260324_122354_hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headblend_12514_12424_bal85_route15_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_srcdistill_1874_delayed_lw010_longer_lowlr
+      weight: 0.025
+  include_prefixes:
+    - core.
+    - memory_
+    - control_
+    - wait_
+    - release_
+    - sink_proj
+    - readout.
