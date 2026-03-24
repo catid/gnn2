@@ -105,6 +105,41 @@ class AffineAdapter(nn.Module):
         return x * (1.0 + self.scale) + self.bias
 
 
+class StandardizedMLPReadoutHead(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        *,
+        hidden_dim: int = 0,
+    ):
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim if hidden_dim > 0 else max(16, min(128, input_dim * 2))
+        self.register_buffer("input_mean", torch.zeros(input_dim))
+        self.register_buffer("input_std", torch.ones(input_dim))
+        self.fc1 = nn.Linear(input_dim, self.hidden_dim)
+        self.fc2 = nn.Linear(self.hidden_dim, num_classes)
+
+    def reset_parameters(self) -> None:
+        self.fc1.reset_parameters()
+        self.fc2.reset_parameters()
+        self.input_mean.zero_()
+        self.input_std.fill_(1.0)
+
+    def set_standardizer(self, mean: torch.Tensor, std: torch.Tensor) -> None:
+        self.input_mean.copy_(mean)
+        self.input_std.copy_(std.clamp_min(1e-5))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        hidden = (x - self.input_mean.to(device=x.device, dtype=x.dtype)) / self.input_std.to(
+            device=x.device,
+            dtype=x.dtype,
+        ).clamp_min(1e-5)
+        hidden = F.gelu(self.fc1(hidden))
+        return self.fc2(hidden)
+
+
 class CosineReadoutHead(nn.Module):
     def __init__(
         self,
@@ -426,6 +461,7 @@ class PacketRoutingModel(nn.Module):
         self.readout_mode = str(config.get("readout_mode", "plain"))
         self.readout_base_mode = str(config.get("readout_base_mode", "plain"))
         self.readout_head_mode = str(config.get("readout_head_mode", "linear"))
+        self.readout_mlp_hidden_dim = int(config.get("readout_mlp_hidden_dim", 0))
         self.readout_metric_dim = int(config.get("readout_metric_dim", 0))
         self.readout_logit_scale_init = float(config.get("readout_logit_scale_init", 10.0))
         self.readout_learnable_scale = bool(config.get("readout_learnable_scale", True))
@@ -443,6 +479,8 @@ class PacketRoutingModel(nn.Module):
                 ["final_sink_state", "packet_state_query"],
             )
         )
+        self.query_offset = int(config.get("query_offset", -1))
+        self.query_cardinality = int(config.get("query_cardinality", 0))
         self.readout_iter_steps = int(config.get("readout_iter_steps", 1))
         self.readout_view_dropout = float(config.get("readout_view_dropout", 0.0))
         self.readout_attention_heads = int(config.get("readout_attention_heads", 1))
@@ -607,6 +645,12 @@ class PacketRoutingModel(nn.Module):
                 nn.LayerNorm(self.obs_dim),
                 nn.Linear(self.obs_dim, self.hidden_dim * 2),
             )
+        elif self.readout_mode == "probe_query_views":
+            if self.query_cardinality <= 0 or self.query_offset < 0:
+                raise ValueError(
+                    "probe_query_views requires positive query_cardinality and non-negative query_offset."
+                )
+            readout_input_dim = (self.hidden_dim * len(self.readout_views)) + self.query_cardinality
         elif self.readout_mode in self.multiview_readout_modes:
             if effective_base_mode == "query_conditioned":
                 self.query_readout_proj = nn.Sequential(
@@ -715,6 +759,12 @@ class PacketRoutingModel(nn.Module):
                 nn.LayerNorm(readout_input_dim),
                 nn.Linear(readout_input_dim, self.num_classes),
             )
+        elif self.readout_head_mode == "mlp":
+            self.readout = StandardizedMLPReadoutHead(
+                readout_input_dim,
+                self.num_classes,
+                hidden_dim=self.readout_mlp_hidden_dim,
+            )
         elif self.readout_head_mode == "cosine":
             self.readout = CosineReadoutHead(
                 readout_input_dim,
@@ -747,7 +797,7 @@ class PacketRoutingModel(nn.Module):
         query_obs = observations[:, -1, 0]
         mode = (
             self.readout_mode
-            if self.readout_mode not in self.multiview_readout_modes
+            if self.readout_mode not in self.multiview_readout_modes and self.readout_mode != "probe_query_views"
             else self.readout_base_mode
         )
         if mode == "plain":
@@ -770,6 +820,14 @@ class PacketRoutingModel(nn.Module):
             gamma, beta = torch.chunk(film_params, 2, dim=-1)
             return sink_state * (1.0 + torch.tanh(gamma)) + beta
         raise ValueError(f"Unknown baseline readout mode: {mode}")
+
+    def _query_one_hot_view(self, observations: torch.Tensor) -> torch.Tensor:
+        end = self.query_offset + self.query_cardinality
+        if self.query_offset < 0 or self.query_cardinality <= 0 or end > self.obs_dim:
+            raise ValueError(
+                "Query view requested, but query_offset/query_cardinality are not configured for the benchmark."
+            )
+        return observations[:, -1, 0, self.query_offset:end]
 
     def _apply_multiview_adapter(self, fused: torch.Tensor) -> torch.Tensor:
         if self.multiview_adapter is None or fused.shape[-1] != self.hidden_dim:
@@ -1617,7 +1675,21 @@ class PacketRoutingModel(nn.Module):
         if trace is not None:
             trace["final_sink_state"] = sink_state
 
-        if self.readout_mode in self.multiview_readout_modes:
+        if self.readout_mode == "probe_query_views":
+            baseline_view = self._baseline_readout_input(
+                sink_state,
+                observations,
+                for_multiview=False,
+            )
+            view_map = {
+                "final_sink_state": sink_state,
+                "sink_state_query": sink_state_query,
+                "packet_state_query": packet_state_query,
+                "baseline_readout_input": baseline_view,
+            }
+            view_tensors = [view_map[name] for name in self.readout_views]
+            readout_input = torch.cat([*view_tensors, self._query_one_hot_view(observations)], dim=-1)
+        elif self.readout_mode in self.multiview_readout_modes:
             baseline_view = self._baseline_readout_input(
                 sink_state,
                 observations,

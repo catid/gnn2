@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_sinkfrozen_readoutonly_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 11913
+
+model:
+  readout_mode: probe_query_views
+  readout_head_mode: mlp
+  readout_views:
+    - final_sink_state
+    - sink_state_query
+

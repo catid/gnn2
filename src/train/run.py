@@ -27,6 +27,7 @@ from src.data.benchmarks import (
 )
 from src.es import LowRankEvolutionStrategy, standardize_fitness
 from src.models import ACTION_DELAY, ACTION_EXIT, PacketRoutingModel
+from src.models.packet_routing import StandardizedMLPReadoutHead
 from src.utils.config import load_config
 
 
@@ -1182,6 +1183,165 @@ def apply_partial_init(
     }
 
 
+def apply_probe_warmstart(
+    model: PacketRoutingModel,
+    *,
+    benchmark,
+    benchmark_name: str,
+    cfg: dict[str, Any],
+    device: torch.device,
+    route_mode: str,
+    temperature: float,
+    estimator: str,
+) -> dict[str, Any]:
+    warm_cfg = dict(cfg.get("training", {}).get("probe_warmstart", {}) or {})
+    if not bool(warm_cfg.get("enabled", False)):
+        return {}
+    if not isinstance(model.readout, StandardizedMLPReadoutHead):
+        raise ValueError("training.probe_warmstart requires readout_head_mode=mlp.")
+
+    split = str(warm_cfg.get("split", "train"))
+    num_batches = int(warm_cfg.get("num_batches", 8))
+    batch_size = int(warm_cfg.get("batch_size", cfg["training"].get("batch_size", 64)))
+    epochs = int(warm_cfg.get("epochs", 200))
+    lr = float(warm_cfg.get("lr", 0.05))
+    weight_decay = float(warm_cfg.get("weight_decay", 1e-4))
+    final_query_only = bool(warm_cfg.get("final_query_only", True))
+    amp_enabled = bool(cfg.get("system", {}).get("amp", False))
+    amp_dtype = str(cfg.get("system", {}).get("amp_dtype", "bf16"))
+    compute_penalties = {"hops": 0.0, "delays": 0.0, "ttl_fail": 0.0}
+    routing_cfg = cfg.get("routing")
+
+    features: list[torch.Tensor] = []
+    labels: list[torch.Tensor] = []
+    was_training = model.training
+    model.eval()
+    with torch.no_grad():
+        for step in range(num_batches):
+            batch = benchmark.sample_batch(
+                batch_size=batch_size,
+                split=split,
+                step=step,
+                device=device,
+            )
+            forced_actions, action_masks, oracle_actions, oracle_action_mask, oracle_route_weight, delay_write_weight = build_routing_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
+            memory_payload_targets, memory_payload_mask, memory_payload_weight = build_memory_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
+            control_targets, control_mask, control_weight, anti_exit_mask, anti_exit_weight = build_control_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
+            wait_targets, wait_mask, wait_weight, wait_positive_weight, wait_negative_weight = build_wait_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
+            release_targets, release_mask, release_weight, release_positive_weight = build_release_controls(
+                batch,
+                routing_cfg,
+                split=split,
+            )
+            with autocast_context(device, amp_enabled, amp_dtype):
+                output = model(
+                    observations=batch.observations,
+                    labels=batch.labels,
+                    route_mode=route_mode,
+                    compute_penalties=compute_penalties,
+                    temperature=temperature,
+                    estimator=estimator,
+                    truncate_bptt_steps=0,
+                    forced_actions=forced_actions,
+                    action_masks=action_masks,
+                    oracle_actions=oracle_actions,
+                    oracle_action_mask=oracle_action_mask,
+                    oracle_route_weight=oracle_route_weight,
+                    delay_write_targets=batch.delay_write_targets,
+                    delay_write_mask=batch.delay_write_mask,
+                    delay_write_weight=delay_write_weight,
+                    memory_payload_targets=memory_payload_targets,
+                    memory_payload_mask=memory_payload_mask,
+                    memory_payload_weight=memory_payload_weight,
+                    control_targets=control_targets,
+                    control_mask=control_mask,
+                    control_weight=control_weight,
+                    anti_exit_mask=anti_exit_mask,
+                    anti_exit_weight=anti_exit_weight,
+                    wait_targets=wait_targets,
+                    wait_mask=wait_mask,
+                    wait_weight=wait_weight,
+                    wait_positive_weight=wait_positive_weight,
+                    wait_negative_weight=wait_negative_weight,
+                    release_targets=release_targets,
+                    release_mask=release_mask,
+                    release_weight=release_weight,
+                    release_positive_weight=release_positive_weight,
+                    final_query_mask=batch.metadata.get("needs_final_query"),
+                    return_trace=True,
+                )
+            readout_input = (output.trace or {}).get("final_readout_input")
+            if readout_input is None:
+                continue
+            if final_query_only:
+                mask = batch.metadata.get("needs_final_query")
+                if mask is None:
+                    continue
+                mask = mask > 0
+            else:
+                mask = torch.ones_like(batch.labels, dtype=torch.bool)
+            if not bool(mask.any().item()):
+                continue
+            features.append(readout_input[mask].detach())
+            labels.append(batch.labels[mask].detach())
+    if was_training:
+        model.train()
+
+    if not features:
+        raise ValueError(
+            f"probe_warmstart collected no samples for {benchmark_name} on split={split}."
+        )
+
+    train_x = torch.cat(features, dim=0).to(device=device, dtype=torch.float32)
+    train_y = torch.cat(labels, dim=0).to(device=device, dtype=torch.long)
+    mean = train_x.mean(dim=0)
+    std = train_x.std(dim=0).clamp_min(1e-5)
+    model.readout.reset_parameters()
+    model.readout.set_standardizer(mean, std)
+    optimizer = torch.optim.AdamW(model.readout.parameters(), lr=lr, weight_decay=weight_decay)
+    model.readout.train()
+    final_loss = 0.0
+    for _ in range(epochs):
+        logits = model.readout(train_x)
+        loss = F.cross_entropy(logits, train_y)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        final_loss = float(loss.detach().item())
+    model.readout.eval()
+    with torch.no_grad():
+        accuracy = float((model.readout(train_x).argmax(dim=-1) == train_y).float().mean().item())
+    return {
+        "probe_warmstart_enabled": True,
+        "probe_warmstart_split": split,
+        "probe_warmstart_num_batches": num_batches,
+        "probe_warmstart_batch_size": batch_size,
+        "probe_warmstart_final_query_only": final_query_only,
+        "probe_warmstart_num_examples": int(train_x.shape[0]),
+        "probe_warmstart_epochs": epochs,
+        "probe_warmstart_lr": lr,
+        "probe_warmstart_weight_decay": weight_decay,
+        "probe_warmstart_train_accuracy": accuracy,
+        "probe_warmstart_final_loss": final_loss,
+    }
+
+
 def build_supervised_optimizer(
     model: PacketRoutingModel,
     train_cfg: dict[str, Any],
@@ -1296,7 +1456,7 @@ def resolve_checkpoint_from_run_dir(run_dir: Path, explicit: str | None = None) 
 
 
 def benchmark_model_config(base_model_cfg: dict[str, Any], benchmark) -> dict[str, Any]:
-    return {
+    model_cfg = {
         **base_model_cfg,
         "num_nodes": benchmark.num_nodes,
         "obs_dim": benchmark.obs_dim,
@@ -1306,6 +1466,11 @@ def benchmark_model_config(base_model_cfg: dict[str, Any], benchmark) -> dict[st
             benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
         ),
     }
+    if hasattr(benchmark, "query_offset"):
+        model_cfg["query_offset"] = int(benchmark.query_offset)
+    if hasattr(benchmark, "query_cardinality"):
+        model_cfg["query_cardinality"] = int(benchmark.query_cardinality)
+    return model_cfg
 
 
 def load_teacher_distillation(
@@ -1598,6 +1763,20 @@ def run_supervised_phase(
     auxiliary_eval_benchmarks = load_auxiliary_eval_benchmarks(cfg, section="training")
     partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
     resume_path, resume_strict = resolve_resume_checkpoint(cfg)
+    probe_warmstart_summary = (
+        apply_probe_warmstart(
+            model,
+            benchmark=benchmark,
+            benchmark_name=benchmark_name,
+            cfg=cfg,
+            device=device,
+            route_mode=route_mode,
+            temperature=temperature,
+            estimator=estimator,
+        )
+        if not cfg.get("resume")
+        else {}
+    )
 
     trainable_summary = configure_trainable_parameters(model, train_cfg)
     optimizer = build_supervised_optimizer(model, train_cfg)
@@ -2014,6 +2193,7 @@ def run_supervised_phase(
         "peak_train_memory_mb": peak_train_memory_mb,
         **trainable_summary,
         **partial_init_summary,
+        **probe_warmstart_summary,
     }
 
 
@@ -2617,16 +2797,7 @@ def main() -> None:
         )
 
     benchmark = build_benchmark(cfg["benchmark"])
-    model_cfg = {
-        **cfg["model"],
-        "num_nodes": benchmark.num_nodes,
-        "obs_dim": benchmark.obs_dim,
-        "num_classes": benchmark.num_classes,
-        "max_total_steps": benchmark.config.get(
-            "max_total_steps",
-            benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
-        ),
-    }
+    model_cfg = benchmark_model_config(cfg["model"], benchmark)
     model = PacketRoutingModel(model_cfg).to(context.device)
     benchmark_name = cfg["benchmark"]["name"]
     logger = JsonlLogger(results_dir / "metrics.jsonl")

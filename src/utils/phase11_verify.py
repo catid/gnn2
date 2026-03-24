@@ -326,6 +326,10 @@ def evaluate_checkpoint(
             benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
         ),
     }
+    if hasattr(benchmark, "query_offset"):
+        model_cfg["query_offset"] = int(benchmark.query_offset)
+    if hasattr(benchmark, "query_cardinality"):
+        model_cfg["query_cardinality"] = int(benchmark.query_cardinality)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = PacketRoutingModel(model_cfg).to(device)
     load_checkpoint(checkpoint_path, model, strict=bool(cfg.get("resume_strict", True)))

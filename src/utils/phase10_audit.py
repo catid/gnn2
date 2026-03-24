@@ -95,7 +95,7 @@ def infer_route_settings(cfg: dict[str, Any]) -> tuple[str, float, str]:
 
 
 def build_model_cfg(model_cfg: dict[str, Any], benchmark) -> dict[str, Any]:
-    return {
+    payload = {
         **model_cfg,
         "num_nodes": benchmark.num_nodes,
         "obs_dim": benchmark.obs_dim,
@@ -105,6 +105,11 @@ def build_model_cfg(model_cfg: dict[str, Any], benchmark) -> dict[str, Any]:
             benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
         ),
     }
+    if hasattr(benchmark, "query_offset"):
+        payload["query_offset"] = int(benchmark.query_offset)
+    if hasattr(benchmark, "query_cardinality"):
+        payload["query_cardinality"] = int(benchmark.query_cardinality)
+    return payload
 
 
 def fit_answer_probe(
