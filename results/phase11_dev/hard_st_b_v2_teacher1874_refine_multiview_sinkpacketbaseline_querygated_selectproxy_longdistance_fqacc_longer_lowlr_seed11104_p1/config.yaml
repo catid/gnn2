@@ -1,0 +1,14 @@
+_base_: ../../phase10/dev/hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 11104
+  results_root: results/phase11_dev
+
+training:
+  selection_metric: selection_eval.longdistance.per_mode.delay_to_final_query.accuracy
+  selection_eval_benchmarks:
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      num_batches: 8
+
