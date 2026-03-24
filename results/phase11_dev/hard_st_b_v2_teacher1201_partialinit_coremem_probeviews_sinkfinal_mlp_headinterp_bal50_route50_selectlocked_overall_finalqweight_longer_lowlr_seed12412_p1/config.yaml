@@ -1,0 +1,23 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_probeinit_selectlocked_overall_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 12412
+
+partial_init:
+  sources:
+    - run_dir: results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_probeinit_selectlocked_overall_finalqweight_longer_lowlr_seed12011_p1
+      weight: 0.5
+    - run_dir: results/phase11_dev/hard_st_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_probeinit_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr_seed11914_p1
+      weight: 0.5
+  include_prefixes:
+    - core.
+    - memory_
+    - control_
+    - wait_
+    - release_
+    - sink_proj
+    - readout.
+
+training:
+  probe_warmstart:
+    enabled: false
