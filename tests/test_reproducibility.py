@@ -387,6 +387,7 @@ def test_load_auxiliary_train_benchmarks_resolves_relative_configs_and_weight_ov
                         "config": "confirm_locked.yaml",
                         "split": "confirm",
                         "loss_weight": 0.75,
+                        "agreement_weight": 0.25,
                         "final_query_weight": 5.0,
                     }
                 ],
@@ -400,6 +401,7 @@ def test_load_auxiliary_train_benchmarks_resolves_relative_configs_and_weight_ov
     assert source.split == "confirm"
     assert source.batch_size == 8
     assert source.loss_weight == 0.75
+    assert source.agreement_weight == 0.25
     assert source.task_weight_cfg == {"final_query_weight": 5.0, "non_final_query_weight": 0.5}
 
     confirm_a = source.benchmark.sample_batch(batch_size=4, split="confirm", step=1, device="cpu")

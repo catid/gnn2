@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 11311
+  results_root: results/phase11_dev
+
+proxy_teacher:
+  run_dir: results/phase10_dev/hard_st_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_finalqweight_longer_lowlr_seed10012_p1
+  logits_weight: 1.0
+  distill_temperature: 2.0
+  target_scope: final_query_only
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.0
+      agreement_weight: 0.05

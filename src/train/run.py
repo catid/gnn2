@@ -72,6 +72,7 @@ class AuxiliaryTrainBenchmark:
     split: str
     batch_size: int
     loss_weight: float
+    agreement_weight: float
     task_weight_cfg: dict[str, float]
 
 
@@ -654,6 +655,7 @@ def load_auxiliary_train_benchmarks(cfg: dict[str, Any]) -> list[AuxiliaryTrainB
                 split=str(spec.get("split", "confirm")),
                 batch_size=int(spec.get("batch_size", train_cfg["batch_size"])),
                 loss_weight=float(spec.get("loss_weight", 1.0)),
+                agreement_weight=float(spec.get("agreement_weight", 0.0)),
                 task_weight_cfg=task_weight_cfg,
             )
         )
@@ -1310,8 +1312,9 @@ def load_teacher_distillation(
     *,
     benchmark,
     device: torch.device,
+    section: str = "teacher",
 ) -> TeacherDistillation | None:
-    teacher_cfg = dict(cfg.get("teacher", {}) or {})
+    teacher_cfg = dict(cfg.get(section, {}) or {})
     weights = {
         "logits_weight": float(teacher_cfg.get("logits_weight", 0.0)),
         "route_weight": float(teacher_cfg.get("route_weight", 0.0)),
@@ -1327,7 +1330,7 @@ def load_teacher_distillation(
 
     run_dir = teacher_cfg.get("run_dir")
     if not run_dir:
-        raise ValueError("Teacher distillation requires teacher.run_dir when any teacher weight is positive.")
+        raise ValueError(f"{section} distillation requires {section}.run_dir when any teacher weight is positive.")
     run_dir = Path(run_dir)
     summary_path = run_dir / "summary.json"
     if not summary_path.exists():
@@ -1589,6 +1592,7 @@ def run_supervised_phase(
     amp_enabled = bool(system_cfg.get("amp", False))
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
     teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device)
+    proxy_teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device, section="proxy_teacher")
     auxiliary_train_benchmarks = load_auxiliary_train_benchmarks(cfg)
     auxiliary_eval_benchmarks = load_auxiliary_eval_benchmarks(cfg, section="training")
     partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
@@ -1736,7 +1740,7 @@ def run_supervised_phase(
             auxiliary_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
             auxiliary_metrics: dict[str, float] = {}
             for aux_source in auxiliary_train_benchmarks:
-                if aux_source.loss_weight <= 0.0:
+                if aux_source.loss_weight <= 0.0 and aux_source.agreement_weight <= 0.0:
                     continue
                 aux_batch = aux_source.benchmark.sample_batch(
                     batch_size=aux_source.batch_size,
@@ -1775,6 +1779,7 @@ def run_supervised_phase(
                     device=aux_batch.labels.device,
                     dtype=aux_batch.observations.dtype,
                 )
+                aux_return_trace = proxy_teacher is not None and aux_source.agreement_weight > 0.0
                 aux_output = model(
                     observations=aux_batch.observations,
                     labels=aux_batch.labels,
@@ -1811,12 +1816,14 @@ def run_supervised_phase(
                     release_weight=aux_release_weight,
                     release_positive_weight=aux_release_positive_weight,
                     task_sample_weights=aux_task_sample_weights,
-                    return_trace=False,
+                    return_trace=aux_return_trace,
                 )
-                auxiliary_loss = auxiliary_loss + (aux_output.loss * aux_source.loss_weight)
                 aux_prefix = f"aux_{aux_source.name}"
+                if aux_source.loss_weight > 0.0:
+                    auxiliary_loss = auxiliary_loss + (aux_output.loss * aux_source.loss_weight)
                 auxiliary_metrics[f"{aux_prefix}_loss"] = float(aux_output.loss.detach().item())
                 auxiliary_metrics[f"{aux_prefix}_loss_weight"] = float(aux_source.loss_weight)
+                auxiliary_metrics[f"{aux_prefix}_agreement_weight"] = float(aux_source.agreement_weight)
                 auxiliary_metrics[f"{aux_prefix}_accuracy"] = float(aux_output.stats["accuracy"].detach().float().mean().item())
                 final_query_mask = aux_batch.metadata.get("needs_final_query")
                 if final_query_mask is not None:
@@ -1826,6 +1833,30 @@ def run_supervised_phase(
                         auxiliary_metrics[f"{aux_prefix}_final_query_accuracy"] = float(
                             (predictions[final_query_mask] == aux_batch.labels[final_query_mask]).float().mean().item()
                         )
+                if proxy_teacher is not None and aux_source.agreement_weight > 0.0:
+                    with torch.no_grad():
+                        aux_teacher_output = proxy_teacher.model(
+                            observations=aux_batch.observations,
+                            labels=aux_batch.labels,
+                            route_mode=proxy_teacher.route_mode,
+                            compute_penalties=compute_penalties,
+                            temperature=proxy_teacher.temperature,
+                            estimator=proxy_teacher.estimator,
+                            truncate_bptt_steps=0,
+                            return_trace=True,
+                        )
+                    agreement_loss, agreement_metrics = compute_teacher_distillation_loss(
+                        batch=aux_batch,
+                        student_output=aux_output,
+                        teacher_output=aux_teacher_output,
+                        teacher=proxy_teacher,
+                        device=device,
+                        scale=aux_source.agreement_weight,
+                        dropout_prob=0.0,
+                    )
+                    auxiliary_loss = auxiliary_loss + agreement_loss
+                    for key, value in agreement_metrics.items():
+                        auxiliary_metrics[f"{aux_prefix}_{key}"] = value
             total_loss = output.loss + teacher_loss + auxiliary_loss
         scaler.scale(total_loss).backward()
         scaler.unscale_(optimizer)

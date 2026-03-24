@@ -1,0 +1,12 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_proxyagree_locked005_selectlocked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 11312
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.0
+      agreement_weight: 0.1
