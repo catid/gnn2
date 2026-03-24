@@ -37,6 +37,8 @@ case "${cluster}" in
       "hard_st_benchmark_b_v2_teacher1874_refine_querygated_adapter_lowrank_finalqweight_longer_lowlr.yaml"
       "hard_st_benchmark_b_v2_teacher1874_refine_querygated_adapter_residual_finalqweight_longer_lowlr.yaml"
       "hard_st_benchmark_b_v2_teacher1874_refine_queryfilm_adapter_lowrank_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1842_refine_multiview_sinkpacketbaseline_querygated_adapter_affine_fq5_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1821_refine_multiview_sinkpacketbaseline_querygated_adapter_residual_fq5_longer_lowlr.yaml"
     )
     ;;
   iterative)
