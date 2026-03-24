@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import math
 
-from src.train.run import apply_cli_overrides, resolve_resume_checkpoint, validation_score
+from src.train.run import apply_cli_overrides, initial_selection_score, resolve_resume_checkpoint, validation_score
 
 
 def test_apply_cli_overrides_preserves_config_resume_when_flag_missing() -> None:
@@ -125,4 +125,78 @@ def test_validation_score_supports_weighted_geomean_composite_selector() -> None
         "weighted_geomean("
         "1*selection_eval.full_locked.accuracy + "
         "2*selection_eval.full_locked.per_mode.delay_to_final_query.route_match)"
+    )
+
+
+def test_validation_score_supports_lexicographic_selector() -> None:
+    cfg = {
+        "training": {
+            "selection_metric_mode": "lexicographic",
+            "selection_metric_terms": [
+                {"path": "selection_eval.full_locked.per_mode.delay_to_final_query.route_match"},
+                {"path": "selection_eval.full_locked.accuracy"},
+            ],
+        }
+    }
+    metrics = {
+        "selection_eval": {
+            "full_locked": {
+                "accuracy": 0.6,
+                "per_mode": {"delay_to_final_query": {"route_match": 0.8}},
+            }
+        }
+    }
+
+    score, metric_name = validation_score(metrics, cfg)
+
+    assert score == (0.8, 0.6)
+    assert metric_name == (
+        "lexicographic("
+        "selection_eval.full_locked.per_mode.delay_to_final_query.route_match > "
+        "selection_eval.full_locked.accuracy)"
+    )
+
+
+def test_validation_score_supports_lexicographic_floor_selector() -> None:
+    cfg = {
+        "training": {
+            "selection_metric_mode": "lexicographic",
+            "selection_metric_terms": [
+                {
+                    "path": "selection_eval.full_locked.per_mode.delay_to_final_query.route_match",
+                    "minimum": 0.5,
+                },
+                {"path": "selection_eval.full_locked.accuracy"},
+            ],
+        }
+    }
+    route_passing_metrics = {
+        "selection_eval": {
+            "full_locked": {
+                "accuracy": 0.45,
+                "per_mode": {"delay_to_final_query": {"route_match": 0.55}},
+            }
+        }
+    }
+    route_failing_metrics = {
+        "selection_eval": {
+            "full_locked": {
+                "accuracy": 0.9,
+                "per_mode": {"delay_to_final_query": {"route_match": 0.4}},
+            }
+        }
+    }
+
+    passing_score, metric_name = validation_score(route_passing_metrics, cfg)
+    failing_score, _ = validation_score(route_failing_metrics, cfg)
+
+    assert passing_score == (1.0, 0.55, 0.45)
+    assert failing_score == (0.0, 0.4, 0.9)
+    assert passing_score > failing_score
+    assert initial_selection_score(cfg["training"]) == (float("-inf"), float("-inf"), float("-inf"))
+    assert metric_name == (
+        "lexicographic("
+        "selection_eval.full_locked.per_mode.delay_to_final_query.route_match>=0.5 > "
+        "selection_eval.full_locked.per_mode.delay_to_final_query.route_match > "
+        "selection_eval.full_locked.accuracy)"
     )

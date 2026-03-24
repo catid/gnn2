@@ -208,16 +208,45 @@ def resolve_metric_path(metrics: dict[str, Any], path: str) -> float:
     return float("nan")
 
 
-def composite_metric_score(section_cfg: dict[str, Any], metrics: dict[str, Any]) -> tuple[float, str] | None:
+def selector_score_arity(section_cfg: dict[str, Any]) -> int:
+    terms_cfg = section_cfg.get("selection_metric_terms")
+    if not isinstance(terms_cfg, list):
+        return 1
+    mode = str(section_cfg.get("selection_metric_mode", "weighted_sum"))
+    if mode != "lexicographic":
+        return 1
+    arity = 0
+    for item in terms_cfg:
+        if not isinstance(item, dict) or item.get("path") is None:
+            continue
+        if item.get("minimum") is not None:
+            arity += 1
+        arity += 1
+    return max(1, arity)
+
+
+def initial_selection_score(section_cfg: dict[str, Any]) -> float | tuple[float, ...]:
+    mode = str(section_cfg.get("selection_metric_mode", ""))
+    if mode == "lexicographic":
+        return tuple(float("-inf") for _ in range(selector_score_arity(section_cfg)))
+    return float("-inf")
+
+
+def composite_metric_score(
+    section_cfg: dict[str, Any],
+    metrics: dict[str, Any],
+) -> tuple[float | tuple[float, ...], str] | None:
     terms_cfg = section_cfg.get("selection_metric_terms")
     if not terms_cfg:
         return None
     if not isinstance(terms_cfg, list):
         raise ValueError("selection_metric_terms must be a list of term mappings.")
     mode = str(section_cfg.get("selection_metric_mode", "weighted_sum"))
-    if mode not in {"weighted_sum", "weighted_geomean"}:
-        raise ValueError("selection_metric_mode must be one of: weighted_sum, weighted_geomean")
+    if mode not in {"weighted_sum", "weighted_geomean", "lexicographic"}:
+        raise ValueError("selection_metric_mode must be one of: weighted_sum, weighted_geomean, lexicographic")
     terms: list[tuple[str, float, float]] = []
+    lexicographic_score: list[float] = []
+    lexicographic_name_parts: list[str] = []
     for item in terms_cfg:
         if not isinstance(item, dict):
             raise ValueError("selection_metric_terms entries must be mappings.")
@@ -227,11 +256,33 @@ def composite_metric_score(section_cfg: dict[str, Any], metrics: dict[str, Any])
         weight = float(item.get("weight", 1.0))
         value = resolve_metric_path(metrics, str(path))
         if math.isnan(value):
+            if mode == "lexicographic":
+                fallback_name_parts: list[str] = []
+                for term in terms_cfg:
+                    if isinstance(term, dict) and term.get("path") is not None:
+                        label = str(term["path"])
+                        if term.get("minimum") is not None:
+                            label = f"{label}>={float(term['minimum']):g} > {label}"
+                        fallback_name_parts.append(label)
+                return initial_selection_score(section_cfg), f"lexicographic(" + " > ".join(fallback_name_parts) + ")"
             return float("nan"), f"{mode}(" + " + ".join(
                 f"{float(term.get('weight', 1.0)):g}*{term['path']}" for term in terms_cfg if isinstance(term, dict) and "path" in term
             ) + ")"
+        if mode == "lexicographic":
+            minimum = item.get("minimum")
+            if minimum is not None:
+                minimum_value = float(minimum)
+                lexicographic_score.append(1.0 if value >= minimum_value else 0.0)
+                lexicographic_name_parts.append(f"{path}>={minimum_value:g}")
+            lexicographic_score.append(value)
+            lexicographic_name_parts.append(str(path))
+            continue
         terms.append((str(path), weight, value))
     if not terms:
+        if mode == "lexicographic":
+            if not lexicographic_score:
+                raise ValueError("selection_metric_terms must not be empty.")
+            return tuple(lexicographic_score), f"lexicographic(" + " > ".join(lexicographic_name_parts) + ")"
         raise ValueError("selection_metric_terms must not be empty.")
     if mode == "weighted_sum":
         score = sum(weight * value for _, weight, value in terms)
@@ -1060,7 +1111,11 @@ def evaluate_model(
     return metrics
 
 
-def validation_score(metrics: dict[str, Any], cfg: dict[str, Any], section: str = "training") -> tuple[float, str]:
+def validation_score(
+    metrics: dict[str, Any],
+    cfg: dict[str, Any],
+    section: str = "training",
+) -> tuple[float | tuple[float, ...], str]:
     section_cfg = cfg.get(section, {})
     composite = composite_metric_score(section_cfg, metrics)
     if composite is not None:
@@ -1846,7 +1901,7 @@ def run_supervised_phase(
     phase_start_time = time.time()
     peak_train_memory_mb = 0.0
     best_val_metrics: dict[str, Any] | None = None
-    best_val_score = float("-inf")
+    best_val_score = initial_selection_score(train_cfg)
     best_metric_name = str(train_cfg.get("selection_metric", "accuracy"))
     progress = tqdm(range(start_step, total_steps), disable=False)
     for step in progress:
@@ -2290,7 +2345,7 @@ def run_reinforce_phase(
     phase_start_time = time.time()
     peak_train_memory_mb = 0.0
     best_val_metrics: dict[str, Any] | None = None
-    best_val_score = float("-inf")
+    best_val_score = initial_selection_score(train_cfg)
     best_metric_name = str(train_cfg.get("selection_metric", "accuracy"))
     progress = tqdm(range(start_step, total_steps), disable=False)
     for step in progress:
@@ -2595,7 +2650,7 @@ def run_hybrid_es(
     phase_start_time = time.time()
     peak_train_memory_mb = 0.0
     best_val_metrics: dict[str, Any] | None = None
-    best_val_score = float("-inf")
+    best_val_score = initial_selection_score(es_cfg)
     best_metric_name = str(es_cfg.get("selection_metric", "accuracy"))
     progress = tqdm(range(generations), disable=context.rank != 0)
     eval_compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, generations)

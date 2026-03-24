@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_probeinit_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 12214
+
+training:
+  selection_metric_mode: lexicographic
+  selection_metric_terms:
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      minimum: 0.55
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+    - path: selection_eval.full_locked.accuracy
