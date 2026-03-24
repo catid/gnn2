@@ -1,0 +1,39 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 11811
+  results_root: results/phase11_dev
+
+resume: null
+
+model:
+  readout_mode: multiview_query_gated
+  readout_base_mode: query_gated
+  readout_views:
+    - sink_state_query
+    - baseline_readout_input
+
+partial_init:
+  run_dir: results/phase10_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+  include_prefixes:
+    - core.
+    - memory_
+    - control_
+    - wait_
+    - release_
+    - sink_proj
+
+training:
+  final_query_weight: 3.0
+  non_final_query_weight: 0.5
+  selection_metric: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+  selection_eval_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      num_batches: 8
+  trainable_prefixes:
+    - readout
+    - query_readout_proj
+    - multiview_
+
