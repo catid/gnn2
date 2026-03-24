@@ -1,0 +1,4 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headprefixblend_12713_13111_readout_bal95_route05_selectproxy_full_locked_fqacc_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 13511
