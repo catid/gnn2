@@ -11,12 +11,19 @@ case "${mode}" in
   adapter)
     ./scripts/run_phase10_cluster_scouts.sh "${root}" adapter
     ;;
+  iterative)
+    ./scripts/run_phase10_cluster_scouts.sh "${root}" iterative
+    ;;
+  es)
+    ./scripts/run_phase10_cluster_scouts.sh "${root}" es
+    ;;
   tuned)
     ./scripts/run_phase10_cluster_scouts.sh "${root}" multiview
     ./scripts/run_phase10_cluster_scouts.sh "${root}" adapter
+    ./scripts/run_phase10_cluster_scouts.sh "${root}" iterative
     ;;
   *)
-    echo "usage: $0 [results-root] [initial|adapter|tuned]" >&2
+    echo "usage: $0 [results-root] [initial|adapter|iterative|es|tuned]" >&2
     exit 1
     ;;
 esac

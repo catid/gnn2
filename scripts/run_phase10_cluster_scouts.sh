@@ -39,9 +39,28 @@ case "${cluster}" in
       "hard_st_benchmark_b_v2_teacher1874_refine_queryfilm_adapter_lowrank_longer_lowlr.yaml"
     )
     ;;
+  iterative)
+    configs=(
+      "hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_iter2_finalqweight_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_iter4_finalqweight_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_iter2_fq5_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_iter4_fq5_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_iter2_contentdistill_esanchor_finalqweight_longer_lowlr.yaml"
+      "hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_crossattn_iter4_contentdistill_esanchor_finalqweight_longer_lowlr.yaml"
+    )
+    ;;
+  es)
+    configs=(
+      "hybrid_es_benchmark_b_v2_teacher1874_multiview_querygated_resume_from10012.yaml"
+      "hybrid_es_benchmark_b_v2_teacher1874_multiview_queryfilm_resume_from10013.yaml"
+      "hybrid_es_benchmark_b_v2_teacher1874_multiview_crossattn_resume_from10014.yaml"
+      "hybrid_es_benchmark_b_v2_teacher1821_multiview_querygated_fq5_resume_from10152.yaml"
+      "hybrid_es_benchmark_b_v2_teacher1874_adapter_affine_resume_from10021.yaml"
+    )
+    ;;
   *)
     echo "unknown cluster mode: ${cluster}" >&2
-    echo "usage: $0 [results-root] [anchor|multiview|adapter]" >&2
+    echo "usage: $0 [results-root] [anchor|multiview|adapter|iterative|es]" >&2
     exit 1
     ;;
 esac

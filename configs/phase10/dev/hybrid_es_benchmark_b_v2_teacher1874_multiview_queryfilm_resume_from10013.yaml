@@ -1,0 +1,23 @@
+_base_: ../../phase8/dev/hybrid_es_benchmark_b_v2_teacher1842_resume_from1842.yaml
+
+experiment:
+  seed: 10522
+  results_root: results/phase10_dev
+
+resume:
+  checkpoint: results/phase10_dev/hard_st_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_queryfilm_finalqweight_longer_lowlr_seed10013_p1/hard_st_best.pt
+  strict: false
+
+es:
+  generations: 20
+  population: 64
+  rank: 4
+  sigma: 0.02
+  val_every: 4
+  val_batches: 10
+  test_batches: 16
+  selection_metric: per_mode.delay_to_final_query.accuracy
+  trainable_prefixes:
+    - readout
+    - query_readout_proj
+    - multiview_
