@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_pinit_prefix_12713_13111_readout9505_cmix_fq4_selectproxy_src13111_finalq_lw015_s48_llr.yaml
+
+experiment:
+  seed: 14113
+
+teacher:
+  start_step: 48
+  stop_step: 96
