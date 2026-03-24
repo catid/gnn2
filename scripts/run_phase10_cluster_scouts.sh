@@ -71,7 +71,8 @@ seed_for_config() {
 
 results_dir_for_config() {
   local cfg_path="$1"
-  local stem="${cfg_path%.yaml}"
+  local stem
+  stem="$(basename "${cfg_path%.yaml}")"
   local seed
   seed="$(seed_for_config "${cfg_path}")"
   local base="${stem/hard_st_benchmark_b_v2/hard_st_b_v2}"
