@@ -1,0 +1,23 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal45_route55_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 12613
+
+teacher:
+  run_dir: results/phase10_anchor/hybrid_es_b_v2_controlsticky_keepalive_resume_from989_seed1201_p1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: final_query_only
+  logits_weight: 1.0
+  route_weight: 0.0
+  route_action_weight: 0.0
+  control_prob_weight: 0.0
+  release_prob_weight: 0.0
+  wait_prob_weight: 0.0
+  control_state_weight: 0.0
+  memory_read_weight: 0.0
+  start_step: 0
+  stop_step: 384
+  scale_start: 1.0
+  scale_end: 1.0
