@@ -1,0 +1,11 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_refine_multiview_sinkpacketbaseline_querygated_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 11514
+
+model:
+  readout_head_mode: cosine
+  readout_metric_dim: 64
+  readout_logit_scale_init: 10.0
+  readout_prototype_pull_weight: 0.1
+

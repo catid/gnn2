@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.models.packet_routing import PacketRoutingModel, compute_task_classification_loss
+from src.models.packet_routing import CosineReadoutHead, PacketRoutingModel, compute_task_classification_loss
 
 
 class StubCore(nn.Module):
@@ -543,3 +543,70 @@ def test_direct_release_gate_controls_wait_vs_act_decision() -> None:
 
     actions = composed.argmax(dim=-1)
     assert actions.tolist() == [[2, 0]]
+
+
+def test_cosine_readout_head_constructs_and_runs() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "multiview_query_gated",
+            "readout_base_mode": "query_gated",
+            "readout_views": ["final_sink_state", "packet_state_query", "baseline_readout_input"],
+            "readout_head_mode": "cosine",
+            "readout_metric_dim": 6,
+            "readout_prototype_pull_weight": 0.1,
+        }
+    )
+    observations = torch.zeros(2, 3, 2, 8)
+    observations[:, -1, 0, 1] = 1.0
+    labels = torch.tensor([0, 1], dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert output.logits.shape == (2, 3)
+    assert output.trace is not None
+    assert output.trace["final_readout_input"].shape == (2, 4)
+    assert "prototype_pull_loss" in output.stats
+    assert output.stats["prototype_pull_loss"].shape == (2,)
+
+
+def test_cosine_readout_prototype_pull_loss_respects_sample_weights() -> None:
+    head = CosineReadoutHead(input_dim=4, num_classes=3, metric_dim=4, init_scale=8.0)
+    with torch.no_grad():
+        head.readout_prototypes.copy_(
+            torch.tensor(
+                [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                ]
+            )
+        )
+    features = torch.tensor(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.2, 0.0, 1.0, 0.0],
+        ]
+    )
+    labels = torch.tensor([0, 2], dtype=torch.long)
+    weights = torch.tensor([1.0, 0.0])
+
+    full_loss = head.prototype_pull_loss(features, labels)
+    loss = head.prototype_pull_loss(features, labels, sample_weights=weights)
+
+    single_loss = head.prototype_pull_loss(features[:1], labels[:1])
+
+    assert torch.isclose(loss, single_loss, atol=1e-6)
+    assert not torch.isclose(full_loss, single_loss, atol=1e-6)

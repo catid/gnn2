@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -102,6 +103,65 @@ class AffineAdapter(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x * (1.0 + self.scale) + self.bias
+
+
+class CosineReadoutHead(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        *,
+        metric_dim: int = 0,
+        init_scale: float = 10.0,
+        learnable_scale: bool = True,
+    ):
+        super().__init__()
+        self.metric_dim = metric_dim if metric_dim > 0 else input_dim
+        self.readout_norm = nn.LayerNorm(input_dim)
+        if self.metric_dim == input_dim:
+            self.readout_input_proj = None
+        else:
+            self.readout_input_proj = nn.Linear(input_dim, self.metric_dim)
+        self.readout_prototypes = nn.Parameter(torch.empty(num_classes, self.metric_dim))
+        nn.init.normal_(self.readout_prototypes, std=0.02)
+        if learnable_scale:
+            self.readout_logit_scale = nn.Parameter(torch.tensor(math.log(max(init_scale, 1e-3)), dtype=torch.float32))
+            self._fixed_scale = None
+        else:
+            self.readout_logit_scale = None
+            self._fixed_scale = float(init_scale)
+
+    def _embed(self, x: torch.Tensor) -> torch.Tensor:
+        hidden = self.readout_norm(x)
+        if self.readout_input_proj is not None:
+            hidden = F.gelu(self.readout_input_proj(hidden))
+        return F.normalize(hidden, dim=-1, eps=1e-6)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        embedded = self._embed(x)
+        prototypes = F.normalize(self.readout_prototypes, dim=-1, eps=1e-6)
+        if self.readout_logit_scale is None:
+            scale = x.new_tensor(self._fixed_scale)
+        else:
+            scale = self.readout_logit_scale.exp().clamp(max=100.0).to(device=x.device, dtype=x.dtype)
+        return scale * embedded @ prototypes.transpose(0, 1).to(dtype=embedded.dtype)
+
+    def prototype_pull_loss(
+        self,
+        x: torch.Tensor,
+        labels: torch.Tensor,
+        *,
+        sample_weights: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        embedded = self._embed(x)
+        prototypes = F.normalize(self.readout_prototypes, dim=-1, eps=1e-6)
+        target_proto = prototypes[labels]
+        per_sample = 1.0 - (embedded * target_proto).sum(dim=-1)
+        if sample_weights is None:
+            weights = torch.ones_like(per_sample)
+        else:
+            weights = sample_weights.to(device=per_sample.device, dtype=per_sample.dtype)
+        return (per_sample * weights).sum() / weights.sum().clamp_min(1e-8)
 
 
 class NodeCore(nn.Module):
@@ -273,6 +333,11 @@ class PacketRoutingModel(nn.Module):
         self.release_gate_scale = float(config.get("release_gate_scale", 1.0))
         self.readout_mode = str(config.get("readout_mode", "plain"))
         self.readout_base_mode = str(config.get("readout_base_mode", "plain"))
+        self.readout_head_mode = str(config.get("readout_head_mode", "linear"))
+        self.readout_metric_dim = int(config.get("readout_metric_dim", 0))
+        self.readout_logit_scale_init = float(config.get("readout_logit_scale_init", 10.0))
+        self.readout_learnable_scale = bool(config.get("readout_learnable_scale", True))
+        self.readout_prototype_pull_weight = float(config.get("readout_prototype_pull_weight", 0.0))
         self.readout_views = tuple(
             str(name)
             for name in config.get(
@@ -521,10 +586,21 @@ class PacketRoutingModel(nn.Module):
             self.readout_adapter = AffineAdapter(self.hidden_dim)
         else:
             raise ValueError(f"Unknown readout_adapter_mode: {self.readout_adapter_mode}")
-        self.readout = nn.Sequential(
-            nn.LayerNorm(readout_input_dim),
-            nn.Linear(readout_input_dim, self.num_classes),
-        )
+        if self.readout_head_mode == "linear":
+            self.readout = nn.Sequential(
+                nn.LayerNorm(readout_input_dim),
+                nn.Linear(readout_input_dim, self.num_classes),
+            )
+        elif self.readout_head_mode == "cosine":
+            self.readout = CosineReadoutHead(
+                readout_input_dim,
+                self.num_classes,
+                metric_dim=self.readout_metric_dim,
+                init_scale=self.readout_logit_scale_init,
+                learnable_scale=self.readout_learnable_scale,
+            )
+        else:
+            raise ValueError(f"Unknown readout_head_mode: {self.readout_head_mode}")
 
     def _baseline_readout_input(
         self,
@@ -1469,6 +1545,14 @@ class PacketRoutingModel(nn.Module):
             final_query_margin=self.final_query_margin,
             final_query_focal_gamma=self.final_query_focal_gamma,
         )
+        prototype_pull_loss = torch.zeros((), device=device, dtype=dtype)
+        if self.readout_prototype_pull_weight > 0.0 and hasattr(self.readout, "prototype_pull_loss"):
+            prototype_pull_loss = self.readout.prototype_pull_loss(
+                readout_input,
+                labels,
+                sample_weights=task_sample_weights,
+            ).to(dtype)
+            task_loss = task_loss + (self.readout_prototype_pull_weight * prototype_pull_loss)
         penalty_hops = float(compute_penalties.get("hops", 0.0)) * hops.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_delays = float(compute_penalties.get("delays", 0.0)) * delays.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_ttl = float(compute_penalties.get("ttl_fail", 0.0)) * ttl_fail.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
@@ -1562,6 +1646,7 @@ class PacketRoutingModel(nn.Module):
             "wait_loss": torch.full_like(accuracy, float(wait_term.detach().item())),
             "release_loss": torch.full_like(accuracy, float(release_term.detach().item())),
             "task_shaping_loss": torch.full_like(accuracy, float(task_shaping_loss.detach().item())),
+            "prototype_pull_loss": torch.full_like(accuracy, float(prototype_pull_loss.detach().item())),
         }
         for src_index, src_name in ACTION_NAMES.items():
             for dst_index, dst_name in ACTION_NAMES.items():
