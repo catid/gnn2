@@ -30,6 +30,58 @@ class RoutingForwardOutput:
     trace: dict[str, torch.Tensor] | None = None
 
 
+def compute_task_classification_loss(
+    logits: torch.Tensor,
+    labels: torch.Tensor,
+    *,
+    task_sample_weights: torch.Tensor | None = None,
+    final_query_mask: torch.Tensor | None = None,
+    final_query_shaping_mode: str = "none",
+    final_query_shaping_weight: float = 0.0,
+    final_query_margin: float = 0.0,
+    final_query_focal_gamma: float = 2.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    eps = 1e-8
+    per_sample_task_loss = F.cross_entropy(logits, labels, reduction="none")
+    if task_sample_weights is None:
+        weights = torch.ones_like(per_sample_task_loss)
+    else:
+        weights = task_sample_weights.to(device=logits.device, dtype=per_sample_task_loss.dtype)
+    task_loss = (per_sample_task_loss * weights).sum() / weights.sum().clamp_min(eps)
+
+    shaping_loss = torch.zeros((), device=logits.device, dtype=per_sample_task_loss.dtype)
+    if (
+        final_query_shaping_mode == "none"
+        or final_query_shaping_weight <= 0.0
+        or final_query_mask is None
+    ):
+        return task_loss, shaping_loss
+
+    final_query_mask = final_query_mask.to(device=logits.device, dtype=torch.bool)
+    if not bool(final_query_mask.any().item()):
+        return task_loss, shaping_loss
+
+    if final_query_shaping_mode == "margin":
+        target_logits = logits.gather(1, labels.unsqueeze(1)).squeeze(1)
+        other_logits = logits.masked_fill(
+            F.one_hot(labels, num_classes=logits.shape[-1]).to(dtype=torch.bool),
+            float("-inf"),
+        )
+        max_other_logits = other_logits.max(dim=-1).values
+        per_sample_shaping = F.relu(float(final_query_margin) - (target_logits - max_other_logits))
+    elif final_query_shaping_mode == "focal":
+        target_probs = F.softmax(logits.float(), dim=-1).gather(1, labels.unsqueeze(1)).squeeze(1).clamp_min(eps)
+        per_sample_shaping = ((1.0 - target_probs) ** float(final_query_focal_gamma)) * per_sample_task_loss.float()
+    else:
+        raise ValueError(f"Unknown final_query_shaping_mode: {final_query_shaping_mode}")
+
+    shaping_weights = weights.to(per_sample_shaping.dtype) * final_query_mask.to(per_sample_shaping.dtype)
+    shaping_loss = float(final_query_shaping_weight) * (
+        (per_sample_shaping * shaping_weights).sum() / shaping_weights.sum().clamp_min(eps)
+    )
+    return task_loss + shaping_loss.to(task_loss.dtype), shaping_loss.to(task_loss.dtype)
+
+
 class LowRankAdapter(nn.Module):
     def __init__(self, hidden_dim: int, rank: int):
         super().__init__()
@@ -236,6 +288,10 @@ class PacketRoutingModel(nn.Module):
         self.readout_adapter_hidden_dim = int(
             config.get("readout_adapter_hidden_dim", self.hidden_dim)
         )
+        self.final_query_shaping_mode = str(config.get("final_query_shaping_mode", "none"))
+        self.final_query_shaping_weight = float(config.get("final_query_shaping_weight", 0.0))
+        self.final_query_margin = float(config.get("final_query_margin", 0.0))
+        self.final_query_focal_gamma = float(config.get("final_query_focal_gamma", 2.0))
         self.multiview_readout_modes = {
             "multiview_concat",
             "multiview_query_gated",
@@ -574,6 +630,7 @@ class PacketRoutingModel(nn.Module):
         release_weight: float = 0.0,
         release_positive_weight: float = 1.0,
         task_sample_weights: torch.Tensor | None = None,
+        final_query_mask: torch.Tensor | None = None,
         return_trace: bool = False,
     ) -> RoutingForwardOutput:
         batch_size, seq_len, num_nodes, _ = observations.shape
@@ -1402,12 +1459,16 @@ class PacketRoutingModel(nn.Module):
                 trace["baseline_readout_input"] = baseline_view
             trace["final_readout_input"] = readout_input
         logits = self.readout(readout_input)
-        if task_sample_weights is None:
-            task_loss = F.cross_entropy(logits, labels)
-        else:
-            per_sample_task_loss = F.cross_entropy(logits, labels, reduction="none")
-            weights = task_sample_weights.to(device=device, dtype=per_sample_task_loss.dtype)
-            task_loss = (per_sample_task_loss * weights).sum() / weights.sum().clamp_min(float(eps))
+        task_loss, task_shaping_loss = compute_task_classification_loss(
+            logits,
+            labels,
+            task_sample_weights=task_sample_weights,
+            final_query_mask=final_query_mask,
+            final_query_shaping_mode=self.final_query_shaping_mode,
+            final_query_shaping_weight=self.final_query_shaping_weight,
+            final_query_margin=self.final_query_margin,
+            final_query_focal_gamma=self.final_query_focal_gamma,
+        )
         penalty_hops = float(compute_penalties.get("hops", 0.0)) * hops.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_delays = float(compute_penalties.get("delays", 0.0)) * delays.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_ttl = float(compute_penalties.get("ttl_fail", 0.0)) * ttl_fail.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
@@ -1500,6 +1561,7 @@ class PacketRoutingModel(nn.Module):
             "anti_exit_loss": torch.full_like(accuracy, float(anti_exit_term.detach().item())),
             "wait_loss": torch.full_like(accuracy, float(wait_term.detach().item())),
             "release_loss": torch.full_like(accuracy, float(release_term.detach().item())),
+            "task_shaping_loss": torch.full_like(accuracy, float(task_shaping_loss.detach().item())),
         }
         for src_index, src_name in ACTION_NAMES.items():
             for dst_index, dst_name in ACTION_NAMES.items():

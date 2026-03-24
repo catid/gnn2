@@ -968,6 +968,7 @@ def evaluate_model(
                     release_mask=release_mask,
                     release_weight=release_weight,
                     release_positive_weight=release_positive_weight,
+                    final_query_mask=batch.metadata.get("needs_final_query"),
                 )
             batch_metrics = summarize_batch(batch, output, benchmark_name)
             collected.append(batch_metrics)
@@ -1711,6 +1712,7 @@ def run_supervised_phase(
                 release_weight=release_weight,
                 release_positive_weight=release_positive_weight,
                 task_sample_weights=task_sample_weights,
+                final_query_mask=batch.metadata.get("needs_final_query"),
                 return_trace=return_trace,
             )
             teacher_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
@@ -1726,6 +1728,7 @@ def run_supervised_phase(
                         temperature=teacher.temperature,
                         estimator=teacher.estimator,
                         truncate_bptt_steps=0,
+                        final_query_mask=batch.metadata.get("needs_final_query"),
                         return_trace=True,
                     )
                 teacher_loss, teacher_metrics = compute_teacher_distillation_loss(
@@ -1816,6 +1819,7 @@ def run_supervised_phase(
                     release_weight=aux_release_weight,
                     release_positive_weight=aux_release_positive_weight,
                     task_sample_weights=aux_task_sample_weights,
+                    final_query_mask=aux_batch.metadata.get("needs_final_query"),
                     return_trace=aux_return_trace,
                 )
                 aux_prefix = f"aux_{aux_source.name}"
@@ -1843,6 +1847,7 @@ def run_supervised_phase(
                             temperature=proxy_teacher.temperature,
                             estimator=proxy_teacher.estimator,
                             truncate_bptt_steps=0,
+                            final_query_mask=aux_batch.metadata.get("needs_final_query"),
                             return_trace=True,
                         )
                     agreement_loss, agreement_metrics = compute_teacher_distillation_loss(
@@ -2149,6 +2154,7 @@ def run_reinforce_phase(
                 release_weight=release_weight,
                 release_positive_weight=release_positive_weight,
                 task_sample_weights=task_sample_weights,
+                final_query_mask=batch.metadata.get("needs_final_query"),
             )
             reward = build_reward(
                 output.logits,
@@ -2450,6 +2456,7 @@ def run_hybrid_es(
                         release_mask=release_mask,
                         release_weight=release_weight,
                         release_positive_weight=release_positive_weight,
+                        final_query_mask=batch.metadata.get("needs_final_query"),
                     )
                 reward = build_reward(
                     output.logits,

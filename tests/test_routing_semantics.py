@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.models.packet_routing import PacketRoutingModel
+from src.models.packet_routing import PacketRoutingModel, compute_task_classification_loss
 
 
 class StubCore(nn.Module):
@@ -252,6 +252,57 @@ def test_delay_hold_mode_preserves_packet_state() -> None:
     delayed = model._delay_packet_state(current_state=current, updated_state=updated, delay_retain=None)
 
     assert torch.equal(delayed, current)
+
+
+def test_final_query_margin_and_focal_shaping_only_affect_final_query_examples() -> None:
+    logits = torch.tensor(
+        [
+            [3.0, 0.2, -1.0],
+            [0.2, 0.1, -0.4],
+        ],
+        dtype=torch.float32,
+    )
+    labels = torch.tensor([0, 1], dtype=torch.long)
+    final_query_mask = torch.tensor([1, 0], dtype=torch.long)
+
+    base_loss, base_shape = compute_task_classification_loss(
+        logits,
+        labels,
+        final_query_mask=final_query_mask,
+    )
+    margin_loss, margin_shape = compute_task_classification_loss(
+        logits,
+        labels,
+        final_query_mask=final_query_mask,
+        final_query_shaping_mode="margin",
+        final_query_shaping_weight=1.0,
+        final_query_margin=4.0,
+    )
+    focal_loss, focal_shape = compute_task_classification_loss(
+        logits,
+        labels,
+        final_query_mask=final_query_mask,
+        final_query_shaping_mode="focal",
+        final_query_shaping_weight=0.5,
+        final_query_focal_gamma=2.0,
+    )
+
+    assert torch.isclose(base_shape, torch.zeros_like(base_shape))
+    assert margin_shape.item() > 0.0
+    assert focal_shape.item() > 0.0
+    assert margin_loss.item() > base_loss.item()
+    assert focal_loss.item() > base_loss.item()
+
+    no_final_query_loss, no_final_query_shape = compute_task_classification_loss(
+        logits,
+        labels,
+        final_query_mask=torch.zeros_like(final_query_mask),
+        final_query_shaping_mode="margin",
+        final_query_shaping_weight=1.0,
+        final_query_margin=4.0,
+    )
+    assert torch.isclose(no_final_query_shape, torch.zeros_like(no_final_query_shape))
+    assert torch.isclose(no_final_query_loss, base_loss)
 
 
 def test_delay_adaptive_blend_interpolates_packet_state() -> None:
