@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headinterp_bal45_route55_selectlocked_overall_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 12513
+
+training:
+  final_query_weight: 4.0
+  selection_metric: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
