@@ -1,0 +1,18 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_15051readout_15057extras_selectlocked.yaml
+
+experiment:
+  seed: 16083
+
+resume:
+  checkpoint: results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_15051readout_15057extras_selectlocked_seed16045_p1/hard_st_best.pt
+  strict: false
+
+training:
+  lr: 0.00002
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 1.0
+      final_query_weight: 4.0
+      non_final_query_weight: 0.25

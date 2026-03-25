@@ -150,9 +150,33 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked_stop720_guard15057_strictdqf_seed16069_p1" 0
     wait
     ;;
+  d_r1)
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_teacher15057_delayedkl010_selectlocked_lowlr.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_teacher15057_delayedkl010_selectlocked_lowlr_seed16081_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_teacher15051_delayedkl010_selectlocked_lowlr.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_teacher15051_delayedkl010_selectlocked_lowlr_seed16082_p1" 1
+    wait
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_auxfulllocked_fq4_selectlocked_lowlr.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_auxfulllocked_fq4_selectlocked_lowlr_seed16083_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_auxfulllocked_fq4_teacher15057_selectlocked_lowlr.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_auxfulllocked_fq4_teacher15057_selectlocked_lowlr_seed16084_p1" 1
+    wait
+    ;;
+  e_r1)
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1821_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc.yaml \
+      "${results_root}/hard_st_b_v2_teacher1821_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc_seed16091_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1821_factorized_temporalbank_query_bilinear_noroute_selectsum_val_locked_exit_route.yaml \
+      "${results_root}/hard_st_b_v2_teacher1821_factorized_temporalbank_query_bilinear_noroute_selectsum_val_locked_exit_route_seed16092_p1" 1
+    wait
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1879_anchor_queryreadout_selectlexi_lockedroute_lockedfqacc.yaml \
+      "${results_root}/hard_st_b_v2_teacher1879_anchor_queryreadout_selectlexi_lockedroute_lockedfqacc_seed16093_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1879_anchor_queryreadout_selectsum_val_locked_exit_route.yaml \
+      "${results_root}/hard_st_b_v2_teacher1879_anchor_queryreadout_selectsum_val_locked_exit_route_seed16094_p1" 1
+    wait
+    ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|a_r4|b_r1|b_r2|c_r1|c_r2|c_r3|c_r4]" >&2
+    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|a_r4|b_r1|b_r2|c_r1|c_r2|c_r3|c_r4|d_r1|e_r1]" >&2
     exit 1
     ;;
 esac
