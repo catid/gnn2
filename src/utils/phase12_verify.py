@@ -253,110 +253,166 @@ def resolve_metric_path(metrics: dict[str, Any], path: str) -> float:
     return float("nan")
 
 
-def compare_metrics(expected: dict[str, Any], actual: dict[str, Any], tolerance: float) -> dict[str, float]:
-    diffs: dict[str, float] = {}
-    for key, expected_value in expected.items():
-        if isinstance(expected_value, dict):
-            actual_value = actual.get(key, {})
-            if isinstance(actual_value, dict):
-                nested = compare_metrics(expected_value, actual_value, tolerance)
-                for nested_key, diff in nested.items():
-                    diffs[f"{key}.{nested_key}"] = diff
+def metric_paths(metrics: dict[str, Any]) -> list[str]:
+    paths = [
+        "accuracy",
+        "compute",
+        "route_match",
+        "premature_exit_rate",
+        "exit_time",
+        "per_mode.delay_to_final_query.accuracy",
+        "per_mode.delay_to_final_query.exit_time",
+        "per_mode.delay_to_final_query.route_match",
+        "per_mode.delay_to_final_query.premature_exit_rate",
+        "per_mode.delay_to_trigger_exit.accuracy",
+        "per_mode.easy_exit.accuracy",
+    ]
+    return [path for path in paths if resolve_metric_path(metrics, path) == resolve_metric_path(metrics, path)]
+
+
+def compare_metrics(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    tolerance: float,
+) -> dict[str, dict[str, float | bool]]:
+    comparisons: dict[str, dict[str, float | bool]] = {}
+    for path in metric_paths(expected):
+        expected_value = resolve_metric_path(expected, path)
+        actual_value = resolve_metric_path(actual, path)
+        if expected_value != expected_value or actual_value != actual_value:
             continue
-        if not isinstance(expected_value, (int, float)):
-            continue
-        actual_value = actual.get(key)
-        if not isinstance(actual_value, (int, float)):
-            diffs[key] = float("inf")
-            continue
-        diff = abs(float(expected_value) - float(actual_value))
-        if diff > tolerance:
-            diffs[key] = diff
-    return diffs
+        diff = abs(expected_value - actual_value)
+        comparisons[path] = {
+            "expected": expected_value,
+            "actual": actual_value,
+            "abs_diff": diff,
+            "matches": diff <= tolerance,
+        }
+    return comparisons
+
+
+def evaluate_checkpoint(
+    *,
+    cfg: dict[str, Any],
+    payload: dict[str, Any],
+    run_dir: Path,
+    checkpoint_path: Path,
+    args: argparse.Namespace,
+    summary_key_prefix: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    method_name, route_mode, temperature, estimator, total_steps, section_cfg = infer_method_settings(cfg)
+    train_cfg = cfg["training"]
+    system_cfg = cfg.get("system", {})
+    amp_enabled = bool(system_cfg.get("amp", False))
+    amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
+
+    seed_everything(int(cfg["experiment"]["seed"]))
+    benchmark = build_benchmark(cfg["benchmark"])
+    model_cfg = {
+        **cfg["model"],
+        "num_nodes": benchmark.num_nodes,
+        "obs_dim": benchmark.obs_dim,
+        "num_classes": benchmark.num_classes,
+        "max_total_steps": benchmark.config.get(
+            "max_total_steps",
+            benchmark.config.get("seq_len", 2) * max(benchmark.num_nodes, 1) * 2,
+        ),
+    }
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = PacketRoutingModel(model_cfg).to(device)
+    load_checkpoint(checkpoint_path, model, strict=bool(cfg.get("resume_strict", True)))
+
+    compute_penalties = current_compute_penalties(cfg["objective"], cfg.get("objective_schedule", {}), total_steps)
+    eval_batch_size = int(
+        section_cfg.get(
+            "eval_batch_size",
+            section_cfg.get("val_batch_size", train_cfg.get("val_batch_size", train_cfg["batch_size"])),
+        )
+    )
+    split_metrics: dict[str, Any] = {}
+    comparisons: dict[str, Any] = {}
+    allow_summary_compare = summary_key_prefix == "base"
+    for split_name, num_batches in resolve_eval_requests(
+        payload=payload,
+        section_cfg=section_cfg,
+        train_cfg=train_cfg,
+        args=args,
+        allow_summary_compare=allow_summary_compare,
+    ):
+        metrics = evaluate_model(
+            model=model,
+            benchmark=benchmark,
+            device=device,
+            benchmark_name=cfg["benchmark"]["name"],
+            split=split_name,
+            num_batches=num_batches,
+            batch_size=eval_batch_size,
+            route_mode=route_mode,
+            compute_penalties=compute_penalties,
+            temperature=temperature,
+            estimator=estimator,
+            amp_enabled=amp_enabled,
+            amp_dtype=amp_dtype,
+            routing_cfg=None,
+        )
+        split_metrics[split_name] = metrics
+        if allow_summary_compare:
+            expected = payload.get("summary", {}).get(split_name)
+            if isinstance(expected, dict):
+                comparisons[split_name] = compare_metrics(expected, metrics, args.tolerance)
+    return split_metrics, comparisons
 
 
 def main() -> None:
     args = parse_args()
-    run_dir = Path(args.run_dir).resolve()
-    cfg, payload = resolve_run_config(run_dir)
-    seed_everything(int(cfg["experiment"]["seed"]))
-    method_name, route_mode, temperature, estimator, total_steps, section_cfg = infer_method_settings(cfg)
-    checkpoint = resolve_checkpoint(run_dir, method_name, args.checkpoint)
+    run_dir = Path(args.run_dir)
+    base_cfg, payload = resolve_run_config(run_dir)
+    method_name, _, _, _, _, _ = infer_method_settings(base_cfg)
+    checkpoint_path = resolve_checkpoint(run_dir, method_name, args.checkpoint)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = PacketRoutingModel(cfg["model"]).to(device)
-    checkpoint_payload = load_checkpoint(checkpoint, map_location=device)
-    model.load_state_dict(checkpoint_payload["model"])
-    model.eval()
-
-    benchmark_cfg = cfg["benchmark"]
-    benchmark_name = benchmark_cfg["name"]
-    benchmark = build_benchmark(benchmark_name, benchmark_cfg)
-
-    objective_cfg = cfg.get("objective", {})
-    schedule_cfg = cfg.get("training", {}).get("schedules", {})
-    compute_penalties = current_compute_penalties(objective_cfg, schedule_cfg, total_steps)
-    requests = resolve_eval_requests(
-        payload=payload,
-        section_cfg=section_cfg,
-        train_cfg=cfg.get("training", {}),
-        args=args,
-        allow_summary_compare=not args.eval_config,
-    )
-
-    results: dict[str, Any] = {
+    verification_payload: dict[str, Any] = {
         "run_dir": str(run_dir),
-        "checkpoint": str(checkpoint),
-        "config_path": payload.get("config_path"),
+        "base_config_path": payload.get("config_path"),
+        "checkpoint": str(checkpoint_path),
+        "method": method_name,
+        "tolerance": args.tolerance,
         "evaluations": {},
     }
-    for split, num_batches in requests:
-        metrics = evaluate_model(
-            model,
-            benchmark,
-            split=split,
-            route_mode=route_mode,
-            estimator=estimator,
-            temperature=temperature,
-            compute_penalties=compute_penalties,
-            batch_size=int(section_cfg.get("batch_size", cfg.get("training", {}).get("batch_size", 32))),
-            num_batches=num_batches,
-            device=device,
-            objective_cfg=objective_cfg,
-        )
-        results["evaluations"][split] = metrics
+
+    base_metrics, base_comparisons = evaluate_checkpoint(
+        cfg=base_cfg,
+        payload=payload,
+        run_dir=run_dir,
+        checkpoint_path=checkpoint_path,
+        args=args,
+        summary_key_prefix="base",
+    )
+    verification_payload["evaluations"]["base"] = {
+        "config_path": payload.get("config_path"),
+        "metrics": base_metrics,
+        "comparisons": base_comparisons,
+    }
 
     for idx, eval_config_path in enumerate(args.eval_config):
         eval_cfg = load_config(eval_config_path)
-        eval_benchmark = build_benchmark(eval_cfg["benchmark"]["name"], eval_cfg["benchmark"])
-        eval_training = eval_cfg.get("training", {})
-        eval_objective = eval_cfg.get("objective", objective_cfg)
-        eval_schedule = eval_training.get("schedules", {})
-        eval_penalties = current_compute_penalties(eval_objective, eval_schedule, total_steps)
-        label = eval_config_label(eval_config_path, idx)
-        metrics = evaluate_model(
-            model,
-            eval_benchmark,
-            split="test",
-            route_mode=route_mode,
-            estimator=estimator,
-            temperature=temperature,
-            compute_penalties=eval_penalties,
-            batch_size=int(eval_training.get("batch_size", section_cfg.get("batch_size", 32))),
-            num_batches=int(args.confirm_batches if args.confirm_batches > 0 else eval_training.get("test_batches", 16)),
-            device=device,
-            objective_cfg=eval_objective,
+        metrics, comparisons = evaluate_checkpoint(
+            cfg=eval_cfg,
+            payload=payload,
+            run_dir=run_dir,
+            checkpoint_path=checkpoint_path,
+            args=args,
+            summary_key_prefix=f"extra_{idx}",
         )
-        results["evaluations"][label] = metrics
-
-    summary_metrics = payload.get("summary", {})
-    results["summary_diffs"] = compare_metrics(summary_metrics, results["evaluations"], args.tolerance)
-    results["matches_summary_within_tolerance"] = not bool(results["summary_diffs"])
+        verification_payload["evaluations"][eval_config_label(eval_config_path, idx)] = {
+            "config_path": eval_config_path,
+            "metrics": metrics,
+            "comparisons": comparisons,
+        }
 
     out_path = Path(args.out) if args.out is not None else run_dir / "artifacts" / "phase12_verify" / "verification.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(results, indent=2, sort_keys=True))
-    print(json.dumps(results, indent=2, sort_keys=True))
+    out_path.write_text(json.dumps(verification_payload, indent=2, sort_keys=True))
+    print(json.dumps({"out": str(out_path)}, indent=2))
 
 
 if __name__ == "__main__":
