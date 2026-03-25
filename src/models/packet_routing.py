@@ -532,6 +532,7 @@ class PacketRoutingModel(nn.Module):
             "temporalbank_query_gated",
             "temporalbank_query_film",
             "temporalbank_cross_attention",
+            "temporalbank_bilinear",
         }
         self.factorized_readout_modes = {
             "factorized_content_query",
@@ -652,6 +653,7 @@ class PacketRoutingModel(nn.Module):
         self.trajectory_bank_attention_norm = None
         self.trajectory_bank_ff = None
         self.trajectory_bank_score = None
+        self.trajectory_bank_bilinear = None
         self.trajectory_bank_film = None
         self.factorized_query_proj = None
         self.factorized_content_proj = None
@@ -761,7 +763,10 @@ class PacketRoutingModel(nn.Module):
                     nn.Linear(self.hidden_dim * 2, self.hidden_dim),
                 )
             else:
-                self.trajectory_bank_score = nn.Linear(self.hidden_dim, 1)
+                if self.readout_mode == "temporalbank_bilinear":
+                    self.trajectory_bank_bilinear = nn.Bilinear(self.hidden_dim, self.hidden_dim, 1)
+                else:
+                    self.trajectory_bank_score = nn.Linear(self.hidden_dim, 1)
                 if self.readout_mode == "temporalbank_query_film":
                     self.trajectory_bank_film = nn.Linear(self.hidden_dim, self.hidden_dim * 2)
             readout_input_dim = self.hidden_dim
@@ -1217,7 +1222,11 @@ class PacketRoutingModel(nn.Module):
             film_params = self.trajectory_bank_film(query_token)
             gamma, beta = torch.chunk(film_params, 2, dim=-1)
             bank = bank * (1.0 + torch.tanh(gamma).unsqueeze(1)) + beta.unsqueeze(1)
-        scores = self.trajectory_bank_score(torch.tanh(bank + query_token.unsqueeze(1))).squeeze(-1)
+        if self.readout_mode == "temporalbank_bilinear":
+            query_bank = query_token.unsqueeze(1).expand(-1, bank.shape[1], -1)
+            scores = self.trajectory_bank_bilinear(bank, query_bank).squeeze(-1)
+        else:
+            scores = self.trajectory_bank_score(torch.tanh(bank + query_token.unsqueeze(1))).squeeze(-1)
         weights = torch.softmax(scores, dim=-1)
         return (weights.unsqueeze(-1) * bank).sum(dim=1)
 

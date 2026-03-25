@@ -305,7 +305,12 @@ def test_multiview_adapter_constructs_and_runs() -> None:
 
 
 def test_temporal_bank_readouts_construct_and_run() -> None:
-    for mode in ("temporalbank_query_gated", "temporalbank_cross_attention", "temporalbank_query_film"):
+    for mode in (
+        "temporalbank_query_gated",
+        "temporalbank_cross_attention",
+        "temporalbank_query_film",
+        "temporalbank_bilinear",
+    ):
         model = PacketRoutingModel(
             {
                 "num_nodes": 2,
