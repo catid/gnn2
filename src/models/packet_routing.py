@@ -493,6 +493,12 @@ class PacketRoutingModel(nn.Module):
         self.trajectory_bank_route_features = tuple(
             str(name) for name in config.get("trajectory_bank_route_features", [])
         )
+        self.sink_mode = str(config.get("sink_mode", "single"))
+        self.sink_slots = int(config.get("sink_slots", 1))
+        if self.sink_slots <= 0:
+            raise ValueError("sink_slots must be positive.")
+        if self.sink_mode not in {"single", "keyed_mixture"}:
+            raise ValueError("sink_mode must be one of: single, keyed_mixture")
         self.trajectory_bank_use_positional_features = bool(
             config.get("trajectory_bank_use_positional_features", True)
         )
@@ -639,7 +645,13 @@ class PacketRoutingModel(nn.Module):
             )
         else:
             self.release_head = None
-        self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.sink_proj = nn.Linear(self.hidden_dim, self.hidden_dim * self.sink_slots)
+        self.sink_slot_proj = None
+        if self.sink_mode == "keyed_mixture":
+            self.sink_slot_proj = nn.Sequential(
+                nn.LayerNorm(self.hidden_dim),
+                nn.Linear(self.hidden_dim, self.sink_slots),
+            )
         self.query_readout_proj = None
         self.multiview_baseline_proj = None
         self.multiview_query_proj = None
@@ -1009,6 +1021,17 @@ class PacketRoutingModel(nn.Module):
             else:
                 dim += 1
         return dim
+
+    def _sink_features(self, packet_state: torch.Tensor) -> torch.Tensor:
+        projected = self.sink_proj(packet_state)
+        if self.sink_mode == "single":
+            return projected
+        if self.sink_slot_proj is None:
+            raise RuntimeError("sink_slot_proj must be configured for keyed_mixture sink mode.")
+        slot_logits = self.sink_slot_proj(packet_state)
+        slot_weights = torch.softmax(slot_logits, dim=-1)
+        projected = projected.view(*packet_state.shape[:-1], self.sink_slots, self.hidden_dim)
+        return (slot_weights.unsqueeze(-1) * projected).sum(dim=-2)
 
     def _baseline_readout_input_from_query(
         self,
@@ -1983,7 +2006,7 @@ class PacketRoutingModel(nn.Module):
                 hops = hops + forward_mass.sum(dim=1)
                 delays = delays + delay_mass.sum(dim=1)
 
-                exit_features = self.sink_proj(packet_next)
+                exit_features = self._sink_features(packet_next)
                 exit_contrib = (exit_mass.unsqueeze(-1) * exit_features).sum(dim=1)
                 sink_state = sink_state + exit_contrib
                 exit_added = exit_mass.sum(dim=1)
@@ -2130,7 +2153,7 @@ class PacketRoutingModel(nn.Module):
         sink_state_query = sink_state
         residual_mass = packet_masses.sum(dim=1)
         if float(residual_mass.max().detach().cpu()) > 0.0:
-            sink_state = sink_state + (packet_masses.unsqueeze(-1) * self.sink_proj(packet_states)).sum(dim=1)
+            sink_state = sink_state + (packet_masses.unsqueeze(-1) * self._sink_features(packet_states)).sum(dim=1)
             ttl_fail = ttl_fail + residual_mass
             exits = exits + residual_mass
             exit_age_sum = exit_age_sum + (packet_ages.squeeze(-1) * packet_masses).sum(dim=1)

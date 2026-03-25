@@ -27,7 +27,13 @@ class StubCore(nn.Module):
         return node_state, packet_next, logits
 
 
-def make_model(num_nodes: int, max_internal_steps: int) -> PacketRoutingModel:
+def make_model(
+    num_nodes: int,
+    max_internal_steps: int,
+    *,
+    sink_mode: str = "single",
+    sink_slots: int = 1,
+) -> PacketRoutingModel:
     model = PacketRoutingModel(
         {
             "num_nodes": num_nodes,
@@ -37,6 +43,8 @@ def make_model(num_nodes: int, max_internal_steps: int) -> PacketRoutingModel:
             "max_internal_steps": max_internal_steps,
             "max_total_steps": 32,
             "adapter_rank": 0,
+            "sink_mode": sink_mode,
+            "sink_slots": sink_slots,
         }
     )
     model.core = StubCore(hidden_dim=8)
@@ -129,6 +137,27 @@ def test_return_trace_includes_sink_state_views() -> None:
     assert output.trace["final_sink_state"].shape == (1, 8)
     assert output.trace["final_readout_input"].shape == (1, 8)
     assert torch.allclose(output.trace["final_sink_state"], output.sink_state)
+
+
+def test_keyed_mixture_sink_constructs_and_preserves_sink_shapes() -> None:
+    model = make_model(num_nodes=2, max_internal_steps=1, sink_mode="keyed_mixture", sink_slots=4)
+    observations = torch.zeros(1, 2, 2, 16)
+    observations[:, 0, :, 2] = 5.0
+    observations[:, 1, :, 1] = 5.0
+    labels = torch.zeros(1, dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert output.sink_state.shape == (1, 8)
+    assert output.trace is not None
+    assert output.trace["sink_state"].shape == (1, 2, 8)
+    assert output.trace["final_sink_state"].shape == (1, 8)
 
 
 def test_query_conditioned_readout_constructs_and_runs() -> None:

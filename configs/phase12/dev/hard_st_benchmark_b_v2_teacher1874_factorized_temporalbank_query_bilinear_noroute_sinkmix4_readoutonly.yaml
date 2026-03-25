@@ -1,0 +1,9 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_sinkmix4_full.yaml
+
+experiment:
+  seed: 15084
+
+training:
+  trainable_prefixes:
+    - sink_
+    - readout
