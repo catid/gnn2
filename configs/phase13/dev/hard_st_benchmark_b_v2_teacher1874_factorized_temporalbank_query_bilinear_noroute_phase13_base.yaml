@@ -1,0 +1,20 @@
+_base_: ../../phase12/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute.yaml
+
+experiment:
+  seed: 16021
+  results_root: results/phase13_dev
+
+training:
+  selection_eval_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      num_batches: 8
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      num_batches: 8
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      num_batches: 8

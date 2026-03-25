@@ -1,0 +1,5 @@
+_base_: ../../phase12/dev/hard_st_benchmark_b_v2_teacher1879_anchor_queryreadout.yaml
+
+experiment:
+  seed: 16014
+  results_root: results/phase13_anchor

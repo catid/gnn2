@@ -1,0 +1,10 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectproxy_locked.yaml
+
+experiment:
+  seed: 16028
+
+routing:
+  wait_loss_weight: 0.05
+  wait_target_scope: final_query_only
+  wait_positive_weight: 2.0
+  wait_negative_weight: 1.0
