@@ -24,11 +24,13 @@ detailed ledger is in
 - Full-window anchoring plus selection (`16066`) kept the late-route regime
   cleanly, but still confirmed at the old held-confirm ceiling.
 - The live panel work is sharpening this further:
-  `16022` has already produced one strong late-route seed, one badly collapsed
-  late-route content seed, and one middling recovery seed, while `16066` has
-  now banked three acceptable late-route seeds.
+  `16022` has already produced two strong late-route seeds, one badly
+  collapsed late-route content seed, and one middling recovery seed, while
+  `16066` has now banked three strong late-route seeds plus one weaker content
+  dip.
   So Cluster A may contain two different stories:
-  a mixed selection-only path and a cleaner sustained-anchor path.
+  a high-variance selection-only path and a cleaner sustained-anchor path with
+  milder residual variance.
 
 ### B. Stable-To-Upside Continuation Bridge
 

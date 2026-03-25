@@ -64,11 +64,14 @@ The newer `16022` and `16066` exact reruns now reinforce the same conclusion:
 
 But the live panel stress is already more nuanced:
 
-- `16066` has now banked three acceptable late-route seeds,
-- `16022` has one strong seed, one bad late-route content-collapse seed, and
-  one middling late-route recovery seed,
+- `16066` has now banked three strong late-route seeds and one weaker but still
+  late-route seed,
+- `16022` now has two strong seeds, one middling late-route recovery seed, and
+  one bad late-route content-collapse seed,
 - so the remaining instability question is no longer only “shortcut or not”.
-  It may also include weaker non-shortcut content-collapse basins.
+  It may also include weaker non-shortcut content-collapse basins, with `16022`
+  showing the harsher version of that failure mode and `16066` showing a milder
+  version.
 
 ### 2. The held-confirm ceiling still appears separate from stability
 
