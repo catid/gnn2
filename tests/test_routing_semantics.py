@@ -310,6 +310,7 @@ def test_temporal_bank_readouts_construct_and_run() -> None:
         "temporalbank_cross_attention",
         "temporalbank_query_film",
         "temporalbank_bilinear",
+        "temporalbank_latent_pool",
     ):
         model = PacketRoutingModel(
             {

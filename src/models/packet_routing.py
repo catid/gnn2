@@ -489,6 +489,7 @@ class PacketRoutingModel(nn.Module):
         self.trajectory_bank_window = int(config.get("trajectory_bank_window", 8))
         self.trajectory_bank_stride = int(config.get("trajectory_bank_stride", 1))
         self.trajectory_bank_anchor = str(config.get("trajectory_bank_anchor", "final"))
+        self.trajectory_bank_latent_slots = int(config.get("trajectory_bank_latent_slots", 2))
         self.trajectory_bank_route_features = tuple(
             str(name) for name in config.get("trajectory_bank_route_features", [])
         )
@@ -533,6 +534,7 @@ class PacketRoutingModel(nn.Module):
             "temporalbank_query_film",
             "temporalbank_cross_attention",
             "temporalbank_bilinear",
+            "temporalbank_latent_pool",
         }
         self.factorized_readout_modes = {
             "factorized_content_query",
@@ -652,6 +654,7 @@ class PacketRoutingModel(nn.Module):
         self.trajectory_bank_attention = None
         self.trajectory_bank_attention_norm = None
         self.trajectory_bank_ff = None
+        self.trajectory_bank_latents = None
         self.trajectory_bank_score = None
         self.trajectory_bank_bilinear = None
         self.trajectory_bank_film = None
@@ -749,7 +752,7 @@ class PacketRoutingModel(nn.Module):
                     nn.Linear(route_dim, self.hidden_dim),
                     nn.GELU(),
                 )
-            if self.readout_mode == "temporalbank_cross_attention":
+            if self.readout_mode in {"temporalbank_cross_attention", "temporalbank_latent_pool"}:
                 self.trajectory_bank_attention = nn.MultiheadAttention(
                     self.hidden_dim,
                     self.readout_attention_heads,
@@ -762,6 +765,10 @@ class PacketRoutingModel(nn.Module):
                     nn.GELU(),
                     nn.Linear(self.hidden_dim * 2, self.hidden_dim),
                 )
+                if self.readout_mode == "temporalbank_latent_pool":
+                    self.trajectory_bank_latents = nn.Parameter(
+                        torch.randn(self.trajectory_bank_latent_slots, self.hidden_dim) * 0.02
+                    )
             else:
                 if self.readout_mode == "temporalbank_bilinear":
                     self.trajectory_bank_bilinear = nn.Bilinear(self.hidden_dim, self.hidden_dim, 1)
@@ -1218,6 +1225,21 @@ class PacketRoutingModel(nn.Module):
                 latent = self.trajectory_bank_attention_norm(latent + attended.squeeze(1))
                 latent = latent + self.trajectory_bank_ff(latent)
             return latent
+        if self.readout_mode == "temporalbank_latent_pool":
+            latent_bank = self.trajectory_bank_latents.unsqueeze(0).expand(bank.shape[0], -1, -1)
+            latent_bank = latent_bank + query_token.unsqueeze(1)
+            for _ in range(max(1, self.readout_iter_steps)):
+                attended, _ = self.trajectory_bank_attention(
+                    latent_bank,
+                    bank,
+                    bank,
+                    need_weights=False,
+                )
+                latent_bank = self.trajectory_bank_attention_norm(latent_bank + attended)
+                latent_bank = latent_bank + self.trajectory_bank_ff(latent_bank)
+            latent_scores = torch.einsum("bld,bd->bl", latent_bank, query_token)
+            latent_weights = torch.softmax(latent_scores, dim=-1)
+            return (latent_weights.unsqueeze(-1) * latent_bank).sum(dim=1)
         if self.readout_mode == "temporalbank_query_film":
             film_params = self.trajectory_bank_film(query_token)
             gamma, beta = torch.chunk(film_params, 2, dim=-1)
