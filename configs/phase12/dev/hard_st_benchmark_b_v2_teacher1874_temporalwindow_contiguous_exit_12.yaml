@@ -1,0 +1,22 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 15046
+  results_root: results/phase12_dev
+
+model:
+  readout_mode: temporalbank_query_gated
+  readout_base_mode: query_gated
+  trajectory_bank_views:
+    - sink_state
+  trajectory_bank_window: 12
+  trajectory_bank_stride: 1
+  trajectory_bank_anchor: exit
+  trajectory_bank_route_features:
+    - exit_time
+    - action_histogram
+
+training:
+  trainable_prefixes:
+    - readout
+    - trajectory_bank_

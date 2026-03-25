@@ -85,9 +85,28 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1201_temporalwindow_sparse_24_72_seed15042_p1" 1
     wait
     ;;
+  windows_r2)
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1201_temporalwindow_half_24_48.yaml \
+      "${results_root}/hard_st_b_v2_teacher1201_temporalwindow_half_24_48_seed15043_p1" 0
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1201_temporalwindow_half_48_72.yaml \
+      "${results_root}/hard_st_b_v2_teacher1201_temporalwindow_half_48_72_seed15044_p1" 1
+    wait
+    ;;
+  windows_r3)
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1201_temporalwindow_overlap_36_72.yaml \
+      "${results_root}/hard_st_b_v2_teacher1201_temporalwindow_overlap_36_72_seed15045_p1" 0
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1874_temporalwindow_contiguous_exit_12.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_temporalwindow_contiguous_exit_12_seed15046_p1" 1
+    wait
+    ;;
+  windows_r4)
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1821_temporalwindow_sparse_exit_12.yaml \
+      "${results_root}/hard_st_b_v2_teacher1821_temporalwindow_sparse_exit_12_seed15047_p1" 0
+    wait
+    ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|bank|bank_r2a|bank_r2b|bank_r2c|factorized|factorized_r2|factorized_r3|windows]" >&2
+    echo "usage: $0 [results-root] [anchor|bank|bank_r2a|bank_r2b|bank_r2c|factorized|factorized_r2|factorized_r3|windows|windows_r2|windows_r3|windows_r4]" >&2
     exit 1
     ;;
 esac

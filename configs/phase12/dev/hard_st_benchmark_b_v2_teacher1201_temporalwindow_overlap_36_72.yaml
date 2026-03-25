@@ -1,0 +1,22 @@
+_base_: ../../phase11/dev/hard_st_benchmark_b_v2_teacher1201_partialinit_coremem_probeviews_sinkfinal_mlp_headprefixblend_12713_13111_readout_bal95_route05_confirmmix_lockedfqhld_fq4_selectproxy_full_locked_fqacc_longer_lowlr.yaml
+
+experiment:
+  seed: 15045
+  results_root: results/phase12_dev
+
+model:
+  readout_mode: temporalbank_query_gated
+  readout_base_mode: plain
+  trajectory_bank_views:
+    - sink_state
+  trajectory_bank_window: 9
+  trajectory_bank_stride: 1
+  trajectory_bank_anchor: final
+  trajectory_bank_route_features:
+    - exit_time
+    - action_histogram
+
+training:
+  trainable_prefixes:
+    - readout
+    - trajectory_bank_

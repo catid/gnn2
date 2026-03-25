@@ -1,0 +1,22 @@
+_base_: ../../phase10/dev/hard_st_benchmark_b_v2_teacher1821_refine_multiview_sinkpacketbaseline_querygated_fq5_longer_lowlr.yaml
+
+experiment:
+  seed: 15047
+  results_root: results/phase12_dev
+
+model:
+  readout_mode: temporalbank_query_gated
+  readout_base_mode: query_gated
+  trajectory_bank_views:
+    - sink_state
+  trajectory_bank_window: 6
+  trajectory_bank_stride: 2
+  trajectory_bank_anchor: exit
+  trajectory_bank_route_features:
+    - exit_time
+    - delay_fraction
+
+training:
+  trainable_prefixes:
+    - readout
+    - trajectory_bank_
