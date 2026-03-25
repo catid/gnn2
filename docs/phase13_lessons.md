@@ -30,6 +30,13 @@ already stable enough to guide the rest of the campaign.
    instability of the original direct-training path, and the separate held-
    confirm ceiling that remains even after stabilization.
 
+6. “Stable late-route” is not one thing.
+   The live `16022` panel already shows a weaker failure mode:
+   one seed stayed late-route on route and exit while collapsing content badly
+   on the locked slice.
+   So phase 13 now has to distinguish catastrophic shortcut collapse from
+   softer late-route content-collapse basins.
+
 ## Open Questions
 
 1. Do the live `16022` and `16066` panels stay clean across all five seeds, or
