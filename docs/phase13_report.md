@@ -108,5 +108,7 @@ At the time of this draft:
   but high-variance selection-only path,
 - the rerun floor is now cleared by completed `16041_rerun1` and
   `16081_rerun1`,
-- and the only remaining live work is the extra five-seed panel coverage on
-  `16041` and `16081` needed to close the phase-13 verification floor cleanly.
+- the extra `16041` bridge panel is now complete at locked mean
+  `0.9985 / 0.9399 / 121.24`,
+- and the only remaining live work is the final five-seed `16081` refinement
+  panel needed to close the phase-13 verification floor cleanly.
