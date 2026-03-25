@@ -1,7 +1,8 @@
 # Phase 13 Cluster Scorecards
 
-This document is the live phase-13 scorecard. It will be updated as Cluster D
-refinement and Cluster E sanity runs finish. The detailed ledger is in
+This document is the live phase-13 scorecard. The only remaining work is
+verification-floor coverage on the strongest stable `1874` branches. The
+detailed ledger is in
 [phase13_run_matrix.csv](/home/catid/gnn2/docs/phase13_run_matrix.csv).
 
 | Cluster | Half | Best Representative | Current Verdict |
@@ -9,8 +10,8 @@ refinement and Cluster E sanity runs finish. The detailed ledger is in
 | A | fruitful | `16022`, `16064`, `16066` | Strong mapping result. Anti-shortcut stabilization can keep the late-route regime and improve seed stability, but the verified held-confirm frontier still sits near `full_locked fq_acc ~= 0.313`. |
 | B | fruitful | `16041`, `16043`, `16045`, `16072` | Strong mapping result. Conservative continuation from `15051` into the stronger `15057`-style reader clearly stabilizes the late-route basin on `1874`, but verified held-confirm content still falls back to the same ceiling. |
 | C | fruitful | `16055`, `16061_rerun1`, `16062` | Fair negative. Hard-case weighting and basin-aware checkpoint selection improve summary-time late-route slices, but the gains do not survive independent confirm. |
-| D | fruitful | `16081`, `16082` live; `16083`, `16084` queued | In progress. Post-stability refinements are now running on top of the strongest stable bridge boundary `16045`. |
-| E | exploration | `16091`-`16094` queued | In progress. Secondary-source sanity runs are queued behind the live Cluster D deck. |
+| D | fruitful | `16081` | Settled. The best post-stability refinement is real on base behavior but still confirms back to the same held-confirm ceiling. |
+| E | exploration | `16091`-`16094` | Closed. The `1821` carryover did not survive confirm and the `1879` lines stayed proper negatives. |
 | F | exploration gated | not entered | Not yet justified. No stable held-confirm breakthrough exists that would warrant ES polish or a new upstream touch. |
 
 ## Cluster Notes
@@ -42,13 +43,17 @@ refinement and Cluster E sanity runs finish. The detailed ledger is in
 
 ### D. Post-Stability Reader Refinement
 
-- Live.
-- The current tests are deliberately narrow:
-  low-LR delayed-only teacher continuation and low-LR held-confirm-weighted
-  continuation on top of `16045`.
+- Settled.
+- `16081` is the best refinement result and a real stable base-side win on top
+  of `16045`.
+- But even `16081` confirms back to the same held-confirm plateau, so Cluster D
+  did not justify a new frontier beyond the already paneled stable bridge.
 
 ### E. Secondary-Source Sanity
 
-- Queued.
-- The first four runs port the strongest source-agnostic stability selectors to
-  `1821` and the `1879` negative control.
+- Closed.
+- `16092` was the strongest bounded `1821` selector carryover and looked good
+  on summary slices, but confirm fell back to the old medium-source held-
+  confirm regime.
+- `16093` and `16094` stayed in the expected `1879` bad-source regime with no
+  false-positive basin.

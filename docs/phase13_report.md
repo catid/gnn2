@@ -23,8 +23,8 @@ The central phase-13 question is:
 The live ledger is
 [phase13_run_matrix.csv](/home/catid/gnn2/docs/phase13_run_matrix.csv).
 
-This report is being filled in incrementally while Cluster D and Cluster E are
-still running. The final version will summarize:
+This report is being filled in incrementally while the remaining verification
+panels and reruns are still running. The final version will summarize:
 
 - total substantive runs,
 - anchors,
@@ -38,7 +38,7 @@ still running. The final version will summarize:
 
 ### 1. Conservative continuation clearly stabilizes the late-route basin
 
-The strongest current result is the `16045` bridge family from stable
+The strongest current stable family is still the `16045` bridge from stable
 `15051` readout weights into the stronger `15057`-style factorized reader. Its
 completed five-seed panel shows:
 
@@ -53,6 +53,14 @@ The important result is qualitative:
 - none reproduced the old catastrophic shortcut collapse,
 - and the continuation path is therefore materially more stable than the
   original direct `15057` training story.
+
+The newer `16022` and `16066` exact reruns now reinforce the same conclusion:
+
+- `16022_rerun1` cleanly reproduced the intended selection-only late-route
+  basin,
+- `16066_rerun1` cleanly reproduced the sustained-anchor late-route basin,
+- and the first live seeds from both follow-on five-seed panels are also clean
+  late-route seeds rather than shortcut relapses.
 
 ### 2. The held-confirm ceiling still appears separate from stability
 
@@ -78,7 +86,9 @@ frontier. That means checkpoint selection alone is not the missing ingredient.
 
 At the time of this draft:
 
-- Cluster D refinement runs `16081` and `16082` are live,
-- `16083` and `16084` are queued,
-- Cluster E sanity runs `16091`-`16094` are queued,
-- and the report will be finalized once those bounded follow-ups are complete.
+- Cluster D is settled around `16081` as the best refinement result,
+- Cluster E is closed as a bounded portability / negative-control sanity map,
+- two new five-seed `1874` panels are live on `16022` and `16066`,
+- and the next queued verification tranche is the remaining rerun / panel
+  coverage on `16041` and `16081` needed to clear the phase-13 verification
+  floor.
