@@ -18,9 +18,10 @@ This is a live handoff note and will be finalized when phase 13 closes.
 - Whether hard-case mining or held-confirm-aware selection helped:
   only at summary time. Those gains have not survived independent confirm.
 - Current live verification read:
-  the `16066` sustained-anchor panel has now banked two clean late-route seeds,
-  while the `16022` selection-only panel is already mixed: one strong seed and
-  one late-route seed with badly collapsed locked-slice content.
+  the `16066` sustained-anchor panel has now banked three acceptable late-route
+  seeds, while the `16022` selection-only panel is clearly high-variance: one
+  strong seed, one late-route seed with badly collapsed locked-slice content,
+  and one middling late-route recovery seed.
 - Whether any recipe transferred to `1821` / `1842`:
   weakly at best. Cluster E is now closed and the `1821` selector carryover
   fell back to the old medium-source held-confirm regime under confirm.

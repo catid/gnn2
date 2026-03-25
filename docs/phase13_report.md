@@ -64,9 +64,9 @@ The newer `16022` and `16066` exact reruns now reinforce the same conclusion:
 
 But the live panel stress is already more nuanced:
 
-- `16066` has now banked two acceptable late-route seeds,
-- `16022` has one strong seed and one seed that stayed late-route on route and
-  exit while collapsing content badly on the locked slice,
+- `16066` has now banked three acceptable late-route seeds,
+- `16022` has one strong seed, one bad late-route content-collapse seed, and
+  one middling late-route recovery seed,
 - so the remaining instability question is no longer only “shortcut or not”.
   It may also include weaker non-shortcut content-collapse basins.
 
