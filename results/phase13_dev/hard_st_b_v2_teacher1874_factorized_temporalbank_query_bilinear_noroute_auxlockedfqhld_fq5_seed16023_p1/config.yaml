@@ -1,0 +1,25 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectproxy_locked.yaml
+
+experiment:
+  seed: 16023
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.4
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.3
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      loss_weight: 0.3
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25

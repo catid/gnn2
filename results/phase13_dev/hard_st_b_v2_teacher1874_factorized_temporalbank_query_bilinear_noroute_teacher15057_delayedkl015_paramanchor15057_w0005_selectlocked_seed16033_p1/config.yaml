@@ -1,0 +1,15 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_selectlocked.yaml
+
+experiment:
+  seed: 16033
+
+parameter_anchor:
+  run_dir: results/phase12_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_seed15057_p1
+  include_prefixes:
+    - readout
+    - factorized_
+    - trajectory_bank_
+  weight: 0.0005
+  start_step: 0
+  stop_step: 384
+  normalize: true

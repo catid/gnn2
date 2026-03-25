@@ -1,0 +1,14 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_phase13_base.yaml
+
+experiment:
+  seed: 16052
+
+training:
+  selection_metric_mode: lexicographic
+  selection_metric_terms:
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.exit_time
+      minimum: 115
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+    - path: selection_eval.finalquery_heavy.per_mode.delay_to_final_query.accuracy
+    - path: per_mode.delay_to_final_query.accuracy
+    - path: accuracy

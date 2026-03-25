@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectgeo_val_locked_route.yaml
+
+experiment:
+  seed: 16057
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 1.0
+      final_query_weight: 8.0
+      non_final_query_weight: 0.25

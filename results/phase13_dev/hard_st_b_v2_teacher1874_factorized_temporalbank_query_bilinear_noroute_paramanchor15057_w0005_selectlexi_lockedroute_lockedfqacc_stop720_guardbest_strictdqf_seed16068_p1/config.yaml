@@ -1,0 +1,17 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlexi_lockedroute_lockedfqacc_stop720.yaml
+
+experiment:
+  seed: 16068
+
+training:
+  stability_guard:
+    start_step: 431
+    checks:
+      - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+        minimum: 0.97
+      - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+        minimum: 0.93
+      - path: selection_eval.full_locked.per_mode.delay_to_final_query.exit_time
+        minimum: 120.5
+    max_consecutive_violations: 1
+    cooldown_evals: 1

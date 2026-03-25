@@ -1,0 +1,44 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectgeo_val_locked_route.yaml
+
+experiment:
+  seed: 16054
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.34
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.33
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      loss_weight: 0.33
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+
+teacher:
+  run_dir: results/phase12_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_seed15057_p1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: delayed_only
+  logits_weight: 0.10
+  route_weight: 0.0
+  route_action_weight: 0.0
+  control_prob_weight: 0.0
+  release_prob_weight: 0.0
+  wait_prob_weight: 0.0
+  control_state_weight: 0.0
+  memory_read_weight: 0.0
+  start_step: 0
+  stop_step: 384
+  scale_start: 1.0
+  scale_end: 1.0

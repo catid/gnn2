@@ -1,16 +1,14 @@
 # Phase 13 Cluster Scorecards
 
-This document is the live phase-13 scorecard. The only remaining work is
-verification-floor coverage on the strongest stable `1874` branches. The
-detailed ledger is in
+This document is the final phase-13 scorecard. The detailed ledger is in
 [phase13_run_matrix.csv](/home/catid/gnn2/docs/phase13_run_matrix.csv).
 
 | Cluster | Half | Best Representative | Current Verdict |
 | --- | --- | --- | --- |
 | A | fruitful | `16022`, `16064`, `16066` | Strong mapping result. Anti-shortcut stabilization can keep the late-route regime and improve seed stability, but the verified held-confirm frontier still sits near `full_locked fq_acc ~= 0.313`. The completed panel contrast is now sharp: `16022` is high-variance at locked mean `0.8530 / 0.9399 / 121.29`, while `16066` is the cleaner sustained-anchor family at `0.9557 / 0.9391 / 121.34`. |
-| B | fruitful | `16041`, `16043`, `16045`, `16072` | Strong mapping result. Conservative continuation from `15051` into the stronger `15057`-style reader clearly stabilizes the late-route basin on `1874`, but verified held-confirm content still falls back to the same ceiling. |
+| B | fruitful | `16041`, `16043`, `16045`, `16072` | Strong mapping result. Conservative continuation from `15051` into the stronger `15057`-style reader clearly stabilizes the late-route basin on `1874`. `16045` is the best fully paneled stable control at locked mean `0.9965 / 0.9460 / 121.86`, and `16041` provides a second stable bridge panel at `0.9985 / 0.9399 / 121.24`, but verified held-confirm content still falls back to the same ceiling. |
 | C | fruitful | `16055`, `16061_rerun1`, `16062` | Fair negative. Hard-case weighting and basin-aware checkpoint selection improve summary-time late-route slices, but the gains do not survive independent confirm. |
-| D | fruitful | `16081` | Settled. The best post-stability refinement is real on base behavior but still confirms back to the same held-confirm ceiling. |
+| D | fruitful | `16081` | Settled. The best post-stability refinement is real on base behavior; its completed panel finished at `0.9998 / 0.9410 / 121.44`, but it still confirms back to the same held-confirm ceiling and does not displace `16045` as the cleaner stable control. |
 | E | exploration | `16091`-`16094` | Closed. The `1821` carryover did not survive confirm and the `1879` lines stayed proper negatives. |
 | F | exploration gated | not entered | Not yet justified. No stable held-confirm breakthrough exists that would warrant ES polish or a new upstream touch. |
 
@@ -53,6 +51,9 @@ detailed ledger is in
 - Settled.
 - `16081` is the best refinement result and a real stable base-side win on top
   of `16045`.
+- Its completed five-seed panel finished at locked mean
+  `0.9998 / 0.9410 / 121.44`: content stayed saturated across all five seeds,
+  while route and exit softened mildly relative to `16045`.
 - But even `16081` confirms back to the same held-confirm plateau, so Cluster D
   did not justify a new frontier beyond the already paneled stable bridge.
 

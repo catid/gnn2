@@ -1,0 +1,5 @@
+_base_: ../../phase12/dev/hard_st_benchmark_b_v2_teacher1821_factorized_temporalbank_query_bilinear_noroute.yaml
+
+experiment:
+  seed: 16013
+  results_root: results/phase13_anchor

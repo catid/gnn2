@@ -1,0 +1,14 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_phase13_base.yaml
+
+experiment:
+  seed: 16051
+
+training:
+  selection_metric_mode: weighted_geomean
+  selection_metric_terms:
+    - path: per_mode.delay_to_final_query.accuracy
+      weight: 1.0
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+      weight: 1.0
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      weight: 2.0

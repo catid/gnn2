@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectgeo_val_locked_route.yaml
+
+experiment:
+  seed: 16053
+
+training:
+  auxiliary_train_benchmarks:
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25

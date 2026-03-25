@@ -20,19 +20,18 @@ The central phase-13 question is:
 
 ## Campaign Coverage
 
-The live ledger is
+The ledger is
 [phase13_run_matrix.csv](/home/catid/gnn2/docs/phase13_run_matrix.csv).
 
-This report is being filled in incrementally while the remaining verification
-panels and reruns are still running. The final version will summarize:
+This final ledger covers the full phase-13 campaign:
 
-- total substantive runs,
-- anchors,
-- reruns,
-- confirmations,
-- seed panels,
-- source coverage,
-- and the final positive vs strong-mapping exit decision.
+- 81 launched runs recorded in the matrix,
+- 8 exact reruns or rerun-style reproductions,
+- 13 locked confirmation evaluations,
+- 5 completed five-seed panel roots,
+- strong-source work on `1874`,
+- bounded sanity on `1821` and `1879`,
+- and a final strong-mapping exit rather than a positive ceiling-break.
 
 ## Current Headline Findings
 
@@ -97,18 +96,21 @@ The strongest examples, `16055` and `16061_rerun1`, improved summary-time
 locked-route slices but independently verified back to the same held-confirm
 frontier. That means checkpoint selection alone is not the missing ingredient.
 
-## Live Work
+## Final Verification Read
 
-At the time of this draft:
+At close:
 
-- Cluster D is settled around `16081` as the best refinement result,
-- Cluster E is closed as a bounded portability / negative-control sanity map,
-- the `16022` and `16066` five-seed `1874` panels are now complete,
-- `16066` is the cleaner current Cluster A leader while `16022` remains a real
-  but high-variance selection-only path,
-- the rerun floor is now cleared by completed `16041_rerun1` and
-  `16081_rerun1`,
-- the extra `16041` bridge panel is now complete at locked mean
-  `0.9985 / 0.9399 / 121.24`,
-- and the only remaining live work is the final five-seed `16081` refinement
-  panel needed to close the phase-13 verification floor cleanly.
+- Cluster D is settled around `16081`. Its exact rerun reproduced cleanly and
+  its five-seed panel finished at locked mean `0.9998 / 0.9410 / 121.44`.
+- Relative to `16045`, `16081` adds content while softening route and exit, so
+  it is a real stable refinement rather than a new stable control.
+- The completed `1874` panel roots are now `16045`, `16022`, `16066`, `16041`,
+  and `16081`.
+- Conservative continuation and sustained anchoring are enough to keep the late-
+  route regime alive across panels without recreating the old catastrophic
+  shortcut story.
+- Every independently confirmed branch still falls back to the same held-
+  confirm plateau near `full_locked 0.648 / 0.313 / 0.877 / 115.49`.
+- Phase 13 therefore closes as a strong mapping exit: shortcut instability is
+  no longer the main blocker by itself; the remaining bottleneck is held-
+  confirm content recovery after stability is already improved.

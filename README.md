@@ -226,6 +226,26 @@ Best current phase-12 high-base factorized reader family:
   later drifted into an early-exit shortcut regime, so this family is a strong
   mapping result rather than a robust new ceiling-breaker
 
+Best current phase-13 stable late-route control:
+
+- [stable bridge 16045 family](/home/catid/gnn2/results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_15051readout_15057extras_selectlocked_seed16045_p1)
+  selected full-locked five-seed mean `0.9965 / 0.9460 / 121.86`
+  for `fq_acc / fq_route / fq_exit`
+
+Best current phase-13 stable refinement:
+
+- [refinement 16081 family](/home/catid/gnn2/results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_resume16045_teacher15057_delayedkl010_selectlocked_lowlr_seed16081_p1)
+  selected full-locked five-seed mean `0.9998 / 0.9410 / 121.44`
+  for `fq_acc / fq_route / fq_exit`; it adds content on top of `16045` but
+  softens route and exit
+
+Phase-13 conclusion:
+
+- stabilization and continuation are enough to keep the late-route regime alive
+  across reruns and panels, but confirmed held-confirm metrics still sit near
+  `0.648 / 0.313 / 0.877 / 115.49`, so the remaining bottleneck now looks more
+  like held-confirm content recovery than catastrophic shortcut instability
+
 ## Phase 7 Commands
 
 Phase 7 focused on keepalive-basin discovery, staged recovery, ES role mapping,

@@ -1,0 +1,19 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectproxy_locked.yaml
+
+experiment:
+  seed: 16046
+
+partial_init:
+  sources:
+    - run_dir: results/phase12_dev/hard_st_b_v2_teacher1874_temporalbank_sinkreadout_bilinear_exit_routehist_seed15051_p1
+      weight: 0.5
+      include_prefixes:
+        - readout
+    - run_dir: results/phase12_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_seed15057_p1
+      weight: 0.5
+      include_prefixes:
+        - readout
+    - run_dir: results/phase12_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_seed15057_p1
+      include_prefixes:
+        - factorized_
+        - trajectory_bank_

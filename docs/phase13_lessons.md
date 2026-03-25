@@ -1,7 +1,6 @@
 # Phase 13 Lessons
 
-This is a live phase-13 lessons document. It captures conclusions that are
-already stable enough to guide the rest of the campaign.
+This is the final phase-13 lessons document.
 
 ## Current Lessons
 
@@ -20,9 +19,9 @@ already stable enough to guide the rest of the campaign.
    real and still disappear under independent confirm.
 
 4. The strongest current control is a bridge, not a direct regularizer.
-   `16045` is more informative than any single trust-region or hard-case
-   weighting variant because it preserves the late-route regime across a full
-   five-seed panel.
+   `16045` and the extra `16041` panel are more informative than any single
+   trust-region or hard-case weighting variant because both preserve the late-
+   route regime across full five-seed panels.
 
 5. The phase-12 shortcut-collapse story is now narrower.
    The original `15057_rerun1` collapse did not cleanly reproduce on the current
@@ -38,13 +37,15 @@ already stable enough to guide the rest of the campaign.
    So phase 13 now has to distinguish catastrophic shortcut collapse from
    softer late-route content-collapse basins.
 
-## Open Questions
+7. Post-stability refinement improves content more readily than route/exit.
+   The completed `16081` panel stayed fully late-route and pushed content near
+   saturation at `0.9998 / 0.9410 / 121.44`, but it still softened route and
+   exit relative to `16045` and still did not move the held-confirm ceiling.
 
-1. Do the queued `16041` and `16081` reruns reproduce as cleanly as the new
-   `16022` and `16066` reruns or do they expose another softer content-collapse
-   mode?
-2. Once the current verification floor is complete, does the remaining ceiling
-   look fundamentally like content capacity rather than stability?
-3. Are the queued `16041` and `16081` reruns / panels enough to close phase 13
-   cleanly, or does one more stable `1874` family still need full verification
-   to make the final map defensible?
+## Next Experiment
+
+1. Keep the `16045` stabilization recipe fixed and add a narrow content-focused
+   auxiliary or distillation target on the factorized content branch only.
+   Phase 13 already showed that stability is no longer the main unknown. The
+   next clean question is whether explicit content supervision can move held-
+   confirm recovery without giving back late-route fidelity.
