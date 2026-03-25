@@ -304,6 +304,85 @@ def test_multiview_adapter_constructs_and_runs() -> None:
     assert output.trace["final_readout_input"].shape == (2, 4)
 
 
+def test_temporal_bank_readouts_construct_and_run() -> None:
+    for mode in ("temporalbank_query_gated", "temporalbank_cross_attention", "temporalbank_query_film"):
+        model = PacketRoutingModel(
+            {
+                "num_nodes": 2,
+                "obs_dim": 8,
+                "hidden_dim": 4,
+                "num_classes": 3,
+                "max_internal_steps": 1,
+                "max_total_steps": 8,
+                "adapter_rank": 0,
+                "readout_mode": mode,
+                "readout_base_mode": "query_gated",
+                "trajectory_bank_views": ["sink_state", "temporal_baseline_readout"],
+                "trajectory_bank_window": 3,
+                "trajectory_bank_anchor": "exit",
+                "trajectory_bank_route_features": ["exit_time", "action_histogram"],
+                "readout_attention_heads": 1,
+            }
+        )
+        observations = torch.zeros(2, 4, 2, 8)
+        observations[:, -1, 0, 1] = 1.0
+        labels = torch.zeros(2, dtype=torch.long)
+
+        output = model(
+            observations=observations,
+            labels=labels,
+            route_mode="hard",
+            compute_penalties={},
+            return_trace=True,
+        )
+
+        assert output.logits.shape == (2, 3)
+        assert output.trace is not None
+        assert output.trace["sink_state"].shape == (2, 4, 4)
+        assert output.trace["final_readout_input"].shape == (2, 4)
+
+
+def test_factorized_readouts_construct_and_run() -> None:
+    for content_source, combiner in (
+        ("final_sink_state", "concat"),
+        ("trajectory_bank", "gated"),
+    ):
+        model = PacketRoutingModel(
+            {
+                "num_nodes": 2,
+                "obs_dim": 8,
+                "hidden_dim": 4,
+                "num_classes": 3,
+                "max_internal_steps": 1,
+                "max_total_steps": 8,
+                "adapter_rank": 0,
+                "readout_mode": "factorized_content_query",
+                "factorized_content_source": content_source,
+                "factorized_combiner_mode": combiner,
+                "readout_base_mode": "query_gated",
+                "trajectory_bank_views": ["sink_state"],
+                "trajectory_bank_window": 3,
+                "trajectory_bank_anchor": "final",
+                "trajectory_bank_route_features": ["action_histogram"],
+            }
+        )
+        observations = torch.zeros(2, 4, 2, 8)
+        observations[:, -1, 0, 2] = 1.0
+        labels = torch.zeros(2, dtype=torch.long)
+
+        output = model(
+            observations=observations,
+            labels=labels,
+            route_mode="hard",
+            compute_penalties={},
+            return_trace=True,
+        )
+
+        assert output.logits.shape == (2, 3)
+        assert output.trace is not None
+        assert output.trace["final_readout_input"].shape == (2, 4)
+
+
 def test_delay_hold_mode_preserves_packet_state() -> None:
     model = PacketRoutingModel(
         {

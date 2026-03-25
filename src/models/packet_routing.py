@@ -479,6 +479,24 @@ class PacketRoutingModel(nn.Module):
                 ["final_sink_state", "packet_state_query"],
             )
         )
+        self.trajectory_bank_views = tuple(
+            str(name)
+            for name in config.get(
+                "trajectory_bank_views",
+                ["sink_state"],
+            )
+        )
+        self.trajectory_bank_window = int(config.get("trajectory_bank_window", 8))
+        self.trajectory_bank_stride = int(config.get("trajectory_bank_stride", 1))
+        self.trajectory_bank_anchor = str(config.get("trajectory_bank_anchor", "final"))
+        self.trajectory_bank_route_features = tuple(
+            str(name) for name in config.get("trajectory_bank_route_features", [])
+        )
+        self.trajectory_bank_use_positional_features = bool(
+            config.get("trajectory_bank_use_positional_features", True)
+        )
+        self.factorized_content_source = str(config.get("factorized_content_source", "final_sink_state"))
+        self.factorized_combiner_mode = str(config.get("factorized_combiner_mode", "concat"))
         self.query_offset = int(config.get("query_offset", -1))
         self.query_cardinality = int(config.get("query_cardinality", 0))
         self.readout_iter_steps = int(config.get("readout_iter_steps", 1))
@@ -503,6 +521,14 @@ class PacketRoutingModel(nn.Module):
             "multiview_query_gated",
             "multiview_query_film",
             "multiview_cross_attention",
+        }
+        self.temporal_bank_readout_modes = {
+            "temporalbank_query_gated",
+            "temporalbank_query_film",
+            "temporalbank_cross_attention",
+        }
+        self.factorized_readout_modes = {
+            "factorized_content_query",
         }
         self.core = NodeCore(
             obs_dim=self.obs_dim,
@@ -613,6 +639,20 @@ class PacketRoutingModel(nn.Module):
         self.multiview_attention_norm = None
         self.multiview_ff = None
         self.multiview_adapter = None
+        self.trajectory_bank_view_proj = None
+        self.trajectory_bank_query_proj = None
+        self.trajectory_bank_route_proj = None
+        self.trajectory_bank_attention = None
+        self.trajectory_bank_attention_norm = None
+        self.trajectory_bank_ff = None
+        self.trajectory_bank_score = None
+        self.trajectory_bank_film = None
+        self.factorized_query_proj = None
+        self.factorized_content_proj = None
+        self.factorized_combiner = None
+        self.factorized_gate = None
+        self.factorized_bilinear = None
+        self.factorized_film = None
         self.multiview_view_dropout = (
             nn.Dropout(self.readout_view_dropout)
             if self.readout_view_dropout > 0.0
@@ -620,9 +660,13 @@ class PacketRoutingModel(nn.Module):
         )
         self.readout_adapter = None
         effective_base_mode = (
-            self.readout_mode
-            if self.readout_mode not in self.multiview_readout_modes
-            else self.readout_base_mode
+            self.readout_base_mode
+            if (
+                self.readout_mode in self.multiview_readout_modes
+                or self.readout_mode in self.temporal_bank_readout_modes
+                or self.readout_mode in self.factorized_readout_modes
+            )
+            else self.readout_mode
         )
         if self.readout_mode == "plain":
             readout_input_dim = self.hidden_dim
@@ -651,6 +695,149 @@ class PacketRoutingModel(nn.Module):
                     "probe_query_views requires positive query_cardinality and non-negative query_offset."
                 )
             readout_input_dim = (self.hidden_dim * len(self.readout_views)) + self.query_cardinality
+        elif self.readout_mode in self.temporal_bank_readout_modes:
+            if effective_base_mode == "query_conditioned":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+                self.multiview_baseline_proj = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim * 2),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                    nn.GELU(),
+                )
+            elif effective_base_mode == "query_gated":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                )
+            elif effective_base_mode == "query_film":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim * 2),
+                )
+            elif effective_base_mode != "plain":
+                raise ValueError(f"Unknown readout_base_mode: {effective_base_mode}")
+            bank_input_dim = (self.hidden_dim * len(self.trajectory_bank_views)) + (
+                2 if self.trajectory_bank_use_positional_features else 0
+            )
+            self.trajectory_bank_view_proj = nn.Sequential(
+                nn.LayerNorm(bank_input_dim),
+                nn.Linear(bank_input_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            self.trajectory_bank_query_proj = nn.Sequential(
+                nn.LayerNorm(self.obs_dim),
+                nn.Linear(self.obs_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            route_dim = self._trajectory_route_feature_dim()
+            if route_dim > 0:
+                self.trajectory_bank_route_proj = nn.Sequential(
+                    nn.LayerNorm(route_dim),
+                    nn.Linear(route_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+            if self.readout_mode == "temporalbank_cross_attention":
+                self.trajectory_bank_attention = nn.MultiheadAttention(
+                    self.hidden_dim,
+                    self.readout_attention_heads,
+                    batch_first=True,
+                )
+                self.trajectory_bank_attention_norm = nn.LayerNorm(self.hidden_dim)
+                self.trajectory_bank_ff = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim),
+                    nn.Linear(self.hidden_dim, self.hidden_dim * 2),
+                    nn.GELU(),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                )
+            else:
+                self.trajectory_bank_score = nn.Linear(self.hidden_dim, 1)
+                if self.readout_mode == "temporalbank_query_film":
+                    self.trajectory_bank_film = nn.Linear(self.hidden_dim, self.hidden_dim * 2)
+            readout_input_dim = self.hidden_dim
+        elif self.readout_mode in self.factorized_readout_modes:
+            if effective_base_mode == "query_conditioned":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+                self.multiview_baseline_proj = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim * 2),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                    nn.GELU(),
+                )
+            elif effective_base_mode == "query_gated":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                )
+            elif effective_base_mode == "query_film":
+                self.query_readout_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim * 2),
+                )
+            elif effective_base_mode != "plain":
+                raise ValueError(f"Unknown readout_base_mode: {effective_base_mode}")
+            if self.factorized_content_source == "trajectory_bank":
+                bank_input_dim = (self.hidden_dim * len(self.trajectory_bank_views)) + (
+                    2 if self.trajectory_bank_use_positional_features else 0
+                )
+                self.trajectory_bank_view_proj = nn.Sequential(
+                    nn.LayerNorm(bank_input_dim),
+                    nn.Linear(bank_input_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+                self.trajectory_bank_query_proj = nn.Sequential(
+                    nn.LayerNorm(self.obs_dim),
+                    nn.Linear(self.obs_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+                route_dim = self._trajectory_route_feature_dim()
+                if route_dim > 0:
+                    self.trajectory_bank_route_proj = nn.Sequential(
+                        nn.LayerNorm(route_dim),
+                        nn.Linear(route_dim, self.hidden_dim),
+                        nn.GELU(),
+                    )
+                self.trajectory_bank_score = nn.Linear(self.hidden_dim, 1)
+            self.factorized_query_proj = nn.Sequential(
+                nn.LayerNorm(self.obs_dim),
+                nn.Linear(self.obs_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            self.factorized_content_proj = nn.Sequential(
+                nn.LayerNorm(self.hidden_dim),
+                nn.Linear(self.hidden_dim, self.hidden_dim),
+                nn.GELU(),
+            )
+            if self.factorized_combiner_mode == "concat":
+                self.factorized_combiner = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim * 2),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                    nn.GELU(),
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                    nn.GELU(),
+                )
+            elif self.factorized_combiner_mode == "gated":
+                self.factorized_gate = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim),
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                )
+                self.factorized_combiner = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim * 2),
+                    nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+                    nn.GELU(),
+                )
+            elif self.factorized_combiner_mode == "bilinear":
+                self.factorized_bilinear = nn.Bilinear(self.hidden_dim, self.hidden_dim, self.hidden_dim)
+            elif self.factorized_combiner_mode == "film":
+                self.factorized_film = nn.Linear(self.hidden_dim, self.hidden_dim * 2)
+            else:
+                raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
+            readout_input_dim = self.hidden_dim
         elif self.readout_mode in self.multiview_readout_modes:
             if effective_base_mode == "query_conditioned":
                 self.query_readout_proj = nn.Sequential(
@@ -787,17 +974,30 @@ class PacketRoutingModel(nn.Module):
         else:
             raise ValueError(f"Unknown readout_head_mode: {self.readout_head_mode}")
 
-    def _baseline_readout_input(
+    def _trajectory_route_feature_dim(self) -> int:
+        dim = 0
+        for name in self.trajectory_bank_route_features:
+            if name in {"action_histogram", "route_action_histogram"}:
+                dim += len(ACTION_NAMES)
+            else:
+                dim += 1
+        return dim
+
+    def _baseline_readout_input_from_query(
         self,
         sink_state: torch.Tensor,
-        observations: torch.Tensor,
+        query_obs: torch.Tensor,
         *,
         for_multiview: bool = False,
     ) -> torch.Tensor:
-        query_obs = observations[:, -1, 0]
         mode = (
             self.readout_mode
-            if self.readout_mode not in self.multiview_readout_modes and self.readout_mode != "probe_query_views"
+            if (
+                self.readout_mode not in self.multiview_readout_modes
+                and self.readout_mode not in self.temporal_bank_readout_modes
+                and self.readout_mode not in self.factorized_readout_modes
+                and self.readout_mode != "probe_query_views"
+            )
             else self.readout_base_mode
         )
         if mode == "plain":
@@ -821,6 +1021,20 @@ class PacketRoutingModel(nn.Module):
             return sink_state * (1.0 + torch.tanh(gamma)) + beta
         raise ValueError(f"Unknown baseline readout mode: {mode}")
 
+    def _baseline_readout_input(
+        self,
+        sink_state: torch.Tensor,
+        observations: torch.Tensor,
+        *,
+        for_multiview: bool = False,
+    ) -> torch.Tensor:
+        query_obs = observations[:, -1, 0]
+        return self._baseline_readout_input_from_query(
+            sink_state,
+            query_obs,
+            for_multiview=for_multiview,
+        )
+
     def _query_one_hot_view(self, observations: torch.Tensor) -> torch.Tensor:
         end = self.query_offset + self.query_cardinality
         if self.query_offset < 0 or self.query_cardinality <= 0 or end > self.obs_dim:
@@ -838,6 +1052,209 @@ class PacketRoutingModel(nn.Module):
         if self.readout_adapter is None or fused.shape[-1] != self.hidden_dim:
             return fused
         return fused + self.readout_adapter(fused)
+
+    def _trajectory_anchor_index(
+        self,
+        *,
+        trace: dict[str, torch.Tensor],
+        first_exit_time: torch.Tensor,
+        seq_len: int,
+    ) -> torch.Tensor:
+        anchor = self.trajectory_bank_anchor
+        if anchor in {"final", "final_query"}:
+            index = torch.full_like(first_exit_time, seq_len - 1)
+        elif anchor == "exit":
+            index = first_exit_time.round()
+        elif anchor == "delay_peak":
+            index = trace["action_mass"][:, :, ACTION_DELAY].argmax(dim=1).to(first_exit_time.dtype)
+        else:
+            raise ValueError(f"Unknown trajectory_bank_anchor: {anchor}")
+        return index.clamp_(0.0, float(seq_len - 1)).long()
+
+    def _trajectory_route_features(
+        self,
+        *,
+        first_exit_time: torch.Tensor,
+        delays: torch.Tensor,
+        action_totals: torch.Tensor,
+        route_entropy_sum: torch.Tensor,
+        route_conf_sum: torch.Tensor,
+        route_weight_total: torch.Tensor,
+        seq_len: int,
+        eps: torch.Tensor,
+    ) -> torch.Tensor | None:
+        if not self.trajectory_bank_route_features:
+            return None
+        features: list[torch.Tensor] = []
+        for name in self.trajectory_bank_route_features:
+            if name == "exit_time":
+                features.append((first_exit_time / max(1, seq_len - 1)).unsqueeze(-1))
+            elif name in {"delay_fraction", "delay_counts"}:
+                features.append((delays / max(1, seq_len)).unsqueeze(-1))
+            elif name in {"action_histogram", "route_action_histogram"}:
+                histogram = action_totals / action_totals.sum(dim=-1, keepdim=True).clamp_min(float(eps))
+                features.append(histogram)
+            elif name == "route_entropy":
+                features.append((route_entropy_sum / route_weight_total.clamp_min(float(eps))).unsqueeze(-1))
+            elif name == "route_confidence":
+                features.append((route_conf_sum / route_weight_total.clamp_min(float(eps))).unsqueeze(-1))
+            else:
+                raise ValueError(f"Unknown trajectory bank route feature: {name}")
+        return torch.cat(features, dim=-1)
+
+    def _select_temporal_bank(
+        self,
+        *,
+        trace: dict[str, torch.Tensor],
+        observations: torch.Tensor,
+        first_exit_time: torch.Tensor,
+        delays: torch.Tensor,
+        action_totals: torch.Tensor,
+        route_entropy_sum: torch.Tensor,
+        route_conf_sum: torch.Tensor,
+        route_weight_total: torch.Tensor,
+        eps: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        batch_size, seq_len = observations.shape[:2]
+        device = observations.device
+        dtype = observations.dtype
+        anchor_idx = self._trajectory_anchor_index(
+            trace=trace,
+            first_exit_time=first_exit_time,
+            seq_len=seq_len,
+        )
+        query_obs = observations[:, -1, 0]
+
+        view_tensors: list[torch.Tensor] = []
+        for name in self.trajectory_bank_views:
+            if name == "sink_state":
+                view_tensors.append(trace["sink_state"])
+            elif name == "packet_state":
+                view_tensors.append(trace["packet_state"])
+            elif name == "temporal_baseline_readout":
+                query_seq = query_obs.unsqueeze(1).expand(-1, seq_len, -1)
+                view_tensors.append(
+                    self._baseline_readout_input_from_query(
+                        trace["sink_state"],
+                        query_seq,
+                        for_multiview=False,
+                    )
+                )
+            else:
+                raise ValueError(f"Unknown trajectory bank view: {name}")
+        bank_input = torch.cat(view_tensors, dim=-1)
+        if self.trajectory_bank_use_positional_features:
+            position = torch.linspace(0.0, 1.0, steps=seq_len, device=device, dtype=dtype).view(1, seq_len, 1)
+            relative = (
+                torch.arange(seq_len, device=device, dtype=dtype).view(1, seq_len)
+                - anchor_idx.to(dtype).unsqueeze(1)
+            ) / max(1, seq_len - 1)
+            bank_input = torch.cat(
+                [
+                    bank_input,
+                    position.expand(batch_size, -1, -1),
+                    relative.unsqueeze(-1),
+                ],
+                dim=-1,
+            )
+        bank = self.trajectory_bank_view_proj(bank_input)
+        window = max(1, min(self.trajectory_bank_window, seq_len))
+        stride = max(1, self.trajectory_bank_stride)
+        offsets = torch.arange(window, device=device)
+        offsets = (window - 1 - offsets) * stride
+        gather_index = (anchor_idx.unsqueeze(1) - offsets.unsqueeze(0)).clamp_(0, seq_len - 1)
+        bank = bank.gather(1, gather_index.unsqueeze(-1).expand(-1, -1, bank.shape[-1]))
+        route_features = self._trajectory_route_features(
+            first_exit_time=first_exit_time,
+            delays=delays,
+            action_totals=action_totals,
+            route_entropy_sum=route_entropy_sum,
+            route_conf_sum=route_conf_sum,
+            route_weight_total=route_weight_total,
+            seq_len=seq_len,
+            eps=eps,
+        )
+        return bank, route_features
+
+    def _temporal_bank_context(
+        self,
+        *,
+        bank: torch.Tensor,
+        query_obs: torch.Tensor,
+        route_features: torch.Tensor | None,
+    ) -> torch.Tensor:
+        query_token = self.trajectory_bank_query_proj(query_obs)
+        if route_features is not None:
+            query_token = query_token + self.trajectory_bank_route_proj(route_features)
+        if self.readout_mode == "temporalbank_cross_attention":
+            latent = query_token
+            for _ in range(max(1, self.readout_iter_steps)):
+                attended, _ = self.trajectory_bank_attention(
+                    latent.unsqueeze(1),
+                    bank,
+                    bank,
+                    need_weights=False,
+                )
+                latent = self.trajectory_bank_attention_norm(latent + attended.squeeze(1))
+                latent = latent + self.trajectory_bank_ff(latent)
+            return latent
+        if self.readout_mode == "temporalbank_query_film":
+            film_params = self.trajectory_bank_film(query_token)
+            gamma, beta = torch.chunk(film_params, 2, dim=-1)
+            bank = bank * (1.0 + torch.tanh(gamma).unsqueeze(1)) + beta.unsqueeze(1)
+        scores = self.trajectory_bank_score(torch.tanh(bank + query_token.unsqueeze(1))).squeeze(-1)
+        weights = torch.softmax(scores, dim=-1)
+        return (weights.unsqueeze(-1) * bank).sum(dim=1)
+
+    def _factorized_readout_input(
+        self,
+        *,
+        sink_state: torch.Tensor,
+        observations: torch.Tensor,
+        trace: dict[str, torch.Tensor],
+        first_exit_time: torch.Tensor,
+        delays: torch.Tensor,
+        action_totals: torch.Tensor,
+        route_entropy_sum: torch.Tensor,
+        route_conf_sum: torch.Tensor,
+        route_weight_total: torch.Tensor,
+        eps: torch.Tensor,
+    ) -> torch.Tensor:
+        query_obs = observations[:, -1, 0]
+        if self.factorized_content_source == "trajectory_bank":
+            bank, route_features = self._select_temporal_bank(
+                trace=trace,
+                observations=observations,
+                first_exit_time=first_exit_time,
+                delays=delays,
+                action_totals=action_totals,
+                route_entropy_sum=route_entropy_sum,
+                route_conf_sum=route_conf_sum,
+                route_weight_total=route_weight_total,
+                eps=eps,
+            )
+            content = self._temporal_bank_context(
+                bank=bank,
+                query_obs=query_obs,
+                route_features=route_features,
+            )
+        elif self.factorized_content_source == "final_sink_state":
+            content = sink_state
+        else:
+            raise ValueError(f"Unknown factorized_content_source: {self.factorized_content_source}")
+        content = self.factorized_content_proj(content)
+        query_hidden = self.factorized_query_proj(query_obs)
+        if self.factorized_combiner_mode == "concat":
+            return self.factorized_combiner(torch.cat([content, query_hidden], dim=-1))
+        if self.factorized_combiner_mode == "gated":
+            gated = content * torch.sigmoid(self.factorized_gate(query_hidden))
+            return self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1))
+        if self.factorized_combiner_mode == "bilinear":
+            return torch.tanh(self.factorized_bilinear(content, query_hidden))
+        if self.factorized_combiner_mode == "film":
+            gamma, beta = torch.chunk(self.factorized_film(query_hidden), 2, dim=-1)
+            return content * (1.0 + torch.tanh(gamma)) + beta
+        raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
         allowed = [
@@ -1008,8 +1425,13 @@ class PacketRoutingModel(nn.Module):
         release_prob_sum = torch.zeros(batch_size, device=device, dtype=dtype)
         release_prob_weight = torch.zeros(batch_size, device=device, dtype=dtype)
 
+        collect_internal_trace = (
+            return_trace
+            or self.readout_mode in self.temporal_bank_readout_modes
+            or self.readout_mode in self.factorized_readout_modes
+        )
         trace: dict[str, torch.Tensor] | None = None
-        if return_trace:
+        if collect_internal_trace:
             trace = {
                 "active_mass": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
                 "alive_mass": torch.zeros(batch_size, seq_len, device=device, dtype=dtype),
@@ -1732,6 +2154,52 @@ class PacketRoutingModel(nn.Module):
                     fused = fused * (1.0 + torch.tanh(gamma)) + beta
                 readout_input = fused
             readout_input = self._apply_readout_adapter(readout_input)
+        elif self.readout_mode in self.temporal_bank_readout_modes:
+            if trace is None:
+                raise RuntimeError("Temporal-bank readout requires trace collection.")
+            baseline_view = self._baseline_readout_input(
+                sink_state,
+                observations,
+                for_multiview=False,
+            )
+            bank, route_features = self._select_temporal_bank(
+                trace=trace,
+                observations=observations,
+                first_exit_time=first_exit_time,
+                delays=delays,
+                action_totals=action_totals,
+                route_entropy_sum=route_entropy_sum,
+                route_conf_sum=route_conf_sum,
+                route_weight_total=route_weight_total,
+                eps=eps,
+            )
+            readout_input = self._temporal_bank_context(
+                bank=bank,
+                query_obs=observations[:, -1, 0],
+                route_features=route_features,
+            )
+            readout_input = self._apply_readout_adapter(readout_input)
+        elif self.readout_mode in self.factorized_readout_modes:
+            if trace is None:
+                raise RuntimeError("Factorized readout requires trace collection.")
+            baseline_view = self._baseline_readout_input(
+                sink_state,
+                observations,
+                for_multiview=False,
+            )
+            readout_input = self._factorized_readout_input(
+                sink_state=sink_state,
+                observations=observations,
+                trace=trace,
+                first_exit_time=first_exit_time,
+                delays=delays,
+                action_totals=action_totals,
+                route_entropy_sum=route_entropy_sum,
+                route_conf_sum=route_conf_sum,
+                route_weight_total=route_weight_total,
+                eps=eps,
+            )
+            readout_input = self._apply_readout_adapter(readout_input)
         else:
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -1890,7 +2358,7 @@ class PacketRoutingModel(nn.Module):
             route_loss=route_penalty + oracle_route_term + delay_write_term + memory_payload_term + control_term + anti_exit_term + wait_term + release_term,
             task_loss=task_loss,
             stats=stats,
-            trace=trace,
+            trace=trace if return_trace else None,
         )
 
     @staticmethod
