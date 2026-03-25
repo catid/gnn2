@@ -1,0 +1,18 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_adapter_lowrank_r8_random.yaml
+
+experiment:
+  seed: 15073
+
+training:
+  probe_adapter_warmstart:
+    enabled: true
+    split: train
+    num_batches: 8
+    batch_size: 64
+    epochs: 200
+    lr: 0.05
+    weight_decay: 0.0001
+    final_query_only: true
+    feature_source: factorized_content_hidden
+    adapter_target: readout_adapter
+    init_scale: 0.10

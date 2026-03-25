@@ -10,6 +10,8 @@ from src.train.run import (
     apply_cli_overrides,
     apply_partial_init,
     initial_selection_score,
+    probe_guided_affine_scale,
+    probe_guided_low_rank_weights,
     resolve_resume_checkpoint,
     validation_score,
 )
@@ -298,3 +300,41 @@ def test_apply_partial_init_supports_source_specific_filters(tmp_path: Path) -> 
     assert torch.allclose(updated["1.bias"], torch.full_like(updated["1.bias"], 9.0))
     assert summary["partial_init_parameter_count"] == 4
     assert summary["partial_init_weights"] == [0.25, 0.75]
+
+
+def test_probe_guided_low_rank_weights_follow_top_probe_directions() -> None:
+    probe_weight = torch.tensor(
+        [
+            [3.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ],
+        dtype=torch.float32,
+    )
+
+    down_weight, up_weight, coeff = probe_guided_low_rank_weights(probe_weight, rank=2, scale=0.5)
+
+    composed = up_weight @ down_weight
+    assert down_weight.shape == (2, 3)
+    assert up_weight.shape == (3, 2)
+    assert coeff.shape == (2,)
+    assert math.isclose(float(coeff[0]), 0.5, rel_tol=1e-6)
+    assert coeff[0] > coeff[1] > 0.0
+    assert composed[0, 0] > composed[1, 1] > 0.0
+    assert math.isclose(float(composed[2, 2]), 0.0, abs_tol=1e-6)
+
+
+def test_probe_guided_affine_scale_tracks_probe_energy() -> None:
+    probe_weight = torch.tensor(
+        [
+            [2.0, 0.0, 0.0],
+            [0.0, 1.0, 1.0],
+        ],
+        dtype=torch.float32,
+    )
+
+    scale = probe_guided_affine_scale(probe_weight, scale=0.25)
+
+    assert scale.shape == (3,)
+    assert math.isclose(float(scale.max()), 0.25, rel_tol=1e-6)
+    assert scale[0] > scale[1]
+    assert math.isclose(float(scale[1]), float(scale[2]), rel_tol=1e-6)

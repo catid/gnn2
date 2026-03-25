@@ -27,7 +27,7 @@ from src.data.benchmarks import (
 )
 from src.es import LowRankEvolutionStrategy, standardize_fitness
 from src.models import ACTION_DELAY, ACTION_EXIT, PacketRoutingModel
-from src.models.packet_routing import StandardizedMLPReadoutHead
+from src.models.packet_routing import AffineAdapter, LowRankAdapter, StandardizedMLPReadoutHead
 from src.utils.config import load_config
 
 
@@ -1366,19 +1366,35 @@ def apply_probe_warmstart(
     temperature: float,
     estimator: str,
 ) -> dict[str, Any]:
-    warm_cfg = dict(cfg.get("training", {}).get("probe_warmstart", {}) or {})
-    if not bool(warm_cfg.get("enabled", False)):
-        return {}
-    if not isinstance(model.readout, StandardizedMLPReadoutHead):
-        raise ValueError("training.probe_warmstart requires readout_head_mode=mlp.")
+    return _apply_probe_head_or_adapter_warmstart(
+        model,
+        benchmark=benchmark,
+        benchmark_name=benchmark_name,
+        cfg=cfg,
+        device=device,
+        route_mode=route_mode,
+        temperature=temperature,
+        estimator=estimator,
+        target_kind="readout_head",
+    )
 
-    split = str(warm_cfg.get("split", "train"))
-    num_batches = int(warm_cfg.get("num_batches", 8))
-    batch_size = int(warm_cfg.get("batch_size", cfg["training"].get("batch_size", 64)))
-    epochs = int(warm_cfg.get("epochs", 200))
-    lr = float(warm_cfg.get("lr", 0.05))
-    weight_decay = float(warm_cfg.get("weight_decay", 1e-4))
-    final_query_only = bool(warm_cfg.get("final_query_only", True))
+
+def _collect_probe_dataset(
+    model: PacketRoutingModel,
+    *,
+    benchmark,
+    benchmark_name: str,
+    cfg: dict[str, Any],
+    device: torch.device,
+    route_mode: str,
+    temperature: float,
+    estimator: str,
+    split: str,
+    num_batches: int,
+    batch_size: int,
+    final_query_only: bool,
+    feature_source: str,
+) -> tuple[torch.Tensor, torch.Tensor]:
     amp_enabled = bool(cfg.get("system", {}).get("amp", False))
     amp_dtype = str(cfg.get("system", {}).get("amp_dtype", "bf16"))
     compute_penalties = {"hops": 0.0, "delays": 0.0, "ttl_fail": 0.0}
@@ -1460,8 +1476,8 @@ def apply_probe_warmstart(
                     final_query_mask=batch.metadata.get("needs_final_query"),
                     return_trace=True,
                 )
-            readout_input = (output.trace or {}).get("final_readout_input")
-            if readout_input is None:
+            feature_tensor = (output.trace or {}).get(feature_source)
+            if feature_tensor is None:
                 continue
             if final_query_only:
                 mask = batch.metadata.get("needs_final_query")
@@ -1472,41 +1488,136 @@ def apply_probe_warmstart(
                 mask = torch.ones_like(batch.labels, dtype=torch.bool)
             if not bool(mask.any().item()):
                 continue
-            features.append(readout_input[mask].detach())
+            features.append(feature_tensor[mask].detach())
             labels.append(batch.labels[mask].detach())
     if was_training:
         model.train()
 
     if not features:
         raise ValueError(
-            f"probe_warmstart collected no samples for {benchmark_name} on split={split}."
+            f"probe warmstart collected no samples for source={feature_source} "
+            f"on {benchmark_name} split={split}."
         )
 
     train_x = torch.cat(features, dim=0).to(device=device, dtype=torch.float32)
     train_y = torch.cat(labels, dim=0).to(device=device, dtype=torch.long)
-    mean = train_x.mean(dim=0)
-    std = train_x.std(dim=0).clamp_min(1e-5)
-    model.readout.reset_parameters()
-    model.readout.set_standardizer(mean, std)
-    optimizer = torch.optim.AdamW(model.readout.parameters(), lr=lr, weight_decay=weight_decay)
-    model.readout.train()
+    return train_x, train_y
+
+
+def _fit_linear_probe(
+    train_x: torch.Tensor,
+    train_y: torch.Tensor,
+    *,
+    num_classes: int,
+    epochs: int,
+    lr: float,
+    weight_decay: float,
+) -> tuple[torch.Tensor, torch.Tensor, float, float]:
+    probe = torch.nn.Linear(train_x.shape[-1], num_classes, bias=True).to(device=train_x.device, dtype=torch.float32)
+    optimizer = torch.optim.AdamW(probe.parameters(), lr=lr, weight_decay=weight_decay)
     final_loss = 0.0
     for _ in range(epochs):
-        logits = model.readout(train_x)
+        logits = probe(train_x)
         loss = F.cross_entropy(logits, train_y)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
         final_loss = float(loss.detach().item())
-    model.readout.eval()
     with torch.no_grad():
-        accuracy = float((model.readout(train_x).argmax(dim=-1) == train_y).float().mean().item())
-    return {
-        "probe_warmstart_enabled": True,
+        accuracy = float((probe(train_x).argmax(dim=-1) == train_y).float().mean().item())
+        weight = probe.weight.detach().clone()
+        bias = probe.bias.detach().clone()
+    return weight, bias, accuracy, final_loss
+
+
+def probe_guided_low_rank_weights(
+    probe_weight: torch.Tensor,
+    *,
+    rank: int,
+    scale: float,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if probe_weight.ndim != 2:
+        raise ValueError("probe_guided_low_rank_weights expects a rank-2 probe weight matrix.")
+    _, singular_values, vh = torch.linalg.svd(probe_weight.float(), full_matrices=False)
+    effective_rank = max(1, min(rank, int(singular_values.numel()), int(vh.shape[0])))
+    basis = vh[:effective_rank].transpose(0, 1).contiguous()
+    coeff = singular_values[:effective_rank]
+    coeff = coeff / coeff.max().clamp_min(1e-6)
+    coeff = coeff * float(scale)
+    sqrt_coeff = coeff.clamp_min(0.0).sqrt()
+    down_weight = torch.diag(sqrt_coeff) @ basis.transpose(0, 1)
+    up_weight = basis @ torch.diag(sqrt_coeff)
+    return down_weight, up_weight, coeff
+
+
+def probe_guided_affine_scale(
+    probe_weight: torch.Tensor,
+    *,
+    scale: float,
+) -> torch.Tensor:
+    if probe_weight.ndim != 2:
+        raise ValueError("probe_guided_affine_scale expects a rank-2 probe weight matrix.")
+    strength = probe_weight.float().pow(2).sum(dim=0)
+    strength = strength / strength.max().clamp_min(1e-6)
+    return strength * float(scale)
+
+
+def _apply_probe_head_or_adapter_warmstart(
+    model: PacketRoutingModel,
+    *,
+    benchmark,
+    benchmark_name: str,
+    cfg: dict[str, Any],
+    device: torch.device,
+    route_mode: str,
+    temperature: float,
+    estimator: str,
+    target_kind: str,
+) -> dict[str, Any]:
+    warm_cfg = dict(cfg.get("training", {}).get("probe_warmstart", {}) or {})
+    if target_kind == "readout_adapter":
+        warm_cfg = dict(cfg.get("training", {}).get("probe_adapter_warmstart", {}) or {})
+    if not bool(warm_cfg.get("enabled", False)):
+        return {}
+
+    split = str(warm_cfg.get("split", "train"))
+    num_batches = int(warm_cfg.get("num_batches", 8))
+    batch_size = int(warm_cfg.get("batch_size", cfg["training"].get("batch_size", 64)))
+    epochs = int(warm_cfg.get("epochs", 200))
+    lr = float(warm_cfg.get("lr", 0.05))
+    weight_decay = float(warm_cfg.get("weight_decay", 1e-4))
+    final_query_only = bool(warm_cfg.get("final_query_only", True))
+    feature_source = str(warm_cfg.get("feature_source", "final_readout_input"))
+    train_x, train_y = _collect_probe_dataset(
+        model,
+        benchmark=benchmark,
+        benchmark_name=benchmark_name,
+        cfg=cfg,
+        device=device,
+        route_mode=route_mode,
+        temperature=temperature,
+        estimator=estimator,
+        split=split,
+        num_batches=num_batches,
+        batch_size=batch_size,
+        final_query_only=final_query_only,
+        feature_source=feature_source,
+    )
+    probe_weight, probe_bias, accuracy, final_loss = _fit_linear_probe(
+        train_x,
+        train_y,
+        num_classes=model.num_classes,
+        epochs=epochs,
+        lr=lr,
+        weight_decay=weight_decay,
+    )
+
+    summary = {
         "probe_warmstart_split": split,
         "probe_warmstart_num_batches": num_batches,
         "probe_warmstart_batch_size": batch_size,
         "probe_warmstart_final_query_only": final_query_only,
+        "probe_warmstart_feature_source": feature_source,
         "probe_warmstart_num_examples": int(train_x.shape[0]),
         "probe_warmstart_epochs": epochs,
         "probe_warmstart_lr": lr,
@@ -1514,6 +1625,99 @@ def apply_probe_warmstart(
         "probe_warmstart_train_accuracy": accuracy,
         "probe_warmstart_final_loss": final_loss,
     }
+    if target_kind == "readout_head":
+        if not isinstance(model.readout, StandardizedMLPReadoutHead):
+            raise ValueError("training.probe_warmstart requires readout_head_mode=mlp.")
+        mean = train_x.mean(dim=0)
+        std = train_x.std(dim=0).clamp_min(1e-5)
+        model.readout.reset_parameters()
+        model.readout.set_standardizer(mean, std)
+        optimizer = torch.optim.AdamW(model.readout.parameters(), lr=lr, weight_decay=weight_decay)
+        model.readout.train()
+        head_loss = 0.0
+        for _ in range(epochs):
+            logits = model.readout(train_x)
+            loss = F.cross_entropy(logits, train_y)
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+            head_loss = float(loss.detach().item())
+        model.readout.eval()
+        with torch.no_grad():
+            head_accuracy = float((model.readout(train_x).argmax(dim=-1) == train_y).float().mean().item())
+        summary.update(
+            {
+                "probe_warmstart_enabled": True,
+                "probe_warmstart_train_accuracy": head_accuracy,
+                "probe_warmstart_final_loss": head_loss,
+            }
+        )
+        return summary
+
+    adapter_target = str(warm_cfg.get("adapter_target", "readout_adapter"))
+    init_scale = float(warm_cfg.get("init_scale", 0.1))
+    adapter = getattr(model, adapter_target, None)
+    if isinstance(adapter, LowRankAdapter):
+        down_weight, up_weight, coeff = probe_guided_low_rank_weights(
+            probe_weight,
+            rank=int(adapter.down.out_features),
+            scale=init_scale,
+        )
+        adapter.down.weight.data.copy_(down_weight.to(device=adapter.down.weight.device, dtype=adapter.down.weight.dtype))
+        adapter.up.weight.data.copy_(up_weight.to(device=adapter.up.weight.device, dtype=adapter.up.weight.dtype))
+        summary.update(
+            {
+                "probe_adapter_warmstart_enabled": True,
+                "probe_adapter_warmstart_target": adapter_target,
+                "probe_adapter_warmstart_adapter_mode": "low_rank",
+                "probe_adapter_warmstart_init_scale": init_scale,
+                "probe_adapter_warmstart_effective_rank": int(coeff.numel()),
+                "probe_adapter_warmstart_coeff_max": float(coeff.max().item()),
+            }
+        )
+        return summary
+    if isinstance(adapter, AffineAdapter):
+        scale_vec = probe_guided_affine_scale(probe_weight, scale=init_scale)
+        adapter.scale.data.copy_(scale_vec.to(device=adapter.scale.device, dtype=adapter.scale.dtype))
+        adapter.bias.data.zero_()
+        summary.update(
+            {
+                "probe_adapter_warmstart_enabled": True,
+                "probe_adapter_warmstart_target": adapter_target,
+                "probe_adapter_warmstart_adapter_mode": "affine",
+                "probe_adapter_warmstart_init_scale": init_scale,
+                "probe_adapter_warmstart_scale_mean": float(scale_vec.mean().item()),
+                "probe_adapter_warmstart_scale_max": float(scale_vec.max().item()),
+            }
+        )
+        return summary
+    raise ValueError(
+        f"training.probe_adapter_warmstart requires {adapter_target} to be a LowRankAdapter or AffineAdapter."
+    )
+
+
+def apply_probe_adapter_warmstart(
+    model: PacketRoutingModel,
+    *,
+    benchmark,
+    benchmark_name: str,
+    cfg: dict[str, Any],
+    device: torch.device,
+    route_mode: str,
+    temperature: float,
+    estimator: str,
+) -> dict[str, Any]:
+    return _apply_probe_head_or_adapter_warmstart(
+        model,
+        benchmark=benchmark,
+        benchmark_name=benchmark_name,
+        cfg=cfg,
+        device=device,
+        route_mode=route_mode,
+        temperature=temperature,
+        estimator=estimator,
+        target_kind="readout_adapter",
+    )
 
 
 def build_supervised_optimizer(
@@ -1959,6 +2163,20 @@ def run_supervised_phase(
         if not cfg.get("resume")
         else {}
     )
+    probe_adapter_warmstart_summary = (
+        apply_probe_adapter_warmstart(
+            model,
+            benchmark=benchmark,
+            benchmark_name=benchmark_name,
+            cfg=cfg,
+            device=device,
+            route_mode=route_mode,
+            temperature=temperature,
+            estimator=estimator,
+        )
+        if not cfg.get("resume")
+        else {}
+    )
 
     trainable_summary = configure_trainable_parameters(model, train_cfg)
     optimizer = build_supervised_optimizer(model, train_cfg)
@@ -2378,6 +2596,7 @@ def run_supervised_phase(
         **trainable_summary,
         **partial_init_summary,
         **probe_warmstart_summary,
+        **probe_adapter_warmstart_summary,
     }
 
 
