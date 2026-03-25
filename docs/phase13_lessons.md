@@ -32,9 +32,11 @@ already stable enough to guide the rest of the campaign.
 
 ## Open Questions
 
-1. Can the live low-LR post-stability refinements (`16081`-`16084`) move
-   held-confirm content once the basin is already stable?
-2. Are the best stability recipes at least weakly portable to `1821`, or do
-   they immediately degrade into earlier-exit regimes?
-3. Does the remaining ceiling now look fundamentally like content capacity, or
-   is there still a narrower optimization issue inside the stabilized basin?
+1. Do the live `16022` and `16066` panels stay clean across all five seeds, or
+   does any weaker late-route instability reappear once the panel coverage goes
+   beyond the already completed `16045` bridge family?
+2. Once the current verification floor is complete, does the remaining ceiling
+   look fundamentally like content capacity rather than stability?
+3. Are the queued `16041` and `16081` reruns / panels enough to close phase 13
+   cleanly, or does one more stable `1874` family need full verification to
+   make the final map defensible?
