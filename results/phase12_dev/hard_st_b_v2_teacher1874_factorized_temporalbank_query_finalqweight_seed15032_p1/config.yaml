@@ -1,0 +1,24 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 15032
+  results_root: results/phase12_dev
+
+model:
+  readout_mode: factorized_content_query
+  factorized_content_source: trajectory_bank
+  factorized_combiner_mode: gated
+  readout_base_mode: query_gated
+  trajectory_bank_views:
+    - sink_state
+  trajectory_bank_window: 8
+  trajectory_bank_stride: 1
+  trajectory_bank_anchor: final
+  trajectory_bank_route_features:
+    - action_histogram
+
+training:
+  trainable_prefixes:
+    - readout
+    - factorized_
+    - trajectory_bank_

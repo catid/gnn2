@@ -1,0 +1,5 @@
+_base_: ../../phase10/dev/hard_st_benchmark_b_v2_teacher1879_anchor_queryreadout_finalqweight.yaml
+
+experiment:
+  seed: 9102
+  results_root: results/phase12_anchor

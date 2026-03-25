@@ -127,6 +127,7 @@ The current long-horizon writeups are:
 - [docs/phase8_report.md](docs/phase8_report.md)
 - [docs/phase9_report.md](docs/phase9_report.md)
 - [docs/phase10_report.md](docs/phase10_report.md)
+- [docs/phase12_report.md](docs/phase12_report.md)
 
 Current headline state:
 
@@ -158,6 +159,17 @@ Current headline state:
 - the strongest phase-10 adapter outlier reproduced exactly as a single seed
   but failed its five-seed panel, so the next disciplined move is a
   confirmation-aware objective on the best frozen strong-source baseline
+- phase 11 showed that narrow objective, selector, prototype-head, mixture-head,
+  and fusion-only follow-ups on frozen `1874` were reproducible negatives, while
+  frozen-`1201` readout-prefix transfer produced real **base-side** gains
+  without moving the held-confirm plateau
+- phase 12 showed that route-trace conditioning is not the missing ingredient:
+  route-blind temporal-bank and factorized readers can push `1874` base
+  behavior near saturation, but held confirms still do not improve
+- phase 12 also showed that contiguous-window transfer does not generalize,
+  portability to `1821` and `1842` collapses into a weaker earlier-exit regime,
+  and minimal keyed sinks produce stable off-regime shortcuts rather than
+  rescuing held-confirm content
 
 Best current single-run teacher-free basin-entry result from phase 8:
 
@@ -199,6 +211,20 @@ Best current phase-10 strict read-path adapter boundary:
   exact rerun-clean but five-seed full-locked mean only
   `0.6568 / 0.2957 / 0.8840 / 116.21`, so not a robust improvement over the
   phase-9 strong-source baseline
+
+Best current exact-rerun-clean phase-12 trajectory-aware reader:
+
+- [mixed-bank bilinear 15051](/home/catid/gnn2/results/phase12_dev/hard_st_b_v2_teacher1874_temporalbank_sinkreadout_bilinear_exit_routehist_seed15051_p1)
+  base `0.9850 / 0.9699 / 0.9505 / 122.40`
+  and full-locked `0.6494 / 0.3159 / 0.8771 / 115.49`
+  for `overall / fq_acc / fq_route / fq_exit`
+
+Best current phase-12 high-base factorized reader family:
+
+- [no-route temporal bilinear 15057 family](/home/catid/gnn2/results/phase12_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_seed15057_p1)
+  five-seed base mean `0.9982 / 0.9975 / 0.9457 / 121.86`, but the exact rerun
+  later drifted into an early-exit shortcut regime, so this family is a strong
+  mapping result rather than a robust new ceiling-breaker
 
 ## Phase 7 Commands
 
@@ -252,6 +278,22 @@ confirmation.
 ./scripts/run_phase10_confirm.sh <run-dir> [extra-eval-config ...]
 ./scripts/run_phase10_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
 ./scripts/run_phase10_source_audits.sh [results-root]
+```
+
+## Phase 12 Commands
+
+Phase 12 focuses on trajectory-aware temporal-bank readers, factorized
+content/query readers, portability/stress verification, probe-guided adapters,
+and a gated minimal keyed-sink test.
+
+```bash
+./scripts/run_phase12_cluster_scouts.sh [results-root]
+./scripts/run_phase12_reader_banks.sh [results-root]
+./scripts/run_phase12_probe_adapters.sh [results-root]
+./scripts/run_phase12_sink_sweeps.sh [results-root]
+./scripts/run_phase12_main.sh <config> <results-dir> [resume] [nproc_per_node]
+./scripts/run_phase12_confirm.sh <run-dir> [extra-eval-config ...]
+./scripts/run_phase12_seed_panels.sh <config> <results-root> <resume> <seed1> [seed2 ...]
 ```
 
 ## Phase 2 Commands

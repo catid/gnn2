@@ -1,0 +1,23 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute.yaml
+
+experiment:
+  seed: 15068
+
+teacher:
+  run_dir: results/phase10_anchor/hard_st_b_v2_teacher1874_anchor_querygated_finalqweight_seed9142_p1
+  route_mode: hard
+  estimator: straight_through
+  distill_temperature: 1.0
+  target_scope: final_query_only
+  logits_weight: 0.15
+  route_weight: 0.0
+  route_action_weight: 0.0
+  control_prob_weight: 0.0
+  release_prob_weight: 0.0
+  wait_prob_weight: 0.0
+  control_state_weight: 0.0
+  memory_read_weight: 0.0
+  start_step: 0
+  stop_step: 384
+  scale_start: 1.0
+  scale_end: 1.0

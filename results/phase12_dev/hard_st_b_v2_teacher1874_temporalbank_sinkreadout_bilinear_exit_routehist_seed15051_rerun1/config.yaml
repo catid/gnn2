@@ -1,0 +1,10 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_temporalbank_sinkreadout_crossattn_exit_noroute.yaml
+
+experiment:
+  seed: 15051
+
+model:
+  readout_mode: temporalbank_bilinear
+  trajectory_bank_route_features:
+    - exit_time
+    - action_histogram

@@ -1,0 +1,15 @@
+_base_: ../../phase9/dev/hard_st_benchmark_b_v2_teacher1874_refine_querygated_finalqweight_longer_lowlr.yaml
+
+experiment:
+  seed: 15034
+  results_root: results/phase12_dev
+
+model:
+  readout_mode: factorized_content_query
+  factorized_content_source: final_sink_state
+  factorized_combiner_mode: bilinear
+
+training:
+  trainable_prefixes:
+    - readout
+    - factorized_

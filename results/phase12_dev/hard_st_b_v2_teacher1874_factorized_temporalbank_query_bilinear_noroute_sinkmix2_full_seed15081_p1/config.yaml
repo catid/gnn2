@@ -1,0 +1,22 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute.yaml
+
+experiment:
+  seed: 15081
+
+partial_init:
+  run_dir: results/phase12_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_seed15057_p1
+  include_prefixes:
+    - readout
+    - factorized_
+    - trajectory_bank_
+
+model:
+  sink_mode: keyed_mixture
+  sink_slots: 2
+
+training:
+  trainable_prefixes:
+    - sink_
+    - readout
+    - factorized_
+    - trajectory_bank_
