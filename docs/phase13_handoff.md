@@ -6,9 +6,9 @@ This is a live handoff note and will be finalized when phase 13 closes.
   there are now two complementary leaders.
   [16045](/home/catid/gnn2/results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_15051readout_15057extras_selectlocked_seed16045_p1)
   is still the best fully paneled stable bridge and
-  [16022](/home/catid/gnn2/results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc_seed16022_p1)
-  is the strongest confirmed selection-only stability control on locked final-
-  query accuracy.
+  [16066](/home/catid/gnn2/results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlexi_lockedroute_lockedfqacc_stop720_seed16066_p1)
+  is now the cleanest completed Cluster A family after its five-seed panel
+  finished at locked mean `0.9557 / 0.9391 / 121.34`.
 - Whether `15057`-style upside can be stabilized:
   partly yes. Conservative continuation from `15051` into the `15057`-style
   reader survives a five-seed panel without recreating the old shortcut
@@ -17,12 +17,12 @@ This is a live handoff note and will be finalized when phase 13 closes.
   yes. It is the clearest positive result of phase 13 so far.
 - Whether hard-case mining or held-confirm-aware selection helped:
   only at summary time. Those gains have not survived independent confirm.
-- Current live verification read:
-  the `16066` sustained-anchor panel has now banked three strong late-route
-  seeds and one weaker-but-still-late-route content dip, while the `16022`
-  selection-only panel is still higher-variance: two strong seeds, one
-  late-route seed with badly collapsed locked-slice content, and one middling
-  recovery seed.
+- Current verification read:
+  the `16066` sustained-anchor panel is complete and cleaner than `16022`.
+  `16066` finished with four strong late-route seeds plus one weaker content
+  dip for locked mean `0.9557 / 0.9391 / 121.34`, while `16022` finished as a
+  mixed high-variance panel at `0.8530 / 0.9399 / 121.29` with one severe
+  late-route content-collapse outlier and one middling recovery seed.
 - Whether any recipe transferred to `1821` / `1842`:
   weakly at best. Cluster E is now closed and the `1821` selector carryover
   fell back to the old medium-source held-confirm regime under confirm.
@@ -32,6 +32,6 @@ This is a live handoff note and will be finalized when phase 13 closes.
   not moved yet.
 - Single next experiment:
   finish the remaining verification floor on stable `1874` branches:
-  complete the live `16022` and `16066` panels, then finish the queued `16041`
-  and `16081` reruns / panels so the final closeout rests on enough exact
-  reruns and five-seed coverage rather than on one paneled family alone.
+  complete the queued `16041` and `16081` reruns, then decide whether both
+  queued extra five-seed panels are still needed to close phase 13 with the
+  required panel coverage instead of resting mostly on `16045` and `16066`.

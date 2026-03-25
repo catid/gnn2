@@ -31,19 +31,20 @@ already stable enough to guide the rest of the campaign.
    confirm ceiling that remains even after stabilization.
 
 6. “Stable late-route” is not one thing.
-   The live `16022` panel already shows a weaker failure mode:
+   The completed `16022` panel shows a weaker failure mode:
    one seed stayed late-route on route and exit while collapsing content badly
-   on the locked slice.
+   on the locked slice and another recovered only partially.
+   The completed `16066` panel shows a milder version of the same pattern.
    So phase 13 now has to distinguish catastrophic shortcut collapse from
    softer late-route content-collapse basins.
 
 ## Open Questions
 
-1. Do the live `16022` and `16066` panels stay clean across all five seeds, or
-   does any weaker late-route instability reappear once the panel coverage goes
-   beyond the already completed `16045` bridge family?
+1. Do the queued `16041` and `16081` reruns reproduce as cleanly as the new
+   `16022` and `16066` reruns or do they expose another softer content-collapse
+   mode?
 2. Once the current verification floor is complete, does the remaining ceiling
    look fundamentally like content capacity rather than stability?
 3. Are the queued `16041` and `16081` reruns / panels enough to close phase 13
-   cleanly, or does one more stable `1874` family need full verification to
-   make the final map defensible?
+   cleanly, or does one more stable `1874` family still need full verification
+   to make the final map defensible?

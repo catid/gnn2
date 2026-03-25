@@ -54,24 +54,28 @@ The important result is qualitative:
 - and the continuation path is therefore materially more stable than the
   original direct `15057` training story.
 
-The newer `16022` and `16066` exact reruns now reinforce the same conclusion:
+The newer `16022` and `16066` exact reruns and completed five-seed panels now
+reinforce the same conclusion:
 
 - `16022_rerun1` cleanly reproduced the intended selection-only late-route
   basin,
 - `16066_rerun1` cleanly reproduced the sustained-anchor late-route basin,
-- and neither follow-on panel has shown the old catastrophic shortcut relapse
-  so far.
+- the completed `16022` panel finished at locked-slice mean
+  `0.8530 / 0.9399 / 121.29`,
+- and the completed `16066` panel finished at locked-slice mean
+  `0.9557 / 0.9391 / 121.34`.
 
-But the live panel stress is already more nuanced:
+The completed panel stress is more nuanced than the reruns alone:
 
-- `16066` has now banked three strong late-route seeds and one weaker but still
-  late-route seed,
-- `16022` now has two strong seeds, one middling late-route recovery seed, and
-  one bad late-route content-collapse seed,
+- `16066` completed with four strong late-route seeds and one weaker but still
+  late-route content dip,
+- `16022` completed with two strong seeds, one middling recovery seed, one mild
+  late-route dip, and one severe late-route content-collapse seed,
+- none of those seeds reproduced the old catastrophic shortcut basin,
 - so the remaining instability question is no longer only “shortcut or not”.
-  It may also include weaker non-shortcut content-collapse basins, with `16022`
-  showing the harsher version of that failure mode and `16066` showing a milder
-  version.
+  It also includes softer non-shortcut content-collapse basins, with `16022`
+  showing the harsher version of that failure mode and `16066` showing the
+  cleaner current compromise.
 
 ### 2. The held-confirm ceiling still appears separate from stability
 
@@ -99,7 +103,9 @@ At the time of this draft:
 
 - Cluster D is settled around `16081` as the best refinement result,
 - Cluster E is closed as a bounded portability / negative-control sanity map,
-- two new five-seed `1874` panels are live on `16022` and `16066`,
+- the `16022` and `16066` five-seed `1874` panels are now complete,
+- `16066` is the cleaner current Cluster A leader while `16022` remains a real
+  but high-variance selection-only path,
 - and the next queued verification tranche is the remaining rerun / panel
   coverage on `16041` and `16081` needed to clear the phase-13 verification
   floor.
