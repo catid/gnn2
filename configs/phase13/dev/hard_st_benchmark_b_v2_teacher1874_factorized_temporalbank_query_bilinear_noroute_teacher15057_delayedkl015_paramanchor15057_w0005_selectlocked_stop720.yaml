@@ -1,0 +1,11 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked.yaml
+
+experiment:
+  seed: 16064
+
+teacher:
+  stop_step: 720
+
+parameter_anchor:
+  stop_step: 720
+

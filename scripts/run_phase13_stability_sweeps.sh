@@ -68,6 +68,18 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked_seed16033_p1" 0
     wait
     ;;
+  a_r4)
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlocked_stop720.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlocked_stop720_seed16063_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked_stop720.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked_stop720_seed16064_p1" 1
+    wait
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15051_delayedkl015_paramanchor15057_w0005_selectlocked_stop720.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15051_delayedkl015_paramanchor15057_w0005_selectlocked_stop720_seed16065_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlexi_lockedroute_lockedfqacc_stop720.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlexi_lockedroute_lockedfqacc_stop720_seed16066_p1" 1
+    wait
+    ;;
   b_r1)
     run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_15051readout_15057extras_selectlocked.yaml \
       "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_15051readout_15057extras_selectlocked_seed16041_p1" 0
@@ -130,7 +142,7 @@ case "${mode}" in
     ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|b_r1|b_r2|c_r1|c_r2|c_r3]" >&2
+    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|a_r4|b_r1|b_r2|c_r1|c_r2|c_r3]" >&2
     exit 1
     ;;
 esac
