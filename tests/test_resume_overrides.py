@@ -9,7 +9,11 @@ import torch
 from src.train.run import (
     apply_cli_overrides,
     apply_partial_init,
+    compute_parameter_anchor_loss,
     initial_selection_score,
+    load_parameter_anchor,
+    ParameterAnchor,
+    parameter_anchor_weight,
     probe_guided_affine_scale,
     probe_guided_low_rank_weights,
     resolve_resume_checkpoint,
@@ -300,6 +304,88 @@ def test_apply_partial_init_supports_source_specific_filters(tmp_path: Path) -> 
     assert torch.allclose(updated["1.bias"], torch.full_like(updated["1.bias"], 9.0))
     assert summary["partial_init_parameter_count"] == 4
     assert summary["partial_init_weights"] == [0.25, 0.75]
+
+
+def test_parameter_anchor_weight_supports_schedule_and_stop() -> None:
+    anchor = ParameterAnchor(
+        tensors={},
+        weight_start=0.1,
+        weight_end=0.3,
+        weight_schedule_steps=10,
+        start_step=5,
+        stop_step=20,
+        p=2.0,
+        normalize=True,
+    )
+
+    assert parameter_anchor_weight(anchor, 0) == 0.0
+    assert math.isclose(parameter_anchor_weight(anchor, 5), 0.1)
+    assert math.isclose(parameter_anchor_weight(anchor, 10), 0.2)
+    assert math.isclose(parameter_anchor_weight(anchor, 15), 0.3)
+    assert parameter_anchor_weight(anchor, 20) == 0.0
+
+
+def test_load_parameter_anchor_filters_named_parameters(tmp_path: Path) -> None:
+    model = torch.nn.Sequential(torch.nn.Linear(2, 2), torch.nn.Linear(2, 1))
+    current_state = model.state_dict()
+    run_dir = tmp_path / "anchor_run"
+    run_dir.mkdir()
+    torch.save(
+        {
+            "model": {
+                "0.weight": torch.full_like(current_state["0.weight"], 3.0),
+                "0.bias": torch.full_like(current_state["0.bias"], 2.0),
+                "1.weight": torch.full_like(current_state["1.weight"], 9.0),
+                "1.bias": torch.full_like(current_state["1.bias"], 8.0),
+            }
+        },
+        run_dir / "hard_st_best.pt",
+    )
+
+    anchor = load_parameter_anchor(
+        {
+            "parameter_anchor": {
+                "run_dir": str(run_dir),
+                "include_prefixes": ["0."],
+                "weight": 0.05,
+            }
+        },
+        model=model,
+        device=torch.device("cpu"),
+    )
+
+    assert anchor is not None
+    assert set(anchor.tensors.keys()) == {"0.weight", "0.bias"}
+    assert math.isclose(anchor.weight_end, 0.05)
+
+
+def test_compute_parameter_anchor_loss_matches_expected_normalized_l2() -> None:
+    model = torch.nn.Sequential(torch.nn.Linear(2, 2, bias=False))
+    with torch.no_grad():
+        model[0].weight.copy_(torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+    anchor = ParameterAnchor(
+        tensors={"0.weight": torch.zeros_like(model[0].weight)},
+        weight_start=0.5,
+        weight_end=0.5,
+        weight_schedule_steps=0,
+        start_step=0,
+        stop_step=-1,
+        p=2.0,
+        normalize=True,
+    )
+
+    loss, metrics = compute_parameter_anchor_loss(
+        model=model,
+        anchor=anchor,
+        step=0,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+
+    expected_raw = (1.0**2 + 2.0**2 + 3.0**2 + 4.0**2) / 4.0
+    assert math.isclose(metrics["parameter_anchor_loss_raw"], expected_raw)
+    assert math.isclose(metrics["parameter_anchor_loss"], expected_raw * 0.5)
+    assert math.isclose(float(loss.item()), expected_raw * 0.5)
 
 
 def test_probe_guided_low_rank_weights_follow_top_probe_directions() -> None:

@@ -58,6 +58,16 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl030_selectlocked_seed16030_p1" 1
     wait
     ;;
+  a_r3)
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlocked.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0005_selectlocked_seed16031_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0010_selectlocked.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_paramanchor15057_w0010_selectlocked_seed16032_p1" 1
+    wait
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_teacher15057_delayedkl015_paramanchor15057_w0005_selectlocked_seed16033_p1" 0
+    wait
+    ;;
   b_r1)
     run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_15051readout_15057extras_selectlocked.yaml \
       "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_15051readout_15057extras_selectlocked_seed16041_p1" 0
@@ -84,7 +94,7 @@ case "${mode}" in
     ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|b_r1|c_r1]" >&2
+    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|b_r1|c_r1]" >&2
     exit 1
     ;;
 esac

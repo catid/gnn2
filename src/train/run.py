@@ -67,6 +67,18 @@ class TeacherDistillation:
 
 
 @dataclass
+class ParameterAnchor:
+    tensors: dict[str, torch.Tensor]
+    weight_start: float
+    weight_end: float
+    weight_schedule_steps: int
+    start_step: int
+    stop_step: int
+    p: float
+    normalize: bool
+
+
+@dataclass
 class AuxiliaryTrainBenchmark:
     name: str
     benchmark: Any
@@ -1928,6 +1940,120 @@ def load_teacher_distillation(
     )
 
 
+def load_parameter_anchor(
+    cfg: dict[str, Any],
+    *,
+    model: PacketRoutingModel,
+    device: torch.device,
+) -> ParameterAnchor | None:
+    anchor_cfg = dict(cfg.get("parameter_anchor") or {})
+    base_weight = float(anchor_cfg.get("weight", 0.0))
+    weight_start = float(anchor_cfg.get("weight_start", base_weight))
+    weight_end = float(anchor_cfg.get("weight_end", base_weight))
+    if max(weight_start, weight_end) <= 0.0:
+        return None
+
+    run_dir_value = anchor_cfg.get("run_dir")
+    checkpoint_value = anchor_cfg.get("checkpoint")
+    if run_dir_value:
+        checkpoint_path = resolve_checkpoint_from_run_dir(Path(run_dir_value), checkpoint_value)
+    elif checkpoint_value:
+        checkpoint_path = Path(str(checkpoint_value))
+    else:
+        raise ValueError("parameter_anchor requires either parameter_anchor.run_dir or parameter_anchor.checkpoint.")
+
+    payload = torch.load(checkpoint_path, map_location="cpu")
+    state_dict = payload["model"]
+    include_prefixes = tuple(str(prefix) for prefix in anchor_cfg.get("include_prefixes", []))
+    exclude_prefixes = tuple(str(prefix) for prefix in anchor_cfg.get("exclude_prefixes", []))
+    current_state = model.state_dict()
+    anchor_tensors: dict[str, torch.Tensor] = {}
+    for name, tensor in state_dict.items():
+        if name not in current_state or current_state[name].shape != tensor.shape:
+            continue
+        if include_prefixes and not any(name.startswith(prefix) for prefix in include_prefixes):
+            continue
+        if exclude_prefixes and any(name.startswith(prefix) for prefix in exclude_prefixes):
+            continue
+        if not torch.is_floating_point(current_state[name]):
+            continue
+        anchor_tensors[name] = tensor.to(device=device, dtype=current_state[name].dtype)
+
+    if not anchor_tensors:
+        raise ValueError(f"parameter_anchor copied zero parameters from {checkpoint_path}.")
+
+    return ParameterAnchor(
+        tensors=anchor_tensors,
+        weight_start=weight_start,
+        weight_end=weight_end,
+        weight_schedule_steps=int(anchor_cfg.get("weight_schedule_steps", 0)),
+        start_step=int(anchor_cfg.get("start_step", 0)),
+        stop_step=int(anchor_cfg.get("stop_step", -1)),
+        p=float(anchor_cfg.get("p", 2.0)),
+        normalize=bool(anchor_cfg.get("normalize", True)),
+    )
+
+
+def parameter_anchor_weight(anchor: ParameterAnchor, step: int) -> float:
+    if step < anchor.start_step:
+        return 0.0
+    if anchor.stop_step >= 0 and step >= anchor.stop_step:
+        return 0.0
+    if anchor.weight_schedule_steps > 0:
+        frac = min(1.0, max(0.0, (step - anchor.start_step) / max(1, anchor.weight_schedule_steps)))
+        return float(anchor.weight_start + frac * (anchor.weight_end - anchor.weight_start))
+    return float(anchor.weight_end)
+
+
+def compute_parameter_anchor_loss(
+    *,
+    model: PacketRoutingModel,
+    anchor: ParameterAnchor,
+    step: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    weight = parameter_anchor_weight(anchor, step)
+    if weight <= 0.0:
+        zero = torch.zeros((), device=device, dtype=dtype)
+        return zero, {
+            "parameter_anchor_loss": 0.0,
+            "parameter_anchor_loss_raw": 0.0,
+            "parameter_anchor_weight": 0.0,
+            "parameter_anchor_param_count": 0.0,
+        }
+
+    raw_total = torch.zeros((), device=device, dtype=torch.float32)
+    param_count = 0
+    anchored_params = 0
+    p_value = max(1.0, float(anchor.p))
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        reference = anchor.tensors.get(name)
+        if reference is None:
+            continue
+        diff = (parameter.float() - reference.float()).abs()
+        if p_value == 1.0:
+            raw_total = raw_total + diff.sum()
+        else:
+            raw_total = raw_total + diff.pow(p_value).sum()
+        param_count += diff.numel()
+        anchored_params += 1
+    if anchored_params == 0:
+        raise ValueError("parameter_anchor did not match any trainable parameters.")
+    if anchor.normalize and param_count > 0:
+        raw_total = raw_total / float(param_count)
+    total = raw_total.to(dtype=dtype) * float(weight)
+    return total, {
+        "parameter_anchor_loss": float(total.detach().item()),
+        "parameter_anchor_loss_raw": float(raw_total.detach().item()),
+        "parameter_anchor_weight": float(weight),
+        "parameter_anchor_param_count": float(param_count),
+        "parameter_anchor_matched_tensors": float(anchored_params),
+    }
+
+
 def teacher_step_controls(teacher: TeacherDistillation, step: int) -> tuple[float, float]:
     if step < teacher.start_step:
         return 0.0, 0.0
@@ -2145,6 +2271,7 @@ def run_supervised_phase(
     amp_dtype = str(system_cfg.get("amp_dtype", "bf16"))
     teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device)
     proxy_teacher = load_teacher_distillation(cfg, benchmark=benchmark, device=device, section="proxy_teacher")
+    parameter_anchor = load_parameter_anchor(cfg, model=model, device=device)
     auxiliary_train_benchmarks = load_auxiliary_train_benchmarks(cfg)
     auxiliary_eval_benchmarks = load_auxiliary_eval_benchmarks(cfg, section="training")
     partial_init_summary = apply_partial_init(model, cfg.get("partial_init")) if not cfg.get("resume") else {}
@@ -2443,7 +2570,17 @@ def run_supervised_phase(
                     auxiliary_loss = auxiliary_loss + agreement_loss
                     for key, value in agreement_metrics.items():
                         auxiliary_metrics[f"{aux_prefix}_{key}"] = value
-            total_loss = output.loss + teacher_loss + auxiliary_loss
+            parameter_anchor_loss = torch.zeros((), device=device, dtype=output.loss.dtype)
+            parameter_anchor_metrics: dict[str, float] = {}
+            if parameter_anchor is not None:
+                parameter_anchor_loss, parameter_anchor_metrics = compute_parameter_anchor_loss(
+                    model=model,
+                    anchor=parameter_anchor,
+                    step=step,
+                    device=device,
+                    dtype=output.loss.dtype,
+                )
+            total_loss = output.loss + teacher_loss + auxiliary_loss + parameter_anchor_loss
         scaler.scale(total_loss).backward()
         scaler.unscale_(optimizer)
         torch.nn.utils.clip_grad_norm_(
@@ -2461,6 +2598,8 @@ def run_supervised_phase(
         if auxiliary_train_benchmarks:
             batch_metrics["auxiliary_loss"] = float(auxiliary_loss.detach().item())
             batch_metrics.update(auxiliary_metrics)
+        if parameter_anchor is not None:
+            batch_metrics.update(parameter_anchor_metrics)
         batch_metrics.update(
             {
                 "phase": phase_name,
