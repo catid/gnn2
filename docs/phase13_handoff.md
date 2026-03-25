@@ -32,6 +32,6 @@ This is a live handoff note and will be finalized when phase 13 closes.
   not moved yet.
 - Single next experiment:
   finish the remaining verification floor on stable `1874` branches:
-  complete the queued `16041` and `16081` reruns, then decide whether both
-  queued extra five-seed panels are still needed to close phase 13 with the
-  required panel coverage instead of resting mostly on `16045` and `16066`.
+  complete the now-live `16041` and `16081` five-seed panels so the final
+  closeout rests on five completed panel roots instead of mainly on `16045`
+  and `16066`.

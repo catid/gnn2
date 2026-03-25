@@ -106,6 +106,7 @@ At the time of this draft:
 - the `16022` and `16066` five-seed `1874` panels are now complete,
 - `16066` is the cleaner current Cluster A leader while `16022` remains a real
   but high-variance selection-only path,
-- and the next queued verification tranche is the remaining rerun / panel
-  coverage on `16041` and `16081` needed to clear the phase-13 verification
-  floor.
+- the rerun floor is now cleared by completed `16041_rerun1` and
+  `16081_rerun1`,
+- and the only remaining live work is the extra five-seed panel coverage on
+  `16041` and `16081` needed to close the phase-13 verification floor cleanly.
