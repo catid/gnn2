@@ -10,6 +10,7 @@ from src.train.run import (
     apply_cli_overrides,
     apply_partial_init,
     compute_parameter_anchor_loss,
+    evaluate_stability_guard,
     initial_selection_score,
     load_parameter_anchor,
     ParameterAnchor,
@@ -214,6 +215,98 @@ def test_validation_score_supports_lexicographic_floor_selector() -> None:
         "selection_eval.full_locked.per_mode.delay_to_final_query.route_match > "
         "selection_eval.full_locked.accuracy)"
     )
+
+
+def test_evaluate_stability_guard_passes_when_thresholds_hold() -> None:
+    cfg = {
+        "stability_guard": {
+            "start_step": 100,
+            "checks": [
+                {
+                    "path": "selection_eval.full_locked.per_mode.delay_to_final_query.route_match",
+                    "minimum": 0.87,
+                },
+                {
+                    "path": "selection_eval.full_locked.per_mode.delay_to_final_query.exit_time",
+                    "minimum": 115.0,
+                },
+            ],
+            "max_consecutive_violations": 2,
+            "max_rollbacks": 3,
+            "cooldown_evals": 1,
+            "early_stop_after_max_rollbacks": True,
+        }
+    }
+    metrics = {
+        "selection_eval": {
+            "full_locked": {
+                "per_mode": {
+                    "delay_to_final_query": {
+                        "route_match": 0.88,
+                        "exit_time": 116.0,
+                    }
+                }
+            }
+        }
+    }
+
+    status = evaluate_stability_guard(cfg, metrics, step=120)
+
+    assert status is not None
+    assert status["passed"] is True
+    assert status["failures"] == []
+    assert status["max_consecutive_violations"] == 2
+    assert status["max_rollbacks"] == 3
+    assert status["cooldown_evals"] == 1
+    assert status["early_stop_after_max_rollbacks"] is True
+
+
+def test_evaluate_stability_guard_fails_when_metric_drops_below_threshold() -> None:
+    cfg = {
+        "stability_guard": {
+            "checks": [
+                {
+                    "path": "selection_eval.full_locked.per_mode.delay_to_final_query.route_match",
+                    "minimum": 0.88,
+                },
+                {
+                    "path": "selection_eval.full_locked.per_mode.delay_to_final_query.exit_time",
+                    "minimum": 118.0,
+                },
+            ]
+        }
+    }
+    metrics = {
+        "selection_eval": {
+            "full_locked": {
+                "per_mode": {
+                    "delay_to_final_query": {
+                        "route_match": 0.87,
+                        "exit_time": 116.0,
+                    }
+                }
+            }
+        }
+    }
+
+    status = evaluate_stability_guard(cfg, metrics, step=0)
+
+    assert status is not None
+    assert status["passed"] is False
+    assert status["failures"] == [
+        {
+            "path": "selection_eval.full_locked.per_mode.delay_to_final_query.route_match",
+            "reason": "minimum",
+            "value": 0.87,
+            "threshold": 0.88,
+        },
+        {
+            "path": "selection_eval.full_locked.per_mode.delay_to_final_query.exit_time",
+            "reason": "minimum",
+            "value": 116.0,
+            "threshold": 118.0,
+        },
+    ]
 
 
 def test_apply_partial_init_supports_weighted_source_interpolation(tmp_path: Path) -> None:

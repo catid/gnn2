@@ -309,6 +309,63 @@ def composite_metric_score(
     return score, metric_name
 
 
+def evaluate_stability_guard(
+    section_cfg: dict[str, Any],
+    metrics: dict[str, Any],
+    *,
+    step: int,
+) -> dict[str, Any] | None:
+    guard_cfg = section_cfg.get("stability_guard")
+    if not isinstance(guard_cfg, dict) or not guard_cfg:
+        return None
+    start_step = int(guard_cfg.get("start_step", 0))
+    if step < start_step:
+        return None
+    checks_cfg = guard_cfg.get("checks", [])
+    if not isinstance(checks_cfg, list) or not checks_cfg:
+        raise ValueError("training.stability_guard.checks must be a non-empty list of mappings.")
+    failures: list[dict[str, float | str]] = []
+    for item in checks_cfg:
+        if not isinstance(item, dict):
+            raise ValueError("training.stability_guard.checks entries must be mappings.")
+        path = item.get("path")
+        if path is None:
+            raise ValueError("training.stability_guard.checks entries require a path.")
+        value = resolve_metric_path(metrics, str(path))
+        if math.isnan(value):
+            failures.append({"path": str(path), "reason": "nan"})
+            continue
+        minimum = item.get("minimum")
+        if minimum is not None and value < float(minimum):
+            failures.append(
+                {
+                    "path": str(path),
+                    "reason": "minimum",
+                    "value": value,
+                    "threshold": float(minimum),
+                }
+            )
+        maximum = item.get("maximum")
+        if maximum is not None and value > float(maximum):
+            failures.append(
+                {
+                    "path": str(path),
+                    "reason": "maximum",
+                    "value": value,
+                    "threshold": float(maximum),
+                }
+            )
+    return {
+        "enabled": True,
+        "passed": not failures,
+        "failures": failures,
+        "max_consecutive_violations": int(guard_cfg.get("max_consecutive_violations", 1)),
+        "max_rollbacks": int(guard_cfg.get("max_rollbacks", 0)),
+        "cooldown_evals": int(guard_cfg.get("cooldown_evals", 0)),
+        "early_stop_after_max_rollbacks": bool(guard_cfg.get("early_stop_after_max_rollbacks", False)),
+    }
+
+
 def centered_rank_fitness(rewards: torch.Tensor) -> torch.Tensor:
     rewards = rewards.float()
     order = torch.argsort(rewards)
@@ -2312,6 +2369,15 @@ def run_supervised_phase(
     best_val = -1.0
     best_path = results_dir / f"{phase_name}_best.pt"
     last_path = results_dir / f"{phase_name}_last.pt"
+    stability_guard_cfg = train_cfg.get("stability_guard", {}) if isinstance(train_cfg.get("stability_guard"), dict) else {}
+    stability_guard_restore_path: Path | None = None
+    stability_guard_restore_label = "best"
+    if stability_guard_cfg.get("restore_checkpoint") is not None:
+        stability_guard_restore_path = Path(str(stability_guard_cfg["restore_checkpoint"]))
+        stability_guard_restore_label = "checkpoint"
+    elif stability_guard_cfg.get("restore_run_dir") is not None:
+        stability_guard_restore_path = resolve_checkpoint_from_run_dir(Path(str(stability_guard_cfg["restore_run_dir"])))
+        stability_guard_restore_label = "run_dir"
 
     if resume_path:
         payload = load_checkpoint(
@@ -2334,6 +2400,10 @@ def run_supervised_phase(
     best_val_metrics: dict[str, Any] | None = None
     best_val_score = initial_selection_score(train_cfg)
     best_metric_name = str(train_cfg.get("selection_metric", "accuracy"))
+    stability_guard_consecutive_violations = 0
+    stability_guard_rollbacks = 0
+    stability_guard_cooldown = 0
+    should_stop_early = False
     progress = tqdm(range(start_step, total_steps), disable=False)
     for step in progress:
         if device.type == "cuda":
@@ -2663,16 +2733,78 @@ def run_supervised_phase(
             if selection_eval_metrics:
                 val_metrics["selection_eval"] = selection_eval_metrics
             val_metrics.update({"phase": phase_name, "split": "val", "step": step})
+            stability_guard_metrics = evaluate_stability_guard(train_cfg, val_metrics, step=step)
+            if stability_guard_metrics is not None:
+                val_metrics["stability_guard"] = {
+                    **stability_guard_metrics,
+                    "consecutive_violations_before_update": float(stability_guard_consecutive_violations),
+                    "rollbacks_before_update": float(stability_guard_rollbacks),
+                    "cooldown_before_update": float(stability_guard_cooldown),
+                }
             peak_train_memory_mb = max(peak_train_memory_mb, float(val_metrics["peak_memory_mb"]))
             logger.write(val_metrics)
             val_score, metric_name = validation_score(val_metrics, cfg, section="training")
-            if val_score > best_val_score:
+            guard_passed = True
+            if stability_guard_metrics is not None:
+                if stability_guard_cooldown > 0:
+                    stability_guard_cooldown -= 1
+                elif not bool(stability_guard_metrics["passed"]):
+                    guard_passed = False
+                    stability_guard_consecutive_violations += 1
+                    violation_limit = max(1, int(stability_guard_metrics["max_consecutive_violations"]))
+                    if stability_guard_consecutive_violations >= violation_limit:
+                        restore_path = best_path if best_path.exists() else stability_guard_restore_path
+                        if restore_path is not None and restore_path.exists():
+                            load_checkpoint(
+                                restore_path,
+                                model,
+                                optimizer,
+                                strict=(restore_path == best_path),
+                            )
+                            stability_guard_rollbacks += 1
+                            stability_guard_consecutive_violations = 0
+                            stability_guard_cooldown = max(0, int(stability_guard_metrics["cooldown_evals"]))
+                            logger.write(
+                                {
+                                    "phase": phase_name,
+                                    "split": "stability_guard",
+                                    "step": step,
+                                    "guard_action": "rollback",
+                                    "restore_source": stability_guard_restore_label if restore_path != best_path else "best",
+                                    "restore_path": str(restore_path),
+                                    "rollbacks": float(stability_guard_rollbacks),
+                                    "cooldown_evals": float(stability_guard_cooldown),
+                                    "consecutive_violations": float(stability_guard_consecutive_violations),
+                                    "failures": stability_guard_metrics["failures"],
+                                }
+                            )
+                            max_rollbacks = int(stability_guard_metrics["max_rollbacks"])
+                            if max_rollbacks > 0 and stability_guard_rollbacks >= max_rollbacks:
+                                should_stop_early = bool(stability_guard_metrics["early_stop_after_max_rollbacks"])
+                        else:
+                            logger.write(
+                                {
+                                    "phase": phase_name,
+                                    "split": "stability_guard",
+                                    "step": step,
+                                    "guard_action": "violation_without_restore",
+                                    "restore_source": "missing",
+                                    "rollbacks": float(stability_guard_rollbacks),
+                                    "consecutive_violations": float(stability_guard_consecutive_violations),
+                                    "failures": stability_guard_metrics["failures"],
+                                }
+                            )
+                else:
+                    stability_guard_consecutive_violations = 0
+            if guard_passed and val_score > best_val_score:
                 best_val_score = val_score
                 best_metric_name = metric_name
                 best_val = val_metrics["accuracy"]
                 best_val_metrics = val_metrics
                 save_checkpoint(best_path, model, optimizer, step, {"phase": phase_name})
             save_checkpoint(last_path, model, optimizer, step, {"phase": phase_name})
+            if should_stop_early:
+                break
 
     if best_path.exists():
         load_checkpoint(best_path, model)

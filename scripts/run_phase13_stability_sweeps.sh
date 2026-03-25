@@ -116,9 +116,21 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_auxlockedlong_teacher15051_selectlexi_seed16058_p1" 1
     wait
     ;;
+  c_r3)
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectproxy_locked_guardbest.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectproxy_locked_guardbest_seed16059_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc_guardbest_strict.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc_guardbest_strict_seed16060_p1" 1
+    wait
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc_guard15057.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_selectlexi_lockedroute_lockedfqacc_guard15057_seed16061_p1" 0
+    run_bg configs/phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_auxfulllocked_fq8_selectgeo_guard15057.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_noroute_auxfulllocked_fq8_selectgeo_guard15057_seed16062_p1" 1
+    wait
+    ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|b_r1|b_r2|c_r1|c_r2]" >&2
+    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|a_r3|b_r1|b_r2|c_r1|c_r2|c_r3]" >&2
     exit 1
     ;;
 esac
