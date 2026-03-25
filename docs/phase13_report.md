@@ -59,8 +59,16 @@ The newer `16022` and `16066` exact reruns now reinforce the same conclusion:
 - `16022_rerun1` cleanly reproduced the intended selection-only late-route
   basin,
 - `16066_rerun1` cleanly reproduced the sustained-anchor late-route basin,
-- and the first live seeds from both follow-on five-seed panels are also clean
-  late-route seeds rather than shortcut relapses.
+- and neither follow-on panel has shown the old catastrophic shortcut relapse
+  so far.
+
+But the live panel stress is already more nuanced:
+
+- `16066` has now banked two acceptable late-route seeds,
+- `16022` has one strong seed and one seed that stayed late-route on route and
+  exit while collapsing content badly on the locked slice,
+- so the remaining instability question is no longer only “shortcut or not”.
+  It may also include weaker non-shortcut content-collapse basins.
 
 ### 2. The held-confirm ceiling still appears separate from stability
 

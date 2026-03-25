@@ -7,7 +7,7 @@ detailed ledger is in
 
 | Cluster | Half | Best Representative | Current Verdict |
 | --- | --- | --- | --- |
-| A | fruitful | `16022`, `16064`, `16066` | Strong mapping result. Anti-shortcut stabilization can keep the late-route regime and improve seed stability, but the verified held-confirm frontier still sits near `full_locked fq_acc ~= 0.313`. |
+| A | fruitful | `16022`, `16064`, `16066` | Strong mapping result with an important live caveat. Anti-shortcut stabilization can keep the late-route regime and improve seed stability, but the verified held-confirm frontier still sits near `full_locked fq_acc ~= 0.313`, and the live `16022` panel is already mixed rather than uniformly stable. |
 | B | fruitful | `16041`, `16043`, `16045`, `16072` | Strong mapping result. Conservative continuation from `15051` into the stronger `15057`-style reader clearly stabilizes the late-route basin on `1874`, but verified held-confirm content still falls back to the same ceiling. |
 | C | fruitful | `16055`, `16061_rerun1`, `16062` | Fair negative. Hard-case weighting and basin-aware checkpoint selection improve summary-time late-route slices, but the gains do not survive independent confirm. |
 | D | fruitful | `16081` | Settled. The best post-stability refinement is real on base behavior but still confirms back to the same held-confirm ceiling. |
@@ -23,6 +23,12 @@ detailed ledger is in
   improvement over the raw `15057` family.
 - Full-window anchoring plus selection (`16066`) kept the late-route regime
   cleanly, but still confirmed at the old held-confirm ceiling.
+- The live panel work is sharpening this further:
+  `16022` has already produced one strong late-route seed and one weaker
+  late-route seed with badly collapsed locked-slice content, while `16066` has
+  now banked two acceptable late-route seeds.
+  So Cluster A may contain two different stories:
+  a mixed selection-only path and a cleaner sustained-anchor path.
 
 ### B. Stable-To-Upside Continuation Bridge
 
