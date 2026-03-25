@@ -497,8 +497,14 @@ class PacketRoutingModel(nn.Module):
         )
         self.factorized_content_source = str(config.get("factorized_content_source", "final_sink_state"))
         self.factorized_combiner_mode = str(config.get("factorized_combiner_mode", "concat"))
+        payload_cardinality = config.get("payload_cardinality")
+        self.payload_cardinality = int(self.num_classes if payload_cardinality is None else payload_cardinality)
+        self.factorized_payload_aux_weight = float(config.get("factorized_payload_aux_weight", 0.0))
+        self.factorized_query_aux_weight = float(config.get("factorized_query_aux_weight", 0.0))
+        self.factorized_aux_final_query_only = bool(config.get("factorized_aux_final_query_only", False))
         self.query_offset = int(config.get("query_offset", -1))
-        self.query_cardinality = int(config.get("query_cardinality", 0))
+        query_cardinality = config.get("query_cardinality", 0)
+        self.query_cardinality = int(0 if query_cardinality is None else query_cardinality)
         self.readout_iter_steps = int(config.get("readout_iter_steps", 1))
         self.readout_view_dropout = float(config.get("readout_view_dropout", 0.0))
         self.readout_attention_heads = int(config.get("readout_attention_heads", 1))
@@ -653,6 +659,8 @@ class PacketRoutingModel(nn.Module):
         self.factorized_gate = None
         self.factorized_bilinear = None
         self.factorized_film = None
+        self.factorized_payload_head = None
+        self.factorized_query_head = None
         self.multiview_view_dropout = (
             nn.Dropout(self.readout_view_dropout)
             if self.readout_view_dropout > 0.0
@@ -837,6 +845,13 @@ class PacketRoutingModel(nn.Module):
                 self.factorized_film = nn.Linear(self.hidden_dim, self.hidden_dim * 2)
             else:
                 raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
+            if self.factorized_payload_aux_weight > 0.0:
+                self.factorized_payload_head = nn.Linear(self.hidden_dim, self.payload_cardinality)
+            if self.factorized_query_aux_weight > 0.0:
+                self.factorized_query_head = nn.Linear(
+                    self.hidden_dim,
+                    max(1, self.query_cardinality if self.query_cardinality > 0 else self.num_classes),
+                )
             readout_input_dim = self.hidden_dim
         elif self.readout_mode in self.multiview_readout_modes:
             if effective_base_mode == "query_conditioned":
@@ -1219,7 +1234,7 @@ class PacketRoutingModel(nn.Module):
         route_conf_sum: torch.Tensor,
         route_weight_total: torch.Tensor,
         eps: torch.Tensor,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         query_obs = observations[:, -1, 0]
         if self.factorized_content_source == "trajectory_bank":
             bank, route_features = self._select_temporal_bank(
@@ -1245,15 +1260,15 @@ class PacketRoutingModel(nn.Module):
         content = self.factorized_content_proj(content)
         query_hidden = self.factorized_query_proj(query_obs)
         if self.factorized_combiner_mode == "concat":
-            return self.factorized_combiner(torch.cat([content, query_hidden], dim=-1))
+            return self.factorized_combiner(torch.cat([content, query_hidden], dim=-1)), content, query_hidden
         if self.factorized_combiner_mode == "gated":
             gated = content * torch.sigmoid(self.factorized_gate(query_hidden))
-            return self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1))
+            return self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1)), content, query_hidden
         if self.factorized_combiner_mode == "bilinear":
-            return torch.tanh(self.factorized_bilinear(content, query_hidden))
+            return torch.tanh(self.factorized_bilinear(content, query_hidden)), content, query_hidden
         if self.factorized_combiner_mode == "film":
             gamma, beta = torch.chunk(self.factorized_film(query_hidden), 2, dim=-1)
-            return content * (1.0 + torch.tanh(gamma)) + beta
+            return content * (1.0 + torch.tanh(gamma)) + beta, content, query_hidden
         raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
@@ -1320,6 +1335,8 @@ class PacketRoutingModel(nn.Module):
         release_mask: torch.Tensor | None = None,
         release_weight: float = 0.0,
         release_positive_weight: float = 1.0,
+        factorized_payload_targets: torch.Tensor | None = None,
+        factorized_query_targets: torch.Tensor | None = None,
         task_sample_weights: torch.Tensor | None = None,
         final_query_mask: torch.Tensor | None = None,
         return_trace: bool = False,
@@ -2097,6 +2114,8 @@ class PacketRoutingModel(nn.Module):
         if trace is not None:
             trace["final_sink_state"] = sink_state
 
+        factorized_content_hidden = None
+        factorized_query_hidden = None
         if self.readout_mode == "probe_query_views":
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -2187,7 +2206,7 @@ class PacketRoutingModel(nn.Module):
                 observations,
                 for_multiview=False,
             )
-            readout_input = self._factorized_readout_input(
+            readout_input, factorized_content_hidden, factorized_query_hidden = self._factorized_readout_input(
                 sink_state=sink_state,
                 observations=observations,
                 trace=trace,
@@ -2214,6 +2233,10 @@ class PacketRoutingModel(nn.Module):
             trace["packet_state_query"] = packet_state_query
             if baseline_view.shape[-1] == self.hidden_dim:
                 trace["baseline_readout_input"] = baseline_view
+            if factorized_content_hidden is not None:
+                trace["factorized_content_hidden"] = factorized_content_hidden
+            if factorized_query_hidden is not None:
+                trace["factorized_query_hidden"] = factorized_query_hidden
             trace["final_readout_input"] = readout_input
         if self.readout_head_mode == "mixture":
             logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
@@ -2249,6 +2272,38 @@ class PacketRoutingModel(nn.Module):
             mixture_top1_weight = (
                 self.readout.last_mixture_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
             )
+        factorized_payload_aux_loss = torch.zeros((), device=device, dtype=dtype)
+        if (
+            self.factorized_payload_head is not None
+            and factorized_content_hidden is not None
+            and factorized_payload_targets is not None
+            and self.factorized_payload_aux_weight > 0.0
+        ):
+            aux_weights = torch.ones_like(labels, device=device, dtype=dtype)
+            if self.factorized_aux_final_query_only and final_query_mask is not None:
+                aux_weights = final_query_mask.to(device=device, dtype=dtype)
+            if bool(aux_weights.sum().item() > 0):
+                payload_logits = self.factorized_payload_head(factorized_content_hidden.float())
+                payload_targets = factorized_payload_targets.to(device=device, dtype=torch.long)
+                per_sample_payload_loss = F.cross_entropy(payload_logits, payload_targets, reduction="none").to(dtype)
+                factorized_payload_aux_loss = (per_sample_payload_loss * aux_weights).sum() / aux_weights.sum().clamp_min(float(eps))
+                task_loss = task_loss + (self.factorized_payload_aux_weight * factorized_payload_aux_loss)
+        factorized_query_aux_loss = torch.zeros((), device=device, dtype=dtype)
+        if (
+            self.factorized_query_head is not None
+            and factorized_query_hidden is not None
+            and factorized_query_targets is not None
+            and self.factorized_query_aux_weight > 0.0
+        ):
+            aux_weights = torch.ones_like(labels, device=device, dtype=dtype)
+            if self.factorized_aux_final_query_only and final_query_mask is not None:
+                aux_weights = final_query_mask.to(device=device, dtype=dtype)
+            if bool(aux_weights.sum().item() > 0):
+                query_logits = self.factorized_query_head(factorized_query_hidden.float())
+                query_targets = factorized_query_targets.to(device=device, dtype=torch.long)
+                per_sample_query_loss = F.cross_entropy(query_logits, query_targets, reduction="none").to(dtype)
+                factorized_query_aux_loss = (per_sample_query_loss * aux_weights).sum() / aux_weights.sum().clamp_min(float(eps))
+                task_loss = task_loss + (self.factorized_query_aux_weight * factorized_query_aux_loss)
         penalty_hops = float(compute_penalties.get("hops", 0.0)) * hops.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_delays = float(compute_penalties.get("delays", 0.0)) * delays.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
         penalty_ttl = float(compute_penalties.get("ttl_fail", 0.0)) * ttl_fail.mean() if compute_penalties else torch.zeros((), device=device, dtype=dtype)
@@ -2343,6 +2398,8 @@ class PacketRoutingModel(nn.Module):
             "release_loss": torch.full_like(accuracy, float(release_term.detach().item())),
             "task_shaping_loss": torch.full_like(accuracy, float(task_shaping_loss.detach().item())),
             "prototype_pull_loss": torch.full_like(accuracy, float(prototype_pull_loss.detach().item())),
+            "factorized_payload_aux_loss": torch.full_like(accuracy, float(factorized_payload_aux_loss.detach().item())),
+            "factorized_query_aux_loss": torch.full_like(accuracy, float(factorized_query_aux_loss.detach().item())),
             "mixture_balance_loss": torch.full_like(accuracy, float(mixture_balance_loss.detach().item())),
             "mixture_gate_entropy": torch.full_like(accuracy, float(mixture_gate_entropy.detach().item())),
             "mixture_top1_weight": torch.full_like(accuracy, float(mixture_top1_weight.detach().item())),

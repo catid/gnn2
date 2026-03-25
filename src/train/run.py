@@ -1455,6 +1455,8 @@ def apply_probe_warmstart(
                     release_mask=release_mask,
                     release_weight=release_weight,
                     release_positive_weight=release_positive_weight,
+                    factorized_payload_targets=batch.metadata.get("payload"),
+                    factorized_query_targets=batch.metadata.get("query"),
                     final_query_mask=batch.metadata.get("needs_final_query"),
                     return_trace=True,
                 )
@@ -1642,6 +1644,8 @@ def benchmark_model_config(base_model_cfg: dict[str, Any], benchmark) -> dict[st
         model_cfg["query_offset"] = int(benchmark.query_offset)
     if hasattr(benchmark, "query_cardinality"):
         model_cfg["query_cardinality"] = int(benchmark.query_cardinality)
+    if hasattr(benchmark, "payload_cardinality"):
+        model_cfg["payload_cardinality"] = int(benchmark.payload_cardinality)
     return model_cfg
 
 
@@ -2068,6 +2072,8 @@ def run_supervised_phase(
                 release_mask=release_mask,
                 release_weight=release_weight,
                 release_positive_weight=release_positive_weight,
+                factorized_payload_targets=batch.metadata.get("payload"),
+                factorized_query_targets=batch.metadata.get("query"),
                 task_sample_weights=task_sample_weights,
                 final_query_mask=batch.metadata.get("needs_final_query"),
                 return_trace=return_trace,

@@ -78,6 +78,20 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1821_factorized_temporalbank_query_gated_seed15036_p1" 1
     wait
     ;;
+  factorized_aux_r2)
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1874_factorized_sink_query_gated_payloadaux.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_sink_query_gated_payloadaux_seed15037_p1" 0
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1874_factorized_sink_query_gated_payloadqueryaux.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_sink_query_gated_payloadqueryaux_seed15038_p1" 1
+    wait
+    ;;
+  factorized_aux_r3)
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_gated_route_payloadqueryaux.yaml \
+      "${results_root}/hard_st_b_v2_teacher1874_factorized_temporalbank_query_gated_route_payloadqueryaux_seed15039_p1" 0
+    run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1821_factorized_temporalbank_query_gated_payloadqueryaux.yaml \
+      "${results_root}/hard_st_b_v2_teacher1821_factorized_temporalbank_query_gated_payloadqueryaux_seed15040_p1" 1
+    wait
+    ;;
   windows)
     run_bg configs/phase12/dev/hard_st_benchmark_b_v2_teacher1201_temporalwindow_contiguous_24_72.yaml \
       "${results_root}/hard_st_b_v2_teacher1201_temporalwindow_contiguous_24_72_seed15041_p1" 0
@@ -106,7 +120,7 @@ case "${mode}" in
     ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|bank|bank_r2a|bank_r2b|bank_r2c|factorized|factorized_r2|factorized_r3|windows|windows_r2|windows_r3|windows_r4]" >&2
+    echo "usage: $0 [results-root] [anchor|bank|bank_r2a|bank_r2b|bank_r2c|factorized|factorized_r2|factorized_r3|factorized_aux_r2|factorized_aux_r3|windows|windows_r2|windows_r3|windows_r4]" >&2
     exit 1
     ;;
 esac

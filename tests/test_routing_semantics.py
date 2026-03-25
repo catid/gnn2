@@ -380,7 +380,50 @@ def test_factorized_readouts_construct_and_run() -> None:
 
         assert output.logits.shape == (2, 3)
         assert output.trace is not None
+        assert output.trace["factorized_content_hidden"].shape == (2, 4)
+        assert output.trace["factorized_query_hidden"].shape == (2, 4)
         assert output.trace["final_readout_input"].shape == (2, 4)
+
+
+def test_factorized_auxiliary_heads_add_losses() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "payload_cardinality": 5,
+            "query_cardinality": 7,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "gated",
+            "factorized_payload_aux_weight": 0.25,
+            "factorized_query_aux_weight": 0.5,
+            "factorized_aux_final_query_only": True,
+        }
+    )
+    observations = torch.zeros(2, 4, 2, 8)
+    observations[:, -1, 0, 2] = 1.0
+    labels = torch.zeros(2, dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        factorized_payload_targets=torch.tensor([1, 2], dtype=torch.long),
+        factorized_query_targets=torch.tensor([3, 4], dtype=torch.long),
+        final_query_mask=torch.tensor([1, 0], dtype=torch.long),
+        return_trace=True,
+    )
+
+    assert output.stats["factorized_payload_aux_loss"].shape == (2,)
+    assert output.stats["factorized_query_aux_loss"].shape == (2,)
+    assert float(output.stats["factorized_payload_aux_loss"][0].item()) > 0.0
+    assert float(output.stats["factorized_query_aux_loss"][0].item()) > 0.0
 
 
 def test_delay_hold_mode_preserves_packet_state() -> None:
