@@ -1,6 +1,6 @@
 {
   "candidate_name": "18026_multislot4_shared_mean_base",
-  "status": "candidate",
+  "status": "panel_complete",
   "baseline_run": "results/phase15_anchor/hard_st_b_v2_teacher1874_anchor16045_selectlocked_seed18011_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot4_shared_mean_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot4_shared_mean_base_seed18026_p1",
@@ -77,8 +77,27 @@
     }
   },
   "seed_panel": {
-    "panel_dir": "",
-    "headline_metrics": {}
+    "panel_dir": "results/phase15_panel/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot4_shared_mean_base_panel18026",
+    "headline_metrics": {
+      "full_locked": {
+        "overall_accuracy": 0.99775390625,
+        "fq_acc": 0.9960784264973231,
+        "fq_route": 0.9342670450914029,
+        "fq_exit": 120.8668536089159
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.99775390625,
+        "fq_acc": 0.9973055641343093,
+        "fq_route": 0.9387630002964368,
+        "fq_exit": 121.0691969872105
+      },
+      "longdistance": {
+        "overall_accuracy": 0.9978515625,
+        "fq_acc": 0.9969507950011509,
+        "fq_route": 0.9491337416160462,
+        "fq_exit": 153.1024259951903
+      }
+    }
   },
   "summary_eval": {
     "best_val": {
@@ -115,7 +134,7 @@
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": true,
     "verify_passed": true,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
-  "final_decision": "retired_confirm_ceiling_stable"
+  "final_decision": "panel_complete_locked_confirmed_retired_confirm_ceiling"
 }

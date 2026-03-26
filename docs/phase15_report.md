@@ -12,7 +12,12 @@ Can a richer content-only path on top of the fixed `16045` route anchor improve 
 
 Phase 15 has already separated the richer-content-path question into two cleaner sub-answers.
 
-First, a richer path by itself is not enough. The best multi-slot baseline so far is `18026`, the `4`-slot shared-mean channel. It was rerun-clean, preserved the late-route regime under locked confirm, and remained the best multi-slot stable control. But locked confirm still fell back to the old ceiling:
+First, a richer path by itself is not enough. The best multi-slot baseline is still `18026`, the `4`-slot shared-mean channel. It is now rerun-clean, fully paneled, and locked-confirmed. Its five-seed selected summary regime stayed stable:
+
+- `18026` five-seed selected `full_locked overall / fq_acc / fq_route / fq_exit = 0.9978 / 0.9961 / 0.9343 / 120.87`
+- `18026` five-seed selected `finalquery_heavy = 0.9978 / 0.9973 / 0.9388 / 121.07`
+
+But locked confirm still fell back to the old ceiling:
 
 - `18026` locked confirm `full_locked overall / fq_acc / fq_route / fq_exit = 0.6527 / 0.2874 / 0.8850 / 116.22`
 - `18026` locked confirm `finalquery_heavy = 0.4427 / 0.2972 / 0.8789 / 115.56`
@@ -34,7 +39,7 @@ The current best content-only supervision branch is `18052`, the `sidecarkv4 + t
 - `18052` locked confirm `full_locked = 0.6592 / 0.3001 / 0.8797 / 116.14`
 - `18052` locked confirm `finalquery_heavy = 0.4515 / 0.3083 / 0.8785 / 115.97`
 
-Interpretation: the richer sidecar path is currently beating the richer multi-slot path on the real bottleneck, but only by a narrow margin.
+Interpretation: the richer sidecar path is currently beating the richer multi-slot path on the real bottleneck, and that read now holds at panel depth rather than just single-run depth.
 
 ## Cluster A Read
 
@@ -42,6 +47,7 @@ Cluster A is mapped enough to answer its main question.
 
 - best multi-slot branch: `18026`
 - rerun: pass
+- five-seed panel: complete
 - locked confirm: stable but ceiling-limited
 - current interpretation: multi-slot channels do not beat the best sidecar families on held-confirm content
 
@@ -55,7 +61,7 @@ Cluster B is the current phase-15 winner family.
 - stronger-path sidecar follow-ups (`18059`, `18060`) proved that better hard-slice behavior alone still is not enough; both landed on the old confirm ceiling
 - the current best headline branches are `18052` and `18057`
 
-Interpretation: sidecar memory beats multi-slot channels as the better isolated content-path direction, but only modestly so far.
+Interpretation: sidecar memory beats multi-slot channels as the better isolated content-path direction, and that comparison is now locked in at panel depth for the multi-slot side.
 
 ## Cluster C Read
 
@@ -104,5 +110,5 @@ If the remaining panel roots and Cluster F do not change this, the most likely i
 
 The campaign is still filling the comparison panel roots that matter most for that read:
 
-- `18026` multislot panel has two completed seeds (`18226`, `18227`) and a third live seed (`18228`)
-- `18060` stronger sidecar dual-anchor panel has started with live seed `18260`
+- `18026` multislot panel is complete through all five seeds
+- `18060` stronger sidecar dual-anchor panel has two completed seeds (`18260`, `18261`) and two live seeds (`18262`, `18263`)

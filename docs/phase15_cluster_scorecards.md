@@ -10,21 +10,22 @@ Mapped enough to score as a stable negative.
 
 - Best branch: `18026` multislot4 shared-mean
 - Rerun: pass
+- Five-seed panel: complete
 - Locked confirm: pass on route/exit stability, fail on held-confirm content
 - Current answer: multi-slot channels did not break the ceiling
 
 Headline metrics for `18026`:
 
+- five-seed selected `full_locked overall / fq_acc / fq_route / fq_exit = 0.9978 / 0.9961 / 0.9343 / 120.87`
 - locked confirm `full_locked overall / fq_acc / fq_route / fq_exit = 0.6527 / 0.2874 / 0.8850 / 116.22`
 - locked confirm `finalquery_heavy = 0.4427 / 0.2972 / 0.8789 / 115.56`
-- summary selected `full_locked dqf = 0.9966 / 0.9953 / 0.9468 / 122.15`
 
 Scorecard:
 
 - Stability: strong
 - Hard-slice behavior: acceptable
 - Held-confirm lift: no
-- Retirement reason: best multi-slot branch still lands on the old ceiling after rerun plus locked confirm
+- Retirement reason: best multi-slot branch still lands on the old ceiling after rerun, five-seed panel, and locked confirm
 
 ## Cluster B
 
@@ -39,7 +40,7 @@ Scorecard:
 - Stability: strong
 - Route isolation: preserved
 - Held-confirm lift: modest, not decisive
-- Current answer: sidecar memory beats multi-slot channels as the richer-path direction, but only by a small margin
+- Current answer: sidecar memory beats multi-slot channels as the richer-path direction, and that read now holds at panel depth
 
 ## Cluster C
 
