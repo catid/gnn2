@@ -98,7 +98,7 @@ Current bounded sanity branches:
 - `18222` complete on `1821`
 - `18222_rerun1` live on `1821`
 - `18291` complete on `1879`
-- `18292` live on `1879`
+- `18292` complete on `1879`
 
 ## Provisional Conclusion
 
@@ -116,4 +116,4 @@ The campaign is still filling the portability and sanity roots that matter most 
 - `18026` multislot panel is complete through all five seeds
 - `18060` stronger sidecar dual-anchor panel is complete through all five seeds
 - `18222` is now the stronger summary-time `1821` portability read and `18222_rerun1` is live to decide whether it deserves any confirm budget
-- `18291` already closed as a clean negative and `18292` remains live as the final bounded `1879` negative-control run
+- `18291` and `18292` are now both closed as clean bounded `1879` negatives
