@@ -1,6 +1,6 @@
 {
   "candidate_name": "17041_teacher16081_contentmse010_hardslice_fqhld_selectlexi",
-  "status": "candidate_pending_rerun",
+  "status": "retired_after_locked_confirm",
   "baseline_run": "results/phase14_anchor/20260326_005629_hard_st_benchmark_b_v2_teacher1874_anchor16045_selectlocked",
   "config_path": "configs/phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml",
   "run_dir": "results/phase14_dev/20260326_012915_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi",
@@ -44,12 +44,49 @@
     }
   },
   "rerun": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase14_dev/20260326_015804_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi_seed17041_rerun1",
+    "headline_metrics": {
+      "best_val_dqf": {
+        "accuracy": 0.9970,
+        "route_match": 0.9414,
+        "exit_time": 121.7954
+      },
+      "selected_full_locked_dqf": {
+        "accuracy": 0.9953,
+        "route_match": 0.9440,
+        "exit_time": 121.8910
+      },
+      "selected_finalquery_heavy_dqf": {
+        "accuracy": 0.9969,
+        "route_match": 0.9333,
+        "exit_time": 120.7289
+      },
+      "selected_longdistance_dqf": {
+        "accuracy": 0.9986,
+        "route_match": 0.9515,
+        "exit_time": 153.3448
+      }
+    }
   },
   "locked_confirm": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase14_dev/20260326_012915_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi",
+    "headline_metrics": {
+      "selected_full_locked_dqf": {
+        "accuracy": 0.2874,
+        "route_match": 0.8850,
+        "exit_time": 116.22
+      },
+      "selected_finalquery_heavy_dqf": {
+        "accuracy": 0.2968,
+        "route_match": 0.8789,
+        "exit_time": 115.56
+      },
+      "selected_longdistance_dqf": {
+        "accuracy": 0.3303,
+        "route_match": 0.8868,
+        "exit_time": 145.62
+      }
+    }
   },
   "seed_panel": {
     "panel_dir": "",
@@ -60,11 +97,11 @@
     "checksum": "pending_manual_review"
   },
   "gate": {
-    "rerun_preserves_late_route": false,
+    "rerun_preserves_late_route": true,
     "hard_slice_improves_or_holds": true,
-    "locked_confirm_preserves_route_exit": false,
+    "locked_confirm_preserves_route_exit": true,
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending"
+  "final_decision": "retire_locked_confirm_content_ceiling"
 }
