@@ -1,6 +1,6 @@
 {
   "candidate_name": "18031_sidecarkv4_base",
-  "status": "running",
+  "status": "retired",
   "baseline_run": "results/phase15_anchor/hard_st_b_v2_teacher1874_anchor16045_selectlocked_seed18011_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18031_p1",
@@ -14,9 +14,15 @@
     "unit_test_passed": true
   },
   "content_failure_hard_slice": {
-    "artifact_json": "",
-    "artifact_rows_csv": "",
-    "headline_metrics": {}
+    "artifact_json": "artifacts/phase15_hardslice/18011_vs_18031_confirm32b.json",
+    "artifact_rows_csv": "artifacts/phase15_hardslice/18011_vs_18031_confirm32b.rows.csv",
+    "headline_metrics": {
+      "baseline_late_wrong_content": 1,
+      "candidate_late_wrong_content": 2,
+      "late_relaxed_disagreements": 3,
+      "candidate_beats_baseline_on_late_disagreements": 1,
+      "baseline_beats_candidate_on_late_disagreements": 2
+    }
   },
   "rerun": {
     "run_dir": "",
@@ -31,10 +37,30 @@
     "headline_metrics": {}
   },
   "summary_eval": {
-    "best_val": {},
-    "full_locked": {},
-    "finalquery_heavy": {},
-    "longdistance": {}
+    "best_val": {
+      "overall_accuracy": 0.998046875,
+      "fq_acc": 0.9970208493458124,
+      "fq_route": 0.9483614684690194,
+      "fq_exit": 121.97318862566526
+    },
+    "full_locked": {
+      "overall_accuracy": 0.99853515625,
+      "fq_acc": 0.9971988698124997,
+      "fq_route": 0.937441655957287,
+      "fq_exit": 120.81325902858703
+    },
+    "finalquery_heavy": {
+      "overall_accuracy": 0.99609375,
+      "fq_acc": 0.9957134125061876,
+      "fq_route": 0.9485609356567163,
+      "fq_exit": 122.05817345118713
+    },
+    "longdistance": {
+      "overall_accuracy": 0.99853515625,
+      "fq_acc": 0.9979209935838617,
+      "fq_route": 0.938322933283599,
+      "fq_exit": 151.7803172047404
+    }
   },
   "verify": {
     "artifact_json": "",
@@ -47,5 +73,5 @@
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending"
+  "final_decision": "retired_hardslice_negative"
 }
