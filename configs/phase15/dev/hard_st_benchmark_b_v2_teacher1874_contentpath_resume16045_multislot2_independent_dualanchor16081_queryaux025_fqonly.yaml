@@ -1,0 +1,16 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_base.yaml
+
+experiment:
+  seed: 18056
+
+model:
+  factorized_query_aux_weight: 0.25
+  factorized_aux_final_query_only: true
+
+training:
+  trainable_prefixes:
+    - factorized_content_proj
+    - factorized_content_slot
+    - factorized_bilinear
+    - factorized_query_head
+    - readout

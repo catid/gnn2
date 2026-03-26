@@ -56,9 +56,98 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_fqonly_seed18024_p1" 1
     wait
     ;;
+  a_r2)
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_shared_mean_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_shared_mean_base_seed18023_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot4_shared_mean_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot4_shared_mean_base_seed18026_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_mean_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_mean_base_seed18027_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_shared_attention_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_shared_attention_base_seed18028_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_learnedinit_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_learnedinit_base_seed18029_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot4_independent_learnedinit_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot4_independent_learnedinit_base_seed18030_p1" 1
+    wait
+    ;;
+  b_r1)
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv8_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv8_base_seed18033_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_contenthidden_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_contenthidden_base_seed18034_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base_seed18035_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base_seed18036_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv8_trajectorybank_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv8_trajectorybank_base_seed18037_p1" 0
+    wait
+    ;;
+  c_r1)
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_payloadaux040_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_payloadaux040_fqonly_seed18038_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_queryaux025_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_queryaux025_fqonly_seed18039_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_protopull010_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_protopull010_fqonly_seed18040_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_payloadaux040_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_payloadaux040_fqonly_seed18045_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_queryaux025_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_queryaux025_fqonly_seed18046_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_protopull010_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_protopull010_fqonly_seed18047_p1" 1
+    wait
+    ;;
+  d_r1)
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_base_seed18043_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_base.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_base_seed18053_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_payloadaux040_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_payloadaux040_fqonly_seed18055_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_queryaux025_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_dualanchor16081_queryaux025_fqonly_seed18056_p1" 1
+    wait
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_seed18057_p1" 0
+    run_bg \
+      "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_queryaux025_fqonly.yaml" \
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_queryaux025_fqonly_seed18058_p1" 1
+    wait
+    ;;
   *)
     echo "unknown mode: ${mode}" >&2
-    echo "usage: $0 [results-root] [anchor|a_r1]" >&2
+    echo "usage: $0 [results-root] [anchor|a_r1|a_r2|b_r1|c_r1|d_r1]" >&2
     exit 1
     ;;
 esac
