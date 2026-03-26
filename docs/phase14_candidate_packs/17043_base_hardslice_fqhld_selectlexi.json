@@ -1,0 +1,70 @@
+{
+  "candidate_name": "17043_base_hardslice_fqhld_selectlexi",
+  "status": "pending_rerun",
+  "baseline_run": "results/phase14_anchor/20260326_005629_hard_st_benchmark_b_v2_teacher1874_anchor16045_selectlocked",
+  "config_path": "configs/phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi.yaml",
+  "run_dir": "results/phase14_dev/20260326_025608_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi_seed17043_p1",
+  "checkpoint": "results/phase14_dev/20260326_025608_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi_seed17043_p1/hard_st_best.pt",
+  "route_anchor": "16045",
+  "content_teacher": "none",
+  "headline_metrics": {
+    "best_val_dqf": {
+      "accuracy": 0.9990,
+      "route_match": 0.9464,
+      "exit_time": 121.60
+    },
+    "selected_full_locked_dqf": {
+      "accuracy": 0.9981,
+      "route_match": 0.9477,
+      "exit_time": 122.01
+    },
+    "selected_finalquery_heavy_dqf": {
+      "accuracy": 0.9988,
+      "route_match": 0.9461,
+      "exit_time": 121.84
+    },
+    "selected_longdistance_dqf": {
+      "accuracy": 0.9931,
+      "route_match": 0.9425,
+      "exit_time": 152.70
+    }
+  },
+  "content_failure_hard_slice": {
+    "artifact_json": "artifacts/phase14_hardslice/17011_vs_17043_full_locked_32b.json",
+    "artifact_rows_csv": "artifacts/phase14_hardslice/17011_vs_17043_full_locked_32b.rows.csv",
+    "headline_metrics": {
+      "shared_examples": 8192,
+      "late_relaxed_disagreements": 3,
+      "candidate_beats_baseline_on_late_disagreements": 3,
+      "baseline_beats_candidate_on_late_disagreements": 0,
+      "baseline_late_wrong_content": 3,
+      "candidate_late_wrong_content": 0,
+      "baseline_late_relaxed_accuracy": 0.9992393509127789,
+      "candidate_late_relaxed_accuracy": 1.0
+    }
+  },
+  "rerun": {
+    "run_dir": "results/phase14_dev/20260326_031234_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi_seed17043_rerun1",
+    "headline_metrics": {}
+  },
+  "locked_confirm": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "seed_panel": {
+    "panel_dir": "",
+    "headline_metrics": {}
+  },
+  "verify": {
+    "artifact_json": "",
+    "checksum": ""
+  },
+  "gate": {
+    "rerun_preserves_late_route": false,
+    "hard_slice_improves_or_holds": true,
+    "locked_confirm_preserves_route_exit": false,
+    "verify_passed": false,
+    "candidate_pack_complete": false
+  },
+  "final_decision": "pending"
+}
