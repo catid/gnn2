@@ -1,0 +1,26 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_sidecar_teacher16081_contentmse010.yaml
+
+training:
+  auxiliary_train_benchmarks:
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+  selection_metric_mode: lexicographic
+  selection_metric_terms:
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      minimum: 0.94
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.exit_time
+      minimum: 121
+    - path: selection_eval.finalquery_heavy.per_mode.delay_to_final_query.accuracy
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+    - path: per_mode.delay_to_final_query.accuracy
+    - path: accuracy

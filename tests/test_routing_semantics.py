@@ -461,6 +461,45 @@ def test_factorized_auxiliary_heads_add_losses() -> None:
     assert float(output.stats["factorized_query_aux_loss"][0].item()) > 0.0
 
 
+def test_factorized_content_sidecar_zero_init_isolated_to_readout() -> None:
+    model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+            "factorized_content_sidecar_mode": "residual_mlp",
+            "factorized_content_sidecar_source": "final_sink_state",
+            "factorized_content_sidecar_zero_init": True,
+        }
+    )
+    observations = torch.zeros(2, 4, 2, 8)
+    observations[:, -1, 0, 2] = 1.0
+    labels = torch.zeros(2, dtype=torch.long)
+
+    output = model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert output.trace is not None
+    assert output.trace["factorized_content_sidecar_hidden"].shape == (2, 4)
+    assert torch.allclose(
+        output.trace["factorized_content_sidecar_hidden"],
+        torch.zeros_like(output.trace["factorized_content_sidecar_hidden"]),
+        atol=1e-7,
+    )
+
+
 def test_delay_hold_mode_preserves_packet_state() -> None:
     model = PacketRoutingModel(
         {

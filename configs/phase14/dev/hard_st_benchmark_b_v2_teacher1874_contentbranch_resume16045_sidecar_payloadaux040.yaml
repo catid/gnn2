@@ -1,0 +1,5 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_sidecar_base.yaml
+
+model:
+  factorized_payload_aux_weight: 0.40
+  factorized_aux_final_query_only: true

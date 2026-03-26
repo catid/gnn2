@@ -504,6 +504,14 @@ class PacketRoutingModel(nn.Module):
         )
         self.factorized_content_source = str(config.get("factorized_content_source", "final_sink_state"))
         self.factorized_combiner_mode = str(config.get("factorized_combiner_mode", "concat"))
+        self.factorized_content_sidecar_mode = str(config.get("factorized_content_sidecar_mode", "none"))
+        self.factorized_content_sidecar_source = str(
+            config.get("factorized_content_sidecar_source", self.factorized_content_source)
+        )
+        self.factorized_content_sidecar_scale = float(config.get("factorized_content_sidecar_scale", 1.0))
+        self.factorized_content_sidecar_zero_init = bool(
+            config.get("factorized_content_sidecar_zero_init", False)
+        )
         payload_cardinality = config.get("payload_cardinality")
         self.payload_cardinality = int(self.num_classes if payload_cardinality is None else payload_cardinality)
         self.factorized_payload_aux_weight = float(config.get("factorized_payload_aux_weight", 0.0))
@@ -676,6 +684,7 @@ class PacketRoutingModel(nn.Module):
         self.factorized_gate = None
         self.factorized_bilinear = None
         self.factorized_film = None
+        self.factorized_content_sidecar = None
         self.factorized_payload_head = None
         self.factorized_query_head = None
         self.multiview_view_dropout = (
@@ -845,6 +854,21 @@ class PacketRoutingModel(nn.Module):
                 nn.Linear(self.hidden_dim, self.hidden_dim),
                 nn.GELU(),
             )
+            if self.factorized_content_sidecar_mode == "residual_mlp":
+                self.factorized_content_sidecar = nn.Sequential(
+                    nn.LayerNorm(self.hidden_dim),
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                    nn.GELU(),
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                )
+                if self.factorized_content_sidecar_zero_init:
+                    final_linear = self.factorized_content_sidecar[-1]
+                    nn.init.zeros_(final_linear.weight)
+                    nn.init.zeros_(final_linear.bias)
+            elif self.factorized_content_sidecar_mode != "none":
+                raise ValueError(
+                    f"Unknown factorized_content_sidecar_mode: {self.factorized_content_sidecar_mode}"
+                )
             if self.factorized_combiner_mode == "concat":
                 self.factorized_combiner = nn.Sequential(
                     nn.LayerNorm(self.hidden_dim * 2),
@@ -1275,6 +1299,43 @@ class PacketRoutingModel(nn.Module):
         weights = torch.softmax(scores, dim=-1)
         return (weights.unsqueeze(-1) * bank).sum(dim=1)
 
+    def _factorized_content_source_hidden(
+        self,
+        *,
+        source: str,
+        sink_state: torch.Tensor,
+        observations: torch.Tensor,
+        trace: dict[str, torch.Tensor],
+        first_exit_time: torch.Tensor,
+        delays: torch.Tensor,
+        action_totals: torch.Tensor,
+        route_entropy_sum: torch.Tensor,
+        route_conf_sum: torch.Tensor,
+        route_weight_total: torch.Tensor,
+        eps: torch.Tensor,
+    ) -> torch.Tensor:
+        query_obs = observations[:, -1, 0]
+        if source == "trajectory_bank":
+            bank, route_features = self._select_temporal_bank(
+                trace=trace,
+                observations=observations,
+                first_exit_time=first_exit_time,
+                delays=delays,
+                action_totals=action_totals,
+                route_entropy_sum=route_entropy_sum,
+                route_conf_sum=route_conf_sum,
+                route_weight_total=route_weight_total,
+                eps=eps,
+            )
+            return self._temporal_bank_context(
+                bank=bank,
+                query_obs=query_obs,
+                route_features=route_features,
+            )
+        if source == "final_sink_state":
+            return sink_state
+        raise ValueError(f"Unknown factorized content source: {source}")
+
     def _factorized_readout_input(
         self,
         *,
@@ -1288,41 +1349,63 @@ class PacketRoutingModel(nn.Module):
         route_conf_sum: torch.Tensor,
         route_weight_total: torch.Tensor,
         eps: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
         query_obs = observations[:, -1, 0]
-        if self.factorized_content_source == "trajectory_bank":
-            bank, route_features = self._select_temporal_bank(
-                trace=trace,
-                observations=observations,
-                first_exit_time=first_exit_time,
-                delays=delays,
-                action_totals=action_totals,
-                route_entropy_sum=route_entropy_sum,
-                route_conf_sum=route_conf_sum,
-                route_weight_total=route_weight_total,
-                eps=eps,
-            )
-            content = self._temporal_bank_context(
-                bank=bank,
-                query_obs=query_obs,
-                route_features=route_features,
-            )
-        elif self.factorized_content_source == "final_sink_state":
-            content = sink_state
-        else:
-            raise ValueError(f"Unknown factorized_content_source: {self.factorized_content_source}")
-        content = self.factorized_content_proj(content)
+        raw_content = self._factorized_content_source_hidden(
+            source=self.factorized_content_source,
+            sink_state=sink_state,
+            observations=observations,
+            trace=trace,
+            first_exit_time=first_exit_time,
+            delays=delays,
+            action_totals=action_totals,
+            route_entropy_sum=route_entropy_sum,
+            route_conf_sum=route_conf_sum,
+            route_weight_total=route_weight_total,
+            eps=eps,
+        )
+        content = self.factorized_content_proj(raw_content)
+        sidecar_hidden = None
+        if self.factorized_content_sidecar is not None:
+            if self.factorized_content_sidecar_source == self.factorized_content_source:
+                sidecar_source = raw_content
+            else:
+                sidecar_source = self._factorized_content_source_hidden(
+                    source=self.factorized_content_sidecar_source,
+                    sink_state=sink_state,
+                    observations=observations,
+                    trace=trace,
+                    first_exit_time=first_exit_time,
+                    delays=delays,
+                    action_totals=action_totals,
+                    route_entropy_sum=route_entropy_sum,
+                    route_conf_sum=route_conf_sum,
+                    route_weight_total=route_weight_total,
+                    eps=eps,
+                )
+            sidecar_hidden = self.factorized_content_sidecar(sidecar_source)
+            content = content + (self.factorized_content_sidecar_scale * sidecar_hidden)
         query_hidden = self.factorized_query_proj(query_obs)
         if self.factorized_combiner_mode == "concat":
-            return self.factorized_combiner(torch.cat([content, query_hidden], dim=-1)), content, query_hidden
+            return (
+                self.factorized_combiner(torch.cat([content, query_hidden], dim=-1)),
+                content,
+                query_hidden,
+                sidecar_hidden,
+            )
         if self.factorized_combiner_mode == "gated":
             gated = content * torch.sigmoid(self.factorized_gate(query_hidden))
-            return self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1)), content, query_hidden
+            return (
+                self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1)),
+                content,
+                query_hidden,
+                sidecar_hidden,
+            )
         if self.factorized_combiner_mode == "bilinear":
-            return torch.tanh(self.factorized_bilinear(content, query_hidden)), content, query_hidden
+            return torch.tanh(self.factorized_bilinear(content, query_hidden)), content, query_hidden, sidecar_hidden
         if self.factorized_combiner_mode == "film":
             gamma, beta = torch.chunk(self.factorized_film(query_hidden), 2, dim=-1)
-            return content * (1.0 + torch.tanh(gamma)) + beta, content, query_hidden
+            return content * (1.0 + torch.tanh(gamma)) + beta, content, query_hidden, sidecar_hidden
         raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
@@ -2170,6 +2253,7 @@ class PacketRoutingModel(nn.Module):
 
         factorized_content_hidden = None
         factorized_query_hidden = None
+        factorized_content_sidecar_hidden = None
         if self.readout_mode == "probe_query_views":
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -2260,7 +2344,12 @@ class PacketRoutingModel(nn.Module):
                 observations,
                 for_multiview=False,
             )
-            readout_input, factorized_content_hidden, factorized_query_hidden = self._factorized_readout_input(
+            (
+                readout_input,
+                factorized_content_hidden,
+                factorized_query_hidden,
+                factorized_content_sidecar_hidden,
+            ) = self._factorized_readout_input(
                 sink_state=sink_state,
                 observations=observations,
                 trace=trace,
@@ -2291,6 +2380,8 @@ class PacketRoutingModel(nn.Module):
                 trace["factorized_content_hidden"] = factorized_content_hidden
             if factorized_query_hidden is not None:
                 trace["factorized_query_hidden"] = factorized_query_hidden
+            if factorized_content_sidecar_hidden is not None:
+                trace["factorized_content_sidecar_hidden"] = factorized_content_sidecar_hidden
             trace["final_readout_input"] = readout_input
         if self.readout_head_mode == "mixture":
             logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
