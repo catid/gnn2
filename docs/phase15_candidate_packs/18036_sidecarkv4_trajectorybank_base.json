@@ -1,6 +1,6 @@
 {
   "candidate_name": "18036_sidecarkv4_trajectorybank_base",
-  "status": "candidate",
+  "status": "retired",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18031_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base_seed18036_p1",
@@ -25,12 +25,56 @@
     }
   },
   "rerun": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base_seed18036_rerun1_p1",
+    "headline_metrics": {
+      "best_val": {
+        "overall_accuracy": 0.99853515625,
+        "fq_acc": 0.9990069441785878,
+        "fq_route": 0.9394240378741593,
+        "fq_exit": 121.00496582667664
+      },
+      "full_locked": {
+        "overall_accuracy": 0.9970703125,
+        "fq_acc": 0.9953314505037474,
+        "fq_route": 0.941176470309969,
+        "fq_exit": 121.61344564172512
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.998046875,
+        "fq_acc": 0.9975505066808571,
+        "fq_route": 0.9357011581737428,
+        "fq_exit": 120.72994308798721
+      },
+      "longdistance": {
+        "overall_accuracy": 0.9990234375,
+        "fq_acc": 0.9986139876678927,
+        "fq_route": 0.9487179407871852,
+        "fq_exit": 153.02009642793334
+      }
+    }
   },
   "locked_confirm": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base_seed18036_rerun1_p1",
+    "headline_metrics": {
+      "full_locked": {
+        "overall_accuracy": 0.6526692509651184,
+        "fq_acc": 0.2874331600804699,
+        "fq_route": 0.8850267513152112,
+        "fq_exit": 116.22326311325645
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.4427083432674408,
+        "fq_acc": 0.29720853401228714,
+        "fq_route": 0.8788998295814533,
+        "fq_exit": 115.55870250332336
+      },
+      "longdistance": {
+        "overall_accuracy": 0.5260416865348816,
+        "fq_acc": 0.33026679213867344,
+        "fq_route": 0.8868445506749508,
+        "fq_exit": 145.62235822914496
+      }
+    }
   },
   "seed_panel": {
     "panel_dir": "",
@@ -63,15 +107,15 @@
     }
   },
   "verify": {
-    "artifact_json": "",
-    "checksum": ""
+    "artifact_json": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base_seed18036_rerun1_p1/artifacts/phase15_verify/verification.json",
+    "checksum": "7a1568c50f148e00772a7df44c36f4f6b2a470a80ec9b4db641575dcc8a8da35"
   },
   "gate": {
-    "rerun_preserves_late_route": false,
+    "rerun_preserves_late_route": true,
     "hard_slice_improves_or_holds": true,
-    "locked_confirm_preserves_route_exit": false,
-    "verify_passed": false,
+    "locked_confirm_preserves_route_exit": true,
+    "verify_passed": true,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending_rerun"
+  "final_decision": "retired_confirm_ceiling_stable"
 }

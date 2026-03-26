@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_base.yaml
+
+experiment:
+  seed: 18060
+
+model:
+  factorized_content_sidecar_source: trajectory_bank

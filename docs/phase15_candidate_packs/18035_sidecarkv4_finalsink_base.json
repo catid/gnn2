@@ -1,6 +1,6 @@
 {
   "candidate_name": "18035_sidecarkv4_finalsink_base",
-  "status": "candidate",
+  "status": "retired",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18031_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base_seed18035_p1",
@@ -25,12 +25,56 @@
     }
   },
   "rerun": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base_seed18035_rerun1_p1",
+    "headline_metrics": {
+      "best_val": {
+        "overall_accuracy": 0.998046875,
+        "fq_acc": 0.9970208467414386,
+        "fq_route": 0.9374379475398475,
+        "fq_exit": 120.75074522592342
+      },
+      "full_locked": {
+        "overall_accuracy": 0.99951171875,
+        "fq_acc": 0.9990662848916041,
+        "fq_route": 0.9486461285672156,
+        "fq_exit": 122.21755401582834
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.99853515625,
+        "fq_acc": 0.9981628711502463,
+        "fq_route": 0.946111445878082,
+        "fq_exit": 121.80771293102855
+      },
+      "longdistance": {
+        "overall_accuracy": 0.99755859375,
+        "fq_acc": 0.9965349998394814,
+        "fq_route": 0.9501039524997016,
+        "fq_exit": 153.28551990194447
+      }
+    }
   },
   "locked_confirm": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base_seed18035_rerun1_p1",
+    "headline_metrics": {
+      "full_locked": {
+        "overall_accuracy": 0.6526692509651184,
+        "fq_acc": 0.2874331600804699,
+        "fq_route": 0.8850267513152112,
+        "fq_exit": 116.22326311325645
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.4427083432674408,
+        "fq_acc": 0.29720853401228714,
+        "fq_route": 0.8788998295814533,
+        "fq_exit": 115.55870250332336
+      },
+      "longdistance": {
+        "overall_accuracy": 0.5260416865348816,
+        "fq_acc": 0.33026679213867344,
+        "fq_route": 0.8868445506749508,
+        "fq_exit": 145.62235822914496
+      }
+    }
   },
   "seed_panel": {
     "panel_dir": "",
@@ -63,15 +107,15 @@
     }
   },
   "verify": {
-    "artifact_json": "",
-    "checksum": ""
+    "artifact_json": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base_seed18035_rerun1_p1/artifacts/phase15_verify/verification.json",
+    "checksum": "bf90a0dce383ccaa67a9d4e626163a1125392a68d94f877654beb9c74acd5bd1"
   },
   "gate": {
-    "rerun_preserves_late_route": false,
+    "rerun_preserves_late_route": true,
     "hard_slice_improves_or_holds": true,
-    "locked_confirm_preserves_route_exit": false,
-    "verify_passed": false,
+    "locked_confirm_preserves_route_exit": true,
+    "verify_passed": true,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending_rerun"
+  "final_decision": "retired_confirm_ceiling_stable"
 }
