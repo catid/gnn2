@@ -94,7 +94,7 @@
   },
   "verify": {
     "artifact_json": "results/phase14_dev/20260326_025608_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi_seed17043_p1/artifacts/phase14_verify/verification.json",
-    "checksum": "pending_manual_review"
+    "checksum": "manual_review_fail_max_abs_diff_exit0.9285_acc0.00201_route0.00535"
   },
   "gate": {
     "rerun_preserves_late_route": true,
