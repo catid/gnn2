@@ -73,7 +73,7 @@ The matching no-teacher hard-slice control `17043` is also now fully paneled:
 - Five-seed `finalquery_heavy` DQF mean: `0.9977 / 0.9429 / 121.60`
 - Locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
 
-So Cluster C now has both a teacher-backed and a no-teacher paneled negative. The only live Cluster C frontier left is the stronger weighted teacher-backed branch `17042`.
+So Cluster C now has both a teacher-backed and a no-teacher paneled negative. The stronger weighted teacher-backed follow-up `17042` was rerun-clean and hard-slice-positive, but it also failed under locked confirm and was retired without extra panel budget. Cluster C is therefore mapped as a stable negative.
 
 ## Cluster D
 
@@ -100,7 +100,7 @@ Scorecard:
 
 ## Cluster E
 
-Early read already available.
+Characterization complete enough to score.
 
 - `17011`, `17024`, and `17031` all occupy a very similar summary-time late-route compute band around `full_locked exit ~= 121-123`
 - quality differences on that summary-time band are small relative to the confirm collapse
@@ -108,4 +108,23 @@ Early read already available.
 
 ## Cluster F
 
-Pending final scorecard.
+Mapped bounded sanity.
+
+- Best branch: `17101` non-teacher hard-slice lexicographic portability sanity on `1821`
+- Rerun: pass on summary-time late-route behavior
+- Locked confirm: weak bounded carryover only
+- Negative control: `17103` and `17104` both stay properly negative on `1879`
+
+Headline metrics for `17101`:
+
+- selected `full_locked` rerun DQF `0.9925 / 0.9300 / 122.67`
+- locked confirm `full_locked` overall/DQF `0.6136 / 0.2533 / 0.8329 / 116.34`
+- locked confirm `finalquery_heavy` overall/DQF `0.4020 / 0.2582 / 0.8264 / 115.59`
+
+Scorecard:
+
+- Stability: strong on summary-time slices
+- Weak portability: yes
+- New confirmed medium-source regime: no
+- Negative-control integrity: preserved
+- Retirement reason: bounded `1821` carryover survives rerun but confirm falls back to the old medium-source regime; `1879` remains properly negative

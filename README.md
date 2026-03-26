@@ -246,6 +246,20 @@ Phase-13 conclusion:
   `0.648 / 0.313 / 0.877 / 115.49`, so the remaining bottleneck now looks more
   like held-confirm content recovery than catastrophic shortcut instability
 
+Phase-14 conclusion:
+
+- content-branch-only teacher supervision (`17024`, `17025`), dual-anchor
+  route/content contracts (`17031`), hard-slice mining (`17041`, `17043`), and
+  the first gated content-only sidecar (`17063`) all preserve the stabilized
+  late-route summary regime, but locked confirms still fall back to roughly
+  `full_locked dqf 0.287-0.300 / 0.879-0.885 / 115.56-116.22`
+- the best bounded portability sanity (`17101`) is rerun-clean on `1821`
+  summary-time slices, but locked confirm still returns to the old
+  medium-source regime instead of opening a new portable frontier
+- `1879` remains a clean negative control, so the remaining bottleneck now
+  looks more like a deeper content-path architectural limit than a missing
+  supervision trick on the current fixed branch
+
 ## Phase 7 Commands
 
 Phase 7 focused on keepalive-basin discovery, staged recovery, ES role mapping,

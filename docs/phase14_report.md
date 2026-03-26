@@ -2,15 +2,13 @@
 
 ## Status
 
-Draft in progress.
+Complete. Strong mapping exit.
 
 ## Main Question
 
 Can narrow content-branch-only supervision on top of the stabilized `16045` route anchor improve held-confirm content recovery on `1874` without sacrificing the stable late-route regime?
 
 ## Current Read
-
-The campaign is still verification-heavy rather than discovery-heavy.
 
 One branch is already sharply mapped: dual-anchor route/content training has not produced a decisive phase-14 winner so far. The cleanest dual-anchor candidate remains `17031`, which improved the content-failure hard slice against the `17011` stable `16045` anchor and stayed rerun-clean, but its locked confirm still fell back to the familiar held-confirm regime:
 
@@ -65,9 +63,9 @@ The matching no-teacher hard-slice control `17043` is now also fully paneled and
 - `17043` five-seed mean `finalquery_heavy` DQF: `0.9977 / 0.9429 / 121.60`
 - `17043` locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
 
-Interpretation: hard-slice mining matters for stable late-route summary behavior, but neither the teacher-backed nor the no-teacher version changes the held-confirm ceiling once locked confirmation is applied. The remaining live frontier is now the stronger weighted teacher-backed branch `17042`, plus the bounded Cluster F sanity batch.
+Interpretation: hard-slice mining matters for stable late-route summary behavior, but neither the teacher-backed nor the no-teacher version changes the held-confirm ceiling once locked confirmation is applied. The stronger weighted teacher-backed follow-up `17042` was rerun-clean and hard-slice-positive as well, but it still fell back to the same locked-confirm ceiling and was retired without additional panel budget.
 
-## Cluster E Early Read
+## Cluster E Read
 
 The first compute-quality frontier check is already informative even before the remaining panel roots complete. On summary-time slices, the stable baseline `17011`, the first teacher-first branch `17024`, and the first dual-anchor branch `17031` all sit on nearly the same late-route compute band:
 
@@ -90,3 +88,26 @@ It also cleared the hard-slice gate and exact rerun. But its locked confirm stil
 - `17063` selected `finalquery_heavy` confirm DQF: `0.2976 / 0.8789 / 115.56`
 
 Interpretation: a small content-only sidecar path can preserve the stabilized late-route regime, but the first credible sidecar branch still looks like another summary-time improvement that does not survive held-confirm verification.
+
+## Cluster F Read
+
+The bounded portability sanity batch closed cleanly and did not change the main phase-14 conclusion.
+
+The strongest secondary-source carryover was `17101` on `1821`. It was rerun-clean on the summary-time slices:
+
+- `17101` selected `full_locked` rerun DQF: `0.9925 / 0.9300 / 122.67`
+- `17101` selected `finalquery_heavy` rerun DQF: `0.9884 / 0.9271 / 122.80`
+
+But its locked confirm still fell back to the familiar medium-source regime:
+
+- `17101` locked confirm `full_locked` overall/DQF: `0.6136 / 0.2533 / 0.8329 / 116.34`
+- `17101` locked confirm `finalquery_heavy` overall/DQF: `0.4020 / 0.2582 / 0.8264 / 115.59`
+
+The weighted-geomean `1821` control `17102` was weaker than `17101` even on the summary-time selection slices, so it did not earn rerun or confirm budget.
+
+Both `1879` sanity applications stayed properly negative:
+
+- `17103` selected `full_locked` DQF: `0.2698 / 0.8917 / 123.27`
+- `17104` selected `full_locked` DQF: `0.2568 / 0.9048 / 123.22`
+
+Interpretation: the best phase-14 content recipe is weakly portable only as a bounded sanity check. It does not create a new confirmed `1821` regime, and it does not manufacture a false-positive win on `1879`.

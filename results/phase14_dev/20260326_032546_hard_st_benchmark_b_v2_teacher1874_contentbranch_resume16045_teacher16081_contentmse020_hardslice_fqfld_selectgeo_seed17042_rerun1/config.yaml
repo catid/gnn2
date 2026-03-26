@@ -1,0 +1,35 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_fqonly.yaml
+
+experiment:
+  seed: 17042
+
+training:
+  auxiliary_train_benchmarks:
+    - name: full_locked
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml
+      split: confirm
+      loss_weight: 0.34
+      final_query_weight: 5.0
+      non_final_query_weight: 0.25
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.33
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      loss_weight: 0.33
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+  selection_metric_mode: weighted_geomean
+  selection_metric_terms:
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+      weight: 1.0
+    - path: selection_eval.finalquery_heavy.per_mode.delay_to_final_query.accuracy
+      weight: 2.0
+    - path: selection_eval.longdistance.per_slice.distance_long.accuracy
+      weight: 1.0
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      weight: 2.0

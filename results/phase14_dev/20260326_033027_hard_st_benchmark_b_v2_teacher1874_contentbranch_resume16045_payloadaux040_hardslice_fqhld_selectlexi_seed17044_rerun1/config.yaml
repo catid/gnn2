@@ -1,0 +1,30 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_fqonly.yaml
+
+experiment:
+  seed: 17044
+
+training:
+  auxiliary_train_benchmarks:
+    - name: finalquery_heavy
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_finalqueryheavy.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+    - name: longdistance
+      config: ../../phase8/confirm/hard_st_benchmark_b_v2_confirm_longdistance.yaml
+      split: confirm
+      loss_weight: 0.5
+      final_query_weight: 6.0
+      non_final_query_weight: 0.25
+  selection_metric_mode: lexicographic
+  selection_metric_terms:
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.route_match
+      minimum: 0.94
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.exit_time
+      minimum: 121
+    - path: selection_eval.finalquery_heavy.per_mode.delay_to_final_query.accuracy
+    - path: selection_eval.longdistance.per_slice.distance_long.accuracy
+    - path: selection_eval.full_locked.per_mode.delay_to_final_query.accuracy
+    - path: per_mode.delay_to_final_query.accuracy
+    - path: accuracy

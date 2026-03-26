@@ -1,0 +1,7 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux025_fqonly.yaml
+
+experiment:
+  seed: 17023
+
+model:
+  factorized_payload_aux_weight: 0.40

@@ -1,0 +1,13 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_fqonly.yaml
+
+experiment:
+  seed: 17031
+
+parameter_anchor:
+  run_dir: results/phase13_dev/hard_st_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_15051readout_15057extras_selectlocked_seed16045_p1
+  include_prefixes:
+    - readout
+  weight: 0.0005
+  start_step: 0
+  stop_step: 640
+  normalize: true
