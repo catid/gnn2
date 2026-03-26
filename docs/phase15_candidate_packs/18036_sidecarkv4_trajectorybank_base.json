@@ -1,6 +1,6 @@
 {
   "candidate_name": "18036_sidecarkv4_trajectorybank_base",
-  "status": "running",
+  "status": "completed_pending_hardslice",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18031_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_base_seed18036_p1",
@@ -31,10 +31,30 @@
     "headline_metrics": {}
   },
   "summary_eval": {
-    "best_val": {},
-    "full_locked": {},
-    "finalquery_heavy": {},
-    "longdistance": {}
+    "best_val": {
+      "overall_accuracy": 0.99853515625,
+      "fq_acc": 0.9990069441785878,
+      "fq_route": 0.9394240378741593,
+      "fq_exit": 121.00496582667664
+    },
+    "full_locked": {
+      "overall_accuracy": 0.9970703125,
+      "fq_acc": 0.9953314505037474,
+      "fq_route": 0.941176470309969,
+      "fq_exit": 121.61344564172512
+    },
+    "finalquery_heavy": {
+      "overall_accuracy": 0.998046875,
+      "fq_acc": 0.9975505066808571,
+      "fq_route": 0.9357011581737428,
+      "fq_exit": 120.72994308798721
+    },
+    "longdistance": {
+      "overall_accuracy": 0.9990234375,
+      "fq_acc": 0.9986139876678927,
+      "fq_route": 0.9487179407871852,
+      "fq_exit": 153.02009642793334
+    }
   },
   "verify": {
     "artifact_json": "",
@@ -47,5 +67,5 @@
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending"
+  "final_decision": "pending_hardslice"
 }
