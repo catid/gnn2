@@ -46,14 +46,14 @@ case "${mode}" in
       "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_base_seed18021_p1" 0
     run_bg \
       "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base.yaml" \
-      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18022_p1" 1
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18031_p1" 1
     wait
     run_bg \
       "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_teacher16081_contentmse010_fqonly.yaml" \
-      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_teacher16081_contentmse010_fqonly_seed18023_p1" 0
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_teacher16081_contentmse010_fqonly_seed18024_p1" 0
     run_bg \
       "$root/configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_fqonly.yaml" \
-      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_fqonly_seed18024_p1" 1
+      "${results_root}/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_fqonly_seed18032_p1" 1
     wait
     ;;
   a_r2)
