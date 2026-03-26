@@ -1,0 +1,19 @@
+_base_: ../../phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base.yaml
+
+experiment:
+  seed: 18031
+  results_root: results/phase15_dev
+
+model:
+  factorized_content_sidecar_mode: kv_memory
+  factorized_content_sidecar_source: factorized_content_base
+  factorized_content_sidecar_slots: 4
+  factorized_content_sidecar_scale: 1.0
+  factorized_content_sidecar_zero_init: true
+
+training:
+  trainable_prefixes:
+    - factorized_content_proj
+    - factorized_content_sidecar
+    - factorized_bilinear
+    - readout

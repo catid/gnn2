@@ -504,11 +504,29 @@ class PacketRoutingModel(nn.Module):
         )
         self.factorized_content_source = str(config.get("factorized_content_source", "final_sink_state"))
         self.factorized_combiner_mode = str(config.get("factorized_combiner_mode", "concat"))
+        self.factorized_content_slot_count = int(config.get("factorized_content_slot_count", 1))
+        if self.factorized_content_slot_count <= 0:
+            raise ValueError("factorized_content_slot_count must be positive.")
+        self.factorized_content_slot_mode = str(config.get("factorized_content_slot_mode", "none"))
+        if self.factorized_content_slot_mode == "none" and self.factorized_content_slot_count != 1:
+            raise ValueError(
+                "factorized_content_slot_mode='none' requires factorized_content_slot_count == 1."
+            )
+        self.factorized_content_slot_query_mode = str(
+            config.get("factorized_content_slot_query_mode", "attention")
+        )
+        self.factorized_content_slot_scale = float(config.get("factorized_content_slot_scale", 1.0))
+        self.factorized_content_slot_zero_init = bool(
+            config.get("factorized_content_slot_zero_init", False)
+        )
         self.factorized_content_sidecar_mode = str(config.get("factorized_content_sidecar_mode", "none"))
         self.factorized_content_sidecar_source = str(
             config.get("factorized_content_sidecar_source", self.factorized_content_source)
         )
         self.factorized_content_sidecar_scale = float(config.get("factorized_content_sidecar_scale", 1.0))
+        self.factorized_content_sidecar_slots = int(config.get("factorized_content_sidecar_slots", 4))
+        if self.factorized_content_sidecar_slots <= 0:
+            raise ValueError("factorized_content_sidecar_slots must be positive.")
         self.factorized_content_sidecar_zero_init = bool(
             config.get("factorized_content_sidecar_zero_init", False)
         )
@@ -680,11 +698,17 @@ class PacketRoutingModel(nn.Module):
         self.trajectory_bank_film = None
         self.factorized_query_proj = None
         self.factorized_content_proj = None
+        self.factorized_content_slot_proj = None
+        self.factorized_content_slot_embeddings = None
+        self.factorized_content_slot_query_proj = None
         self.factorized_combiner = None
         self.factorized_gate = None
         self.factorized_bilinear = None
         self.factorized_film = None
         self.factorized_content_sidecar = None
+        self.factorized_content_sidecar_key_proj = None
+        self.factorized_content_sidecar_value_proj = None
+        self.factorized_content_sidecar_query_proj = None
         self.factorized_payload_head = None
         self.factorized_query_head = None
         self.multiview_view_dropout = (
@@ -854,6 +878,40 @@ class PacketRoutingModel(nn.Module):
                 nn.Linear(self.hidden_dim, self.hidden_dim),
                 nn.GELU(),
             )
+            if self.factorized_content_slot_mode == "independent":
+                if self.factorized_content_slot_count <= 1:
+                    raise ValueError("factorized_content_slot_mode='independent' requires at least 2 slots.")
+                self.factorized_content_slot_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim * self.factorized_content_slot_count,
+                )
+                if self.factorized_content_slot_zero_init:
+                    nn.init.zeros_(self.factorized_content_slot_proj.weight)
+                    nn.init.zeros_(self.factorized_content_slot_proj.bias)
+            elif self.factorized_content_slot_mode == "shared":
+                if self.factorized_content_slot_count <= 1:
+                    raise ValueError("factorized_content_slot_mode='shared' requires at least 2 slots.")
+                self.factorized_content_slot_proj = nn.Linear(self.hidden_dim, self.hidden_dim)
+                self.factorized_content_slot_embeddings = nn.Parameter(
+                    torch.randn(self.factorized_content_slot_count, self.hidden_dim) * 0.02
+                )
+                if self.factorized_content_slot_zero_init:
+                    nn.init.zeros_(self.factorized_content_slot_proj.weight)
+                    nn.init.zeros_(self.factorized_content_slot_proj.bias)
+                    nn.init.zeros_(self.factorized_content_slot_embeddings)
+            elif self.factorized_content_slot_mode != "none":
+                raise ValueError(f"Unknown factorized_content_slot_mode: {self.factorized_content_slot_mode}")
+            if self.factorized_content_slot_mode != "none":
+                if self.factorized_content_slot_query_mode == "attention":
+                    self.factorized_content_slot_query_proj = nn.Linear(
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        bias=False,
+                    )
+                elif self.factorized_content_slot_query_mode != "mean":
+                    raise ValueError(
+                        "factorized_content_slot_query_mode must be one of: attention, mean"
+                    )
             if self.factorized_content_sidecar_mode == "residual_mlp":
                 self.factorized_content_sidecar = nn.Sequential(
                     nn.LayerNorm(self.hidden_dim),
@@ -865,6 +923,23 @@ class PacketRoutingModel(nn.Module):
                     final_linear = self.factorized_content_sidecar[-1]
                     nn.init.zeros_(final_linear.weight)
                     nn.init.zeros_(final_linear.bias)
+            elif self.factorized_content_sidecar_mode == "kv_memory":
+                self.factorized_content_sidecar_key_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim * self.factorized_content_sidecar_slots,
+                )
+                self.factorized_content_sidecar_value_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim * self.factorized_content_sidecar_slots,
+                )
+                self.factorized_content_sidecar_query_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim,
+                    bias=False,
+                )
+                if self.factorized_content_sidecar_zero_init:
+                    nn.init.zeros_(self.factorized_content_sidecar_value_proj.weight)
+                    nn.init.zeros_(self.factorized_content_sidecar_value_proj.bias)
             elif self.factorized_content_sidecar_mode != "none":
                 raise ValueError(
                     f"Unknown factorized_content_sidecar_mode: {self.factorized_content_sidecar_mode}"
@@ -1349,7 +1424,7 @@ class PacketRoutingModel(nn.Module):
         route_conf_sum: torch.Tensor,
         route_weight_total: torch.Tensor,
         eps: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    ) -> tuple[torch.Tensor, dict[str, torch.Tensor | None]]:
         query_obs = observations[:, -1, 0]
         raw_content = self._factorized_content_source_hidden(
             source=self.factorized_content_source,
@@ -1364,10 +1439,46 @@ class PacketRoutingModel(nn.Module):
             route_weight_total=route_weight_total,
             eps=eps,
         )
-        content = self.factorized_content_proj(raw_content)
+        base_content = self.factorized_content_proj(raw_content)
+        query_hidden = self.factorized_query_proj(query_obs)
+        content = base_content
+        slot_hidden = None
+        slot_weights = None
+        slot_context = None
+        if self.factorized_content_slot_mode != "none":
+            if self.factorized_content_slot_mode == "independent":
+                slot_hidden = self.factorized_content_slot_proj(raw_content).view(
+                    raw_content.shape[0],
+                    self.factorized_content_slot_count,
+                    self.hidden_dim,
+                )
+            else:
+                shared_slot = self.factorized_content_slot_proj(raw_content).unsqueeze(1)
+                slot_embeddings = self.factorized_content_slot_embeddings.to(
+                    device=raw_content.device,
+                    dtype=raw_content.dtype,
+                )
+                slot_hidden = shared_slot + slot_embeddings.unsqueeze(0)
+            if self.factorized_content_slot_query_mode == "mean":
+                slot_weights = torch.full(
+                    (raw_content.shape[0], self.factorized_content_slot_count),
+                    1.0 / self.factorized_content_slot_count,
+                    device=raw_content.device,
+                    dtype=raw_content.dtype,
+                )
+            else:
+                slot_query = self.factorized_content_slot_query_proj(query_hidden)
+                slot_scores = (slot_hidden * slot_query.unsqueeze(1)).sum(dim=-1) / math.sqrt(self.hidden_dim)
+                slot_weights = torch.softmax(slot_scores, dim=-1)
+            slot_context = (slot_weights.unsqueeze(-1) * slot_hidden).sum(dim=1)
+            content = content + (self.factorized_content_slot_scale * slot_context)
         sidecar_hidden = None
-        if self.factorized_content_sidecar is not None:
-            if self.factorized_content_sidecar_source == self.factorized_content_source:
+        sidecar_slots = None
+        sidecar_weights = None
+        if self.factorized_content_sidecar_mode != "none":
+            if self.factorized_content_sidecar_source in {"factorized_content_base", "factorized_content_hidden"}:
+                sidecar_source = base_content
+            elif self.factorized_content_sidecar_source == self.factorized_content_source:
                 sidecar_source = raw_content
             else:
                 sidecar_source = self._factorized_content_source_hidden(
@@ -1383,30 +1494,51 @@ class PacketRoutingModel(nn.Module):
                     route_weight_total=route_weight_total,
                     eps=eps,
                 )
-            sidecar_hidden = self.factorized_content_sidecar(sidecar_source)
+            if self.factorized_content_sidecar_mode == "residual_mlp":
+                sidecar_hidden = self.factorized_content_sidecar(sidecar_source)
+            elif self.factorized_content_sidecar_mode == "kv_memory":
+                key_slots = self.factorized_content_sidecar_key_proj(sidecar_source).view(
+                    sidecar_source.shape[0],
+                    self.factorized_content_sidecar_slots,
+                    self.hidden_dim,
+                )
+                sidecar_slots = self.factorized_content_sidecar_value_proj(sidecar_source).view(
+                    sidecar_source.shape[0],
+                    self.factorized_content_sidecar_slots,
+                    self.hidden_dim,
+                )
+                sidecar_query = self.factorized_content_sidecar_query_proj(query_hidden)
+                sidecar_scores = (key_slots * sidecar_query.unsqueeze(1)).sum(dim=-1) / math.sqrt(self.hidden_dim)
+                sidecar_weights = torch.softmax(sidecar_scores, dim=-1)
+                sidecar_hidden = (sidecar_weights.unsqueeze(-1) * sidecar_slots).sum(dim=1)
+            else:
+                raise ValueError(
+                    f"Unknown factorized_content_sidecar_mode: {self.factorized_content_sidecar_mode}"
+                )
             content = content + (self.factorized_content_sidecar_scale * sidecar_hidden)
-        query_hidden = self.factorized_query_proj(query_obs)
         if self.factorized_combiner_mode == "concat":
-            return (
-                self.factorized_combiner(torch.cat([content, query_hidden], dim=-1)),
-                content,
-                query_hidden,
-                sidecar_hidden,
-            )
-        if self.factorized_combiner_mode == "gated":
+            readout_input = self.factorized_combiner(torch.cat([content, query_hidden], dim=-1))
+        elif self.factorized_combiner_mode == "gated":
             gated = content * torch.sigmoid(self.factorized_gate(query_hidden))
-            return (
-                self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1)),
-                content,
-                query_hidden,
-                sidecar_hidden,
-            )
-        if self.factorized_combiner_mode == "bilinear":
-            return torch.tanh(self.factorized_bilinear(content, query_hidden)), content, query_hidden, sidecar_hidden
-        if self.factorized_combiner_mode == "film":
+            readout_input = self.factorized_combiner(torch.cat([gated, query_hidden], dim=-1))
+        elif self.factorized_combiner_mode == "bilinear":
+            readout_input = torch.tanh(self.factorized_bilinear(content, query_hidden))
+        elif self.factorized_combiner_mode == "film":
             gamma, beta = torch.chunk(self.factorized_film(query_hidden), 2, dim=-1)
-            return content * (1.0 + torch.tanh(gamma)) + beta, content, query_hidden, sidecar_hidden
-        raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
+            readout_input = content * (1.0 + torch.tanh(gamma)) + beta
+        else:
+            raise ValueError(f"Unknown factorized_combiner_mode: {self.factorized_combiner_mode}")
+        return readout_input, {
+            "factorized_content_base_hidden": base_content,
+            "factorized_content_hidden": content,
+            "factorized_query_hidden": query_hidden,
+            "factorized_content_slot_hidden": slot_hidden,
+            "factorized_content_slot_weights": slot_weights,
+            "factorized_content_slot_context": slot_context,
+            "factorized_content_sidecar_hidden": sidecar_hidden,
+            "factorized_content_sidecar_slots": sidecar_slots,
+            "factorized_content_sidecar_weights": sidecar_weights,
+        }
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
         allowed = [
@@ -2252,8 +2384,14 @@ class PacketRoutingModel(nn.Module):
             trace["final_sink_state"] = sink_state
 
         factorized_content_hidden = None
+        factorized_content_base_hidden = None
         factorized_query_hidden = None
+        factorized_content_slot_hidden = None
+        factorized_content_slot_weights = None
+        factorized_content_slot_context = None
         factorized_content_sidecar_hidden = None
+        factorized_content_sidecar_slots = None
+        factorized_content_sidecar_weights = None
         if self.readout_mode == "probe_query_views":
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -2344,12 +2482,7 @@ class PacketRoutingModel(nn.Module):
                 observations,
                 for_multiview=False,
             )
-            (
-                readout_input,
-                factorized_content_hidden,
-                factorized_query_hidden,
-                factorized_content_sidecar_hidden,
-            ) = self._factorized_readout_input(
+            readout_input, factorized_trace = self._factorized_readout_input(
                 sink_state=sink_state,
                 observations=observations,
                 trace=trace,
@@ -2361,6 +2494,15 @@ class PacketRoutingModel(nn.Module):
                 route_weight_total=route_weight_total,
                 eps=eps,
             )
+            factorized_content_base_hidden = factorized_trace.get("factorized_content_base_hidden")
+            factorized_content_hidden = factorized_trace.get("factorized_content_hidden")
+            factorized_query_hidden = factorized_trace.get("factorized_query_hidden")
+            factorized_content_slot_hidden = factorized_trace.get("factorized_content_slot_hidden")
+            factorized_content_slot_weights = factorized_trace.get("factorized_content_slot_weights")
+            factorized_content_slot_context = factorized_trace.get("factorized_content_slot_context")
+            factorized_content_sidecar_hidden = factorized_trace.get("factorized_content_sidecar_hidden")
+            factorized_content_sidecar_slots = factorized_trace.get("factorized_content_sidecar_slots")
+            factorized_content_sidecar_weights = factorized_trace.get("factorized_content_sidecar_weights")
             readout_input = self._apply_readout_adapter(readout_input)
         else:
             baseline_view = self._baseline_readout_input(
@@ -2376,12 +2518,24 @@ class PacketRoutingModel(nn.Module):
             trace["packet_state_query"] = packet_state_query
             if baseline_view.shape[-1] == self.hidden_dim:
                 trace["baseline_readout_input"] = baseline_view
+            if factorized_content_base_hidden is not None:
+                trace["factorized_content_base_hidden"] = factorized_content_base_hidden
             if factorized_content_hidden is not None:
                 trace["factorized_content_hidden"] = factorized_content_hidden
             if factorized_query_hidden is not None:
                 trace["factorized_query_hidden"] = factorized_query_hidden
+            if factorized_content_slot_hidden is not None:
+                trace["factorized_content_slot_hidden"] = factorized_content_slot_hidden
+            if factorized_content_slot_weights is not None:
+                trace["factorized_content_slot_weights"] = factorized_content_slot_weights
+            if factorized_content_slot_context is not None:
+                trace["factorized_content_slot_context"] = factorized_content_slot_context
             if factorized_content_sidecar_hidden is not None:
                 trace["factorized_content_sidecar_hidden"] = factorized_content_sidecar_hidden
+            if factorized_content_sidecar_slots is not None:
+                trace["factorized_content_sidecar_slots"] = factorized_content_sidecar_slots
+            if factorized_content_sidecar_weights is not None:
+                trace["factorized_content_sidecar_weights"] = factorized_content_sidecar_weights
             trace["final_readout_input"] = readout_input
         if self.readout_head_mode == "mixture":
             logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
@@ -2416,6 +2570,26 @@ class PacketRoutingModel(nn.Module):
         if getattr(self.readout, "last_mixture_weights", None) is not None:
             mixture_top1_weight = (
                 self.readout.last_mixture_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
+            )
+        factorized_content_slot_entropy = torch.zeros((), device=device, dtype=dtype)
+        factorized_content_slot_top1_weight = torch.zeros((), device=device, dtype=dtype)
+        if factorized_content_slot_weights is not None:
+            slot_weights = factorized_content_slot_weights.clamp_min(1e-8)
+            factorized_content_slot_entropy = (
+                -(slot_weights * slot_weights.log()).sum(dim=-1).mean().to(device=device, dtype=dtype)
+            )
+            factorized_content_slot_top1_weight = (
+                factorized_content_slot_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
+            )
+        factorized_content_sidecar_entropy = torch.zeros((), device=device, dtype=dtype)
+        factorized_content_sidecar_top1_weight = torch.zeros((), device=device, dtype=dtype)
+        if factorized_content_sidecar_weights is not None:
+            sidecar_weights = factorized_content_sidecar_weights.clamp_min(1e-8)
+            factorized_content_sidecar_entropy = (
+                -(sidecar_weights * sidecar_weights.log()).sum(dim=-1).mean().to(device=device, dtype=dtype)
+            )
+            factorized_content_sidecar_top1_weight = (
+                factorized_content_sidecar_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
             )
         factorized_payload_aux_loss = torch.zeros((), device=device, dtype=dtype)
         if (
@@ -2545,6 +2719,18 @@ class PacketRoutingModel(nn.Module):
             "prototype_pull_loss": torch.full_like(accuracy, float(prototype_pull_loss.detach().item())),
             "factorized_payload_aux_loss": torch.full_like(accuracy, float(factorized_payload_aux_loss.detach().item())),
             "factorized_query_aux_loss": torch.full_like(accuracy, float(factorized_query_aux_loss.detach().item())),
+            "factorized_content_slot_entropy": torch.full_like(
+                accuracy, float(factorized_content_slot_entropy.detach().item())
+            ),
+            "factorized_content_slot_top1_weight": torch.full_like(
+                accuracy, float(factorized_content_slot_top1_weight.detach().item())
+            ),
+            "factorized_content_sidecar_entropy": torch.full_like(
+                accuracy, float(factorized_content_sidecar_entropy.detach().item())
+            ),
+            "factorized_content_sidecar_top1_weight": torch.full_like(
+                accuracy, float(factorized_content_sidecar_top1_weight.detach().item())
+            ),
             "mixture_balance_loss": torch.full_like(accuracy, float(mixture_balance_loss.detach().item())),
             "mixture_gate_entropy": torch.full_like(accuracy, float(mixture_gate_entropy.detach().item())),
             "mixture_top1_weight": torch.full_like(accuracy, float(mixture_top1_weight.detach().item())),

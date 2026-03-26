@@ -1,0 +1,5 @@
+_base_: ../../phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_fqonly.yaml
+
+experiment:
+  seed: 18013
+  results_root: results/phase15_anchor

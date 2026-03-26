@@ -1,0 +1,5 @@
+_base_: ../../phase14/dev/hard_st_benchmark_b_v2_teacher1879_base_hardslice_fqhld_selectlexi.yaml
+
+experiment:
+  seed: 18016
+  results_root: results/phase15_anchor

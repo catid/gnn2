@@ -1,0 +1,19 @@
+_base_: ../../phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base.yaml
+
+experiment:
+  seed: 18021
+  results_root: results/phase15_dev
+
+model:
+  factorized_content_slot_mode: independent
+  factorized_content_slot_count: 2
+  factorized_content_slot_query_mode: attention
+  factorized_content_slot_scale: 1.0
+  factorized_content_slot_zero_init: true
+
+training:
+  trainable_prefixes:
+    - factorized_content_proj
+    - factorized_content_slot
+    - factorized_bilinear
+    - readout

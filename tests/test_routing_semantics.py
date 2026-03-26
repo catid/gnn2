@@ -56,6 +56,14 @@ def make_model(
     return model
 
 
+def _copy_shared_state(source: PacketRoutingModel, target: PacketRoutingModel) -> None:
+    target_state = target.state_dict()
+    for name, tensor in source.state_dict().items():
+        if name in target_state and target_state[name].shape == tensor.shape:
+            target_state[name] = tensor.detach().clone()
+    target.load_state_dict(target_state, strict=False)
+
+
 def test_hard_forward_reaches_sink_same_timestep() -> None:
     model = make_model(num_nodes=3, max_internal_steps=3)
     observations = torch.zeros(1, 1, 3, 16)
@@ -498,6 +506,155 @@ def test_factorized_content_sidecar_zero_init_isolated_to_readout() -> None:
         torch.zeros_like(output.trace["factorized_content_sidecar_hidden"]),
         atol=1e-7,
     )
+
+
+def test_factorized_multislot_zero_init_preserves_route_and_readout() -> None:
+    base_model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+        }
+    )
+    slot_model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+            "factorized_content_slot_mode": "independent",
+            "factorized_content_slot_count": 2,
+            "factorized_content_slot_zero_init": True,
+        }
+    )
+    _copy_shared_state(base_model, slot_model)
+
+    observations = torch.zeros(2, 4, 2, 8)
+    observations[:, -1, 0, 2] = 1.0
+    labels = torch.zeros(2, dtype=torch.long)
+
+    base_output = base_model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+    slot_output = slot_model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert base_output.trace is not None
+    assert slot_output.trace is not None
+    assert slot_output.trace["factorized_content_slot_hidden"].shape == (2, 2, 4)
+    assert slot_output.trace["factorized_content_slot_weights"].shape == (2, 2)
+    assert slot_output.trace["factorized_content_slot_context"].shape == (2, 4)
+    assert torch.allclose(
+        slot_output.trace["factorized_content_slot_context"],
+        torch.zeros_like(slot_output.trace["factorized_content_slot_context"]),
+        atol=1e-7,
+    )
+    assert torch.allclose(base_output.trace["router_probs"], slot_output.trace["router_probs"], atol=1e-7)
+    assert torch.allclose(base_output.trace["final_sink_state"], slot_output.trace["final_sink_state"], atol=1e-7)
+    assert torch.allclose(base_output.trace["final_readout_input"], slot_output.trace["final_readout_input"], atol=1e-7)
+    assert torch.allclose(base_output.logits, slot_output.logits, atol=1e-7)
+    assert torch.allclose(base_output.stats["exit_time"], slot_output.stats["exit_time"], atol=1e-7)
+    assert torch.allclose(base_output.stats["hops"], slot_output.stats["hops"], atol=1e-7)
+    assert torch.allclose(base_output.stats["delays"], slot_output.stats["delays"], atol=1e-7)
+
+
+def test_factorized_kv_sidecar_zero_init_preserves_route_and_readout() -> None:
+    base_model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+        }
+    )
+    sidecar_model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+            "factorized_content_sidecar_mode": "kv_memory",
+            "factorized_content_sidecar_source": "factorized_content_base",
+            "factorized_content_sidecar_slots": 3,
+            "factorized_content_sidecar_zero_init": True,
+        }
+    )
+    _copy_shared_state(base_model, sidecar_model)
+
+    observations = torch.zeros(2, 4, 2, 8)
+    observations[:, -1, 0, 2] = 1.0
+    labels = torch.zeros(2, dtype=torch.long)
+
+    base_output = base_model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+    sidecar_output = sidecar_model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert base_output.trace is not None
+    assert sidecar_output.trace is not None
+    assert sidecar_output.trace["factorized_content_sidecar_slots"].shape == (2, 3, 4)
+    assert sidecar_output.trace["factorized_content_sidecar_weights"].shape == (2, 3)
+    assert sidecar_output.trace["factorized_content_sidecar_hidden"].shape == (2, 4)
+    assert torch.allclose(
+        sidecar_output.trace["factorized_content_sidecar_hidden"],
+        torch.zeros_like(sidecar_output.trace["factorized_content_sidecar_hidden"]),
+        atol=1e-7,
+    )
+    assert torch.allclose(base_output.trace["router_probs"], sidecar_output.trace["router_probs"], atol=1e-7)
+    assert torch.allclose(base_output.trace["final_sink_state"], sidecar_output.trace["final_sink_state"], atol=1e-7)
+    assert torch.allclose(
+        base_output.trace["final_readout_input"],
+        sidecar_output.trace["final_readout_input"],
+        atol=1e-7,
+    )
+    assert torch.allclose(base_output.logits, sidecar_output.logits, atol=1e-7)
+    assert torch.allclose(base_output.stats["exit_time"], sidecar_output.stats["exit_time"], atol=1e-7)
+    assert torch.allclose(base_output.stats["hops"], sidecar_output.stats["hops"], atol=1e-7)
+    assert torch.allclose(base_output.stats["delays"], sidecar_output.stats["delays"], atol=1e-7)
 
 
 def test_delay_hold_mode_preserves_packet_state() -> None:
