@@ -1,6 +1,6 @@
 {
   "candidate_name": "17044_payloadaux040_hardslice_fqhld_selectlexi",
-  "status": "pending_rerun",
+  "status": "rerun_clean_secondary",
   "baseline_run": "results/phase14_anchor/20260326_005629_hard_st_benchmark_b_v2_teacher1874_anchor16045_selectlocked",
   "config_path": "configs/phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi.yaml",
   "run_dir": "results/phase14_dev/20260326_030836_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi_seed17044_p1",
@@ -45,7 +45,28 @@
   },
   "rerun": {
     "run_dir": "results/phase14_dev/20260326_033027_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi_seed17044_rerun1",
-    "headline_metrics": {}
+    "headline_metrics": {
+      "best_val_dqf": {
+        "accuracy": 0.9971,
+        "route_match": 0.9364,
+        "exit_time": 121.12
+      },
+      "selected_full_locked_dqf": {
+        "accuracy": 0.9963,
+        "route_match": 0.9328,
+        "exit_time": 120.78
+      },
+      "selected_finalquery_heavy_dqf": {
+        "accuracy": 0.9957,
+        "route_match": 0.9351,
+        "exit_time": 120.95
+      },
+      "selected_longdistance_dqf": {
+        "accuracy": 0.9986,
+        "route_match": 0.9529,
+        "exit_time": 153.47
+      }
+    }
   },
   "locked_confirm": {
     "run_dir": "",
@@ -60,11 +81,11 @@
     "checksum": ""
   },
   "gate": {
-    "rerun_preserves_late_route": false,
+    "rerun_preserves_late_route": true,
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": false,
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending"
+  "final_decision": "hold_as_secondary_no_confirm"
 }
