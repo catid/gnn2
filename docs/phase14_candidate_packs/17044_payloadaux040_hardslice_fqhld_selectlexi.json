@@ -1,0 +1,70 @@
+{
+  "candidate_name": "17044_payloadaux040_hardslice_fqhld_selectlexi",
+  "status": "pending_rerun",
+  "baseline_run": "results/phase14_anchor/20260326_005629_hard_st_benchmark_b_v2_teacher1874_anchor16045_selectlocked",
+  "config_path": "configs/phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi.yaml",
+  "run_dir": "results/phase14_dev/20260326_030836_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi_seed17044_p1",
+  "checkpoint": "results/phase14_dev/20260326_030836_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi_seed17044_p1/hard_st_best.pt",
+  "route_anchor": "16045",
+  "content_teacher": "none",
+  "headline_metrics": {
+    "best_val_dqf": {
+      "accuracy": 0.9971,
+      "route_match": 0.9364,
+      "exit_time": 121.12
+    },
+    "selected_full_locked_dqf": {
+      "accuracy": 0.9963,
+      "route_match": 0.9328,
+      "exit_time": 120.78
+    },
+    "selected_finalquery_heavy_dqf": {
+      "accuracy": 0.9957,
+      "route_match": 0.9351,
+      "exit_time": 120.95
+    },
+    "selected_longdistance_dqf": {
+      "accuracy": 0.9986,
+      "route_match": 0.9529,
+      "exit_time": 153.47
+    }
+  },
+  "content_failure_hard_slice": {
+    "artifact_json": "artifacts/phase14_hardslice/17011_vs_17044_full_locked_32b.json",
+    "artifact_rows_csv": "artifacts/phase14_hardslice/17011_vs_17044_full_locked_32b.rows.csv",
+    "headline_metrics": {
+      "shared_examples": 8192,
+      "late_relaxed_disagreements": 3,
+      "candidate_beats_baseline_on_late_disagreements": 2,
+      "baseline_beats_candidate_on_late_disagreements": 1,
+      "baseline_late_wrong_content": 2,
+      "candidate_late_wrong_content": 1,
+      "baseline_late_relaxed_accuracy": 0.9994968553459119,
+      "candidate_late_relaxed_accuracy": 0.9997490589711417
+    }
+  },
+  "rerun": {
+    "run_dir": "results/phase14_dev/20260326_033027_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_payloadaux040_hardslice_fqhld_selectlexi_seed17044_rerun1",
+    "headline_metrics": {}
+  },
+  "locked_confirm": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "seed_panel": {
+    "panel_dir": "",
+    "headline_metrics": {}
+  },
+  "verify": {
+    "artifact_json": "",
+    "checksum": ""
+  },
+  "gate": {
+    "rerun_preserves_late_route": false,
+    "hard_slice_improves_or_holds": true,
+    "locked_confirm_preserves_route_exit": false,
+    "verify_passed": false,
+    "candidate_pack_complete": false
+  },
+  "final_decision": "pending"
+}

@@ -1,0 +1,70 @@
+{
+  "candidate_name": "17042_teacher16081_contentmse020_hardslice_fqfld_selectgeo",
+  "status": "pending_rerun",
+  "baseline_run": "results/phase14_anchor/20260326_005629_hard_st_benchmark_b_v2_teacher1874_anchor16045_selectlocked",
+  "config_path": "configs/phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_hardslice_fqfld_selectgeo.yaml",
+  "run_dir": "results/phase14_dev/20260326_025434_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_hardslice_fqfld_selectgeo_seed17042_p1",
+  "checkpoint": "results/phase14_dev/20260326_025434_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_hardslice_fqfld_selectgeo_seed17042_p1/hard_st_best.pt",
+  "route_anchor": "16045",
+  "content_teacher": "16081",
+  "headline_metrics": {
+    "best_val_dqf": {
+      "accuracy": 0.9960,
+      "route_match": 0.9434,
+      "exit_time": 121.91
+    },
+    "selected_full_locked_dqf": {
+      "accuracy": 0.9953,
+      "route_match": 0.9421,
+      "exit_time": 121.42
+    },
+    "selected_finalquery_heavy_dqf": {
+      "accuracy": 0.9957,
+      "route_match": 0.9339,
+      "exit_time": 121.01
+    },
+    "selected_longdistance_dqf": {
+      "accuracy": 0.9993,
+      "route_match": 0.9369,
+      "exit_time": 151.52
+    }
+  },
+  "content_failure_hard_slice": {
+    "artifact_json": "artifacts/phase14_hardslice/17011_vs_17042_full_locked_32b.json",
+    "artifact_rows_csv": "artifacts/phase14_hardslice/17011_vs_17042_full_locked_32b.rows.csv",
+    "headline_metrics": {
+      "shared_examples": 8192,
+      "late_relaxed_disagreements": 3,
+      "candidate_beats_baseline_on_late_disagreements": 3,
+      "baseline_beats_candidate_on_late_disagreements": 0,
+      "baseline_late_wrong_content": 3,
+      "candidate_late_wrong_content": 0,
+      "baseline_late_relaxed_accuracy": 0.9992393509127789,
+      "candidate_late_relaxed_accuracy": 1.0
+    }
+  },
+  "rerun": {
+    "run_dir": "results/phase14_dev/20260326_032546_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_hardslice_fqfld_selectgeo_seed17042_rerun1",
+    "headline_metrics": {}
+  },
+  "locked_confirm": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "seed_panel": {
+    "panel_dir": "",
+    "headline_metrics": {}
+  },
+  "verify": {
+    "artifact_json": "",
+    "checksum": ""
+  },
+  "gate": {
+    "rerun_preserves_late_route": false,
+    "hard_slice_improves_or_holds": true,
+    "locked_confirm_preserves_route_exit": false,
+    "verify_passed": false,
+    "candidate_pack_complete": false
+  },
+  "final_decision": "pending"
+}
