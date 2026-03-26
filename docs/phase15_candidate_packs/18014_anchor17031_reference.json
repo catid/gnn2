@@ -1,6 +1,6 @@
 {
   "candidate_name": "18014_anchor17031_reference",
-  "status": "running_reference_anchor",
+  "status": "reference",
   "baseline_run": "results/phase14_dev/20260326_014731_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_dualanchor16081_base",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_anchor17031_selectlocked.yaml",
   "run_dir": "results/phase15_anchor/hard_st_b_v2_teacher1874_anchor17031_selectlocked_seed18014_p1",
@@ -31,10 +31,30 @@
     "headline_metrics": {}
   },
   "summary_eval": {
-    "best_val": {},
-    "full_locked": {},
-    "finalquery_heavy": {},
-    "longdistance": {}
+    "best_val": {
+      "overall_accuracy": 0.99658203125,
+      "fq_acc": 0.9940417009408566,
+      "fq_route": 0.9304866034911192,
+      "fq_exit": 120.3445884075752
+    },
+    "full_locked": {
+      "overall_accuracy": 0.998046875,
+      "fq_acc": 0.9962651662799824,
+      "fq_route": 0.9393090666397835,
+      "fq_exit": 121.1839414252843
+    },
+    "finalquery_heavy": {
+      "overall_accuracy": 0.9970703125,
+      "fq_acc": 0.9963257756250735,
+      "fq_route": 0.9381506319288381,
+      "fq_exit": 121.40967621952204
+    },
+    "longdistance": {
+      "overall_accuracy": 0.99658203125,
+      "fq_acc": 0.9951490018405769,
+      "fq_route": 0.9362439355830393,
+      "fq_exit": 151.43728406117017
+    }
   },
   "verify": {
     "artifact_json": "",
@@ -45,7 +65,7 @@
     "hard_slice_improves_or_holds": false,
     "locked_confirm_preserves_route_exit": false,
     "verify_passed": false,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
-  "final_decision": "pending_anchor_reproduction"
+  "final_decision": "reference_only"
 }
