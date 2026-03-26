@@ -14,7 +14,9 @@ The cleanest current map is:
 - `18052` is the best current content-only supervision branch on the richer sidecar path. It is now rerun-clean, fully paneled, and locked-confirmed. Five-seed selected `full_locked = 0.9985 / 0.9985 / 0.9397 / 121.19`; locked confirm `full_locked = 0.6592 / 0.3001 / 0.8797 / 116.14`.
 - `18026` paneling is now complete through all five seeds.
 - `18060` stronger sidecar paneling is now complete through all five seeds. Five-seed selected `full_locked = 0.9978 / 0.9968 / 0.9386 / 121.18`, but locked confirm still falls back to `0.6527 / 0.2874 / 0.8850 / 116.22`.
-- `18221` and `18222` are live as the bounded `1821` portability sanity pair, with `18291` and `18292` still queued as the negative-control deck.
+- `18221` is complete as the first bounded `1821` portability sanity run. Summary `full_locked = 0.9731 / 0.9795 / 0.9244 / 122.38`.
+- `18222` remains live as the second bounded `1821` portability sanity run.
+- `18291` is now live as the first bounded `1879` negative-control run, with `18292` still queued behind it.
 
 ## Current Answers
 
@@ -27,4 +29,4 @@ The cleanest current map is:
 
 ## Single Next Step
 
-Finish the bounded Cluster F portability / negative-control deck so phase 15 can close with the panel-depth sidecar-vs-multislot comparison already locked and the required sanity transfer read in hand.
+Finish the remaining bounded Cluster F portability / negative-control deck so phase 15 can close with the panel-depth sidecar-vs-multislot comparison already locked and the required sanity transfer read in hand.
