@@ -56,8 +56,8 @@
     "headline_metrics": {}
   },
   "verify": {
-    "artifact_json": "",
-    "checksum": ""
+    "artifact_json": "artifacts/phase14_verify/17031_verify.json",
+    "checksum": "pending_manual_review"
   },
   "gate": {
     "rerun_preserves_late_route": false,
