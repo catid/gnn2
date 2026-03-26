@@ -1,6 +1,6 @@
 {
   "candidate_name": "18016_anchor17103_reference",
-  "status": "running_reference_anchor",
+  "status": "reference",
   "baseline_run": "hard_st_b_v2_teacher1879_base_hardslice_fqhld_selectlexi_seed17103_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1879_anchor17103_selectlexi_hardslice.yaml",
   "run_dir": "results/phase15_anchor/hard_st_b_v2_teacher1879_anchor17103_selectlexi_hardslice_seed18016_p1",
@@ -31,10 +31,30 @@
     "headline_metrics": {}
   },
   "summary_eval": {
-    "best_val": {},
-    "full_locked": {},
-    "finalquery_heavy": {},
-    "longdistance": {}
+    "best_val": {
+      "overall_accuracy": 0.23583984375,
+      "fq_acc": 0.23138034089201137,
+      "fq_route": 0.883813318630908,
+      "fq_exit": 122.63257414013769
+    },
+    "full_locked": {
+      "overall_accuracy": 0.2626953125,
+      "fq_acc": 0.26517273436963945,
+      "fq_route": 0.8982259673453401,
+      "fq_exit": 123.03641458719719
+    },
+    "finalquery_heavy": {
+      "overall_accuracy": 0.24365234375,
+      "fq_acc": 0.24923453699462048,
+      "fq_route": 0.8916105288562787,
+      "fq_exit": 122.67727892864575
+    },
+    "longdistance": {
+      "overall_accuracy": 0.25048828125,
+      "fq_acc": 0.25433125688190356,
+      "fq_route": 0.7678447646642013,
+      "fq_exit": 150.3458058759725
+    }
   },
   "verify": {
     "artifact_json": "",
@@ -45,7 +65,7 @@
     "hard_slice_improves_or_holds": false,
     "locked_confirm_preserves_route_exit": false,
     "verify_passed": false,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
-  "final_decision": "pending_anchor_reproduction"
+  "final_decision": "reference_only"
 }
