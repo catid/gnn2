@@ -1,0 +1,70 @@
+{
+  "candidate_name": "17041_teacher16081_contentmse010_hardslice_fqhld_selectlexi",
+  "status": "candidate_pending_rerun",
+  "baseline_run": "results/phase14_anchor/20260326_005629_hard_st_benchmark_b_v2_teacher1874_anchor16045_selectlocked",
+  "config_path": "configs/phase14/dev/hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml",
+  "run_dir": "results/phase14_dev/20260326_012915_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi",
+  "checkpoint": "results/phase14_dev/20260326_012915_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_hardslice_fqhld_selectlexi/hard_st_best.pt",
+  "route_anchor": "16045",
+  "content_teacher": "16081",
+  "headline_metrics": {
+    "best_val_dqf": {
+      "accuracy": 0.9970,
+      "route_match": 0.9414,
+      "exit_time": 121.7954
+    },
+    "selected_full_locked_dqf": {
+      "accuracy": 0.9953,
+      "route_match": 0.9440,
+      "exit_time": 121.8910
+    },
+    "selected_finalquery_heavy_dqf": {
+      "accuracy": 0.9969,
+      "route_match": 0.9333,
+      "exit_time": 120.7289
+    },
+    "selected_longdistance_dqf": {
+      "accuracy": 0.9986,
+      "route_match": 0.9515,
+      "exit_time": 153.3448
+    }
+  },
+  "content_failure_hard_slice": {
+    "artifact_json": "artifacts/phase14_hardslice/17011_vs_17041_full_locked_32b.json",
+    "artifact_rows_csv": "artifacts/phase14_hardslice/17011_vs_17041_full_locked_32b.rows.csv",
+    "headline_metrics": {
+      "shared_examples": 8192,
+      "late_relaxed_disagreements": 3,
+      "candidate_beats_baseline_on_late_disagreements": 3,
+      "baseline_beats_candidate_on_late_disagreements": 0,
+      "baseline_late_wrong_content": 3,
+      "candidate_late_wrong_content": 0,
+      "baseline_late_relaxed_accuracy": 0.9992393509127789,
+      "candidate_late_relaxed_accuracy": 1.0
+    }
+  },
+  "rerun": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "locked_confirm": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "seed_panel": {
+    "panel_dir": "",
+    "headline_metrics": {}
+  },
+  "verify": {
+    "artifact_json": "artifacts/phase14_verify/17041_verify.json",
+    "checksum": "pending_manual_review"
+  },
+  "gate": {
+    "rerun_preserves_late_route": false,
+    "hard_slice_improves_or_holds": true,
+    "locked_confirm_preserves_route_exit": false,
+    "verify_passed": false,
+    "candidate_pack_complete": false
+  },
+  "final_decision": "pending"
+}
