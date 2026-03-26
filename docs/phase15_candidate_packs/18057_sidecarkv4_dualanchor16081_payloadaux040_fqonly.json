@@ -1,6 +1,6 @@
 {
   "candidate_name": "18057_sidecarkv4_dualanchor16081_payloadaux040_fqonly",
-  "status": "promoted",
+  "status": "panel_complete",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_dualanchor16081_base_seed18060_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_seed18057_p1",
@@ -77,8 +77,27 @@
     }
   },
   "seed_panel": {
-    "panel_dir": "",
-    "headline_metrics": {}
+    "panel_dir": "results/phase15_panel/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_panel18057",
+    "headline_metrics": {
+      "full_locked": {
+        "overall_accuracy": 0.998046875,
+        "fq_acc": 0.996638645043894,
+        "fq_route": 0.9424836627241611,
+        "fq_exit": 121.45639699157657
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.9966796875,
+        "fq_acc": 0.9958358741069381,
+        "fq_route": 0.9397427926673819,
+        "fq_exit": 121.09932533446367
+      },
+      "longdistance": {
+        "overall_accuracy": 0.9962890625,
+        "fq_acc": 0.9947331938409839,
+        "fq_route": 0.9452529428158878,
+        "fq_exit": 152.62716602053152
+      }
+    }
   },
   "summary_eval": {
     "best_val": {
@@ -115,7 +134,7 @@
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": true,
     "verify_passed": true,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
-  "final_decision": "promoted_for_panel"
+  "final_decision": "panel_complete_locked_confirmed"
 }
