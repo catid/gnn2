@@ -61,13 +61,19 @@ Scorecard:
 
 ## Cluster C
 
-Partially mapped. The first teacher-backed hard-slice panel root `17041` is now complete and it closed as a stable late-route negative:
+Mapped enough to score. The first teacher-backed hard-slice panel root `17041` is complete and it closed as a stable late-route negative:
 
 - Five-seed `full_locked` DQF mean: `0.9948 / 0.9376 / 121.10`
 - Five-seed `finalquery_heavy` DQF mean: `0.9971 / 0.9396 / 121.28`
 - Locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
 
-Current strongest no-teacher hard-slice branch `17043` is rerun-clean but still mid-panel, and the stronger weighted teacher-backed branch `17042` remains the only live teacher-backed frontier.
+The matching no-teacher hard-slice control `17043` is also now fully paneled:
+
+- Five-seed `full_locked` DQF mean: `0.9991 / 0.9425 / 121.70`
+- Five-seed `finalquery_heavy` DQF mean: `0.9977 / 0.9429 / 121.60`
+- Locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
+
+So Cluster C now has both a teacher-backed and a no-teacher paneled negative. The only live Cluster C frontier left is the stronger weighted teacher-backed branch `17042`.
 
 ## Cluster D
 

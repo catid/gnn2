@@ -89,8 +89,29 @@
     }
   },
   "seed_panel": {
-    "panel_dir": "",
-    "headline_metrics": {}
+    "panel_dir": "results/phase14_panel/hard_st_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi_panel",
+    "headline_metrics": {
+      "best_val_dqf_mean": {
+        "accuracy": 0.9983,
+        "route_match": 0.9682,
+        "exit_time": 67.59
+      },
+      "selected_full_locked_dqf_mean": {
+        "accuracy": 0.9991,
+        "route_match": 0.9425,
+        "exit_time": 121.70
+      },
+      "selected_finalquery_heavy_dqf_mean": {
+        "accuracy": 0.9977,
+        "route_match": 0.9429,
+        "exit_time": 121.60
+      },
+      "selected_longdistance_dqf_mean": {
+        "accuracy": 0.9971,
+        "route_match": 0.9455,
+        "exit_time": 152.53
+      }
+    }
   },
   "verify": {
     "artifact_json": "results/phase14_dev/20260326_025608_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_base_hardslice_fqhld_selectlexi_seed17043_p1/artifacts/phase14_verify/verification.json",
@@ -101,7 +122,7 @@
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": true,
     "verify_passed": false,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
   "final_decision": "retire_locked_confirm_content_ceiling"
 }

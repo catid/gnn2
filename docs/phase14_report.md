@@ -57,7 +57,15 @@ The first completed teacher-backed hard-slice panel root `17041` also closed as 
 - `17041` five-seed mean `finalquery_heavy` DQF: `0.9971 / 0.9396 / 121.28`
 - `17041` locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
 
-Interpretation: teacher-backed hard-slice mining preserves the stable late-route regime and survives rerun/panel stress, but it still collapses onto the same held-confirm ceiling under locked confirmation. The remaining live frontier is now the stronger weighted teacher-backed branch `17042` plus the `17043` no-teacher panel control.
+Interpretation: teacher-backed hard-slice mining preserves the stable late-route regime and survives rerun/panel stress, but it still collapses onto the same held-confirm ceiling under locked confirmation.
+
+The matching no-teacher hard-slice control `17043` is now also fully paneled and it closes in the same summary-time regime:
+
+- `17043` five-seed mean `full_locked` DQF: `0.9991 / 0.9425 / 121.70`
+- `17043` five-seed mean `finalquery_heavy` DQF: `0.9977 / 0.9429 / 121.60`
+- `17043` locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
+
+Interpretation: hard-slice mining matters for stable late-route summary behavior, but neither the teacher-backed nor the no-teacher version changes the held-confirm ceiling once locked confirmation is applied. The remaining live frontier is now the stronger weighted teacher-backed branch `17042`, plus the bounded Cluster F sanity batch.
 
 ## Cluster E Early Read
 
