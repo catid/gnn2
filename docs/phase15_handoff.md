@@ -16,7 +16,9 @@ The cleanest current map is:
 - `18060` stronger sidecar paneling is now complete through all five seeds. Five-seed selected `full_locked = 0.9978 / 0.9968 / 0.9386 / 121.18`, but locked confirm still falls back to `0.6527 / 0.2874 / 0.8850 / 116.22`.
 - `18221` is complete as the first bounded `1821` portability sanity run. Summary `full_locked = 0.9731 / 0.9795 / 0.9244 / 122.38`.
 - `18222` is complete as the second bounded `1821` portability sanity run. Summary `full_locked = 0.9795 / 0.9860 / 0.9234 / 122.33`, making it the stronger summary-time secondary-source result and a rerun-budget triage candidate.
-- `18291` and `18292` are now both live as the bounded `1879` negative-control pair.
+- `18222_rerun1` is now live on GPU1 to resolve that rerun-budget triage cleanly.
+- `18291` is complete as a clean `1879` negative control. Summary `full_locked = 0.2627 / 0.2670 / 0.9160 / 123.99`.
+- `18292` remains live as the final bounded `1879` negative-control run.
 
 ## Current Answers
 
@@ -24,9 +26,9 @@ The cleanest current map is:
 - Multi-slot did not beat sidecar. `18026` is the best multi-slot result, and that conclusion now holds at five-seed panel depth as well as locked confirm.
 - Dual-anchor training helped once the content path became richer. `18057` is stronger than the plain richer-path baselines, but not enough to count as a breakthrough.
 - Content-only supervision also helped on the richer sidecar path. `18052` is slightly better than `18057` on locked confirm content, but the margin is small.
-- Portability / negative-control answer: still pending the live `1879` pair and the rerun-budget decision on `18222`.
+- Portability / negative-control answer: still pending `18222_rerun1` plus the final live `1879` run `18292`.
 - Current best interpretation: the remaining ceiling looks more like content writing / retrieval quality inside the isolated richer path than simple readout width or simple supervision weakness.
 
 ## Single Next Step
 
-Finish the bounded `1879` negative-control pair, then decide whether `18222` is strong enough to justify a rerun on `1821` before closing phase 15.
+Finish `18222_rerun1` and the final live `1879` run `18292`, then decide whether the `1821` portability signal is strong enough to justify a confirm eval before closing phase 15.
