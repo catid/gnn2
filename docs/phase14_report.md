@@ -24,3 +24,16 @@ The completed five-seed panel for the `17031` family now shows that the branch i
 - `17031` five-seed mean `longdistance` DQF: `0.9971 / 0.9508 / 153.24`
 
 Interpretation: the dual-anchor contract preserves late-route behavior and keeps content high on summary-time slices, but it still does not convert those gains into held-confirm content recovery once the branch is independently confirmed. The main phase-14 question is therefore still centered on whether the teacher-first content-branch-only lane or the hard-slice mining lane can move that confirm ceiling.
+
+The teacher-first lane has now cleared its first full panel root as well. `17024` kept the same summary-time pattern across five fresh seeds:
+
+- `17024` five-seed mean `full_locked` DQF: `0.9953 / 0.9406 / 121.29`
+- `17024` five-seed mean `finalquery_heavy` DQF: `0.9960 / 0.9429 / 121.51`
+- `17024` five-seed mean `longdistance` DQF: `0.9961 / 0.9486 / 152.96`
+
+But its independently confirmed held-confirm result is still stuck at the old regime:
+
+- `17024` selected `full_locked` confirm DQF: `0.2995 / 0.8797 / 116.14`
+- `17024` selected `finalquery_heavy` confirm DQF: `0.3083 / 0.8785 / 115.97`
+
+Interpretation: content-only teacher supervision on top of the fixed `16045` route anchor clearly preserves the late-route summary regime and improves the content-failure hard slice, but the first fully paneled teacher-first candidate still does not convert that summary-time gain into held-confirm content recovery. The remaining active question is therefore whether the heavier teacher-first branch (`17025`) or the teacher-backed hard-slice lane (`17041`, `17042`) can change that confirm outcome rather than merely reproduce the same split more stably.

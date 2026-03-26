@@ -6,7 +6,27 @@ Draft in progress.
 
 ## Cluster A
 
-Pending final scorecard.
+Mapped enough to score as a stable but still ceiling-limited lane.
+
+- Best fully paneled branch so far: `17024` teacher-first content-hidden distillation
+- Hard-slice gate: pass
+- Exact rerun: pass
+- Locked confirm: fail on held-confirm content
+- Five-seed panel: completed, stable late-route regime retained
+
+Headline metrics for `17024`:
+
+- selected `full_locked` confirm DQF: `0.2995 / 0.8797 / 116.14`
+- selected `finalquery_heavy` confirm DQF: `0.3083 / 0.8785 / 115.97`
+- five-seed mean `full_locked` summary DQF: `0.9953 / 0.9406 / 121.29`
+- five-seed mean `finalquery_heavy` summary DQF: `0.9960 / 0.9429 / 121.51`
+
+Scorecard:
+
+- Stability: strong
+- Content-failure hard-slice targeting: real
+- Held-confirm lift: no
+- Retirement state: still active only through stronger teacher-first and hard-slice variants, not because `17024` itself remains a live headline winner
 
 ## Cluster B
 
