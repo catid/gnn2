@@ -49,7 +49,15 @@ But its locked confirm still fell back to the familiar ceiling:
 - `17025` selected `full_locked` confirm DQF: `0.2874 / 0.8850 / 116.22`
 - `17025` selected `finalquery_heavy` confirm DQF: `0.2968 / 0.8789 / 115.56`
 
-Interpretation: simply scaling teacher-first content-branch supervision does not create a new confirmed regime. The remaining live frontier is therefore the teacher-backed hard-slice lane (`17041`, `17042`), not more plain teacher-first repetition.
+Interpretation: simply scaling teacher-first content-branch supervision does not create a new confirmed regime. The remaining live frontier is therefore the teacher-backed hard-slice lane, not more plain teacher-first repetition.
+
+The first completed teacher-backed hard-slice panel root `17041` also closed as a stable negative:
+
+- `17041` five-seed mean `full_locked` DQF: `0.9948 / 0.9376 / 121.10`
+- `17041` five-seed mean `finalquery_heavy` DQF: `0.9971 / 0.9396 / 121.28`
+- `17041` locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
+
+Interpretation: teacher-backed hard-slice mining preserves the stable late-route regime and survives rerun/panel stress, but it still collapses onto the same held-confirm ceiling under locked confirmation. The remaining live frontier is now the stronger weighted teacher-backed branch `17042` plus the `17043` no-teacher panel control.
 
 ## Cluster E Early Read
 

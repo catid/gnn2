@@ -61,7 +61,13 @@ Scorecard:
 
 ## Cluster C
 
-Still active. Current strongest no-teacher hard-slice branch `17043` is rerun-clean but confirm-ceiling-limited; teacher-backed hard-slice branches `17041` and `17042` remain the live frontier, and the first `17041` five-seed panel root is now running.
+Partially mapped. The first teacher-backed hard-slice panel root `17041` is now complete and it closed as a stable late-route negative:
+
+- Five-seed `full_locked` DQF mean: `0.9948 / 0.9376 / 121.10`
+- Five-seed `finalquery_heavy` DQF mean: `0.9971 / 0.9396 / 121.28`
+- Locked confirm `full_locked` DQF: `0.2874 / 0.8850 / 116.22`
+
+Current strongest no-teacher hard-slice branch `17043` is rerun-clean but still mid-panel, and the stronger weighted teacher-backed branch `17042` remains the only live teacher-backed frontier.
 
 ## Cluster D
 
