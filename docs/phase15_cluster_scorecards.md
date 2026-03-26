@@ -103,6 +103,6 @@ Live, not yet complete in this draft slice.
 Current bounded sanity runs:
 
 - `18221` complete on `1821`
-- `18222` live on `1821`
+- `18222` complete on `1821`
 - `18291` live on `1879`
-- `18292` queued on `1879`
+- `18292` live on `1879`

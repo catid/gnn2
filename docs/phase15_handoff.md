@@ -15,8 +15,8 @@ The cleanest current map is:
 - `18026` paneling is now complete through all five seeds.
 - `18060` stronger sidecar paneling is now complete through all five seeds. Five-seed selected `full_locked = 0.9978 / 0.9968 / 0.9386 / 121.18`, but locked confirm still falls back to `0.6527 / 0.2874 / 0.8850 / 116.22`.
 - `18221` is complete as the first bounded `1821` portability sanity run. Summary `full_locked = 0.9731 / 0.9795 / 0.9244 / 122.38`.
-- `18222` remains live as the second bounded `1821` portability sanity run.
-- `18291` is now live as the first bounded `1879` negative-control run, with `18292` still queued behind it.
+- `18222` is complete as the second bounded `1821` portability sanity run. Summary `full_locked = 0.9795 / 0.9860 / 0.9234 / 122.33`, making it the stronger summary-time secondary-source result and a rerun-budget triage candidate.
+- `18291` and `18292` are now both live as the bounded `1879` negative-control pair.
 
 ## Current Answers
 
@@ -24,9 +24,9 @@ The cleanest current map is:
 - Multi-slot did not beat sidecar. `18026` is the best multi-slot result, and that conclusion now holds at five-seed panel depth as well as locked confirm.
 - Dual-anchor training helped once the content path became richer. `18057` is stronger than the plain richer-path baselines, but not enough to count as a breakthrough.
 - Content-only supervision also helped on the richer sidecar path. `18052` is slightly better than `18057` on locked confirm content, but the margin is small.
-- Portability / negative-control answer: still pending the live Cluster F sanity deck.
+- Portability / negative-control answer: still pending the live `1879` pair and the rerun-budget decision on `18222`.
 - Current best interpretation: the remaining ceiling looks more like content writing / retrieval quality inside the isolated richer path than simple readout width or simple supervision weakness.
 
 ## Single Next Step
 
-Finish the remaining bounded Cluster F portability / negative-control deck so phase 15 can close with the panel-depth sidecar-vs-multislot comparison already locked and the required sanity transfer read in hand.
+Finish the bounded `1879` negative-control pair, then decide whether `18222` is strong enough to justify a rerun on `1821` before closing phase 15.
