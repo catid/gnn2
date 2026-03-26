@@ -48,10 +48,11 @@ Live and currently competitive.
 - Best branch: `18052` sidecarkv4 + teacher16081 + hard-slice selector
 - Rerun: pass
 - Locked confirm: modest lift over phase-14 ceiling
-- Five-seed panel: in progress
+- Five-seed panel: complete
 
 Headline metrics for `18052`:
 
+- five-seed selected `full_locked overall / fq_acc / fq_route / fq_exit = 0.9985 / 0.9985 / 0.9397 / 121.19`
 - locked confirm `full_locked overall / fq_acc / fq_route / fq_exit = 0.6592 / 0.3001 / 0.8797 / 116.14`
 - locked confirm `finalquery_heavy = 0.4515 / 0.3083 / 0.8785 / 115.97`
 
@@ -90,6 +91,7 @@ Pending final writeup.
 Current partial read:
 
 - `18057` keeps selected exit in the same useful late-route compute band as the phase-14 winners
+- `18052` does the same while slightly edging `18057` on locked-confirm content
 - current confirm lift is not caused by an obvious compute collapse
 
 ## Cluster F

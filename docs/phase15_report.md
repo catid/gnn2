@@ -27,15 +27,12 @@ Second, the best phase-15 gains so far come from richer sidecar paths paired wit
 
 Interpretation: the richer sidecar path can buy a modest held-confirm content lift over the old phase-14 ceiling while staying in-range on route/exit, but the gain is still small. This is not a positive exit.
 
-The current best content-only supervision branch is `18052`, the `sidecarkv4 + teacher16081 + hard-slice selector` family. Its rerun and locked confirm are already complete:
+The current best content-only supervision branch is `18052`, the `sidecarkv4 + teacher16081 + hard-slice selector` family. It is now rerun-clean, fully paneled, and locked-confirmed:
 
+- `18052` five-seed selected `full_locked overall / fq_acc / fq_route / fq_exit = 0.9985 / 0.9985 / 0.9397 / 121.19`
+- `18052` five-seed selected `finalquery_heavy = 0.9977 / 0.9971 / 0.9426 / 121.51`
 - `18052` locked confirm `full_locked = 0.6592 / 0.3001 / 0.8797 / 116.14`
 - `18052` locked confirm `finalquery_heavy = 0.4515 / 0.3083 / 0.8785 / 115.97`
-
-Its panel is still being filled, but the first two seeds are consistent with a stable late-route summary regime:
-
-- `18152` selected `full_locked dqf = 0.9985 / 0.9384 / 121.02`
-- `18153` selected `full_locked dqf = 0.9990 / 0.9421 / 121.34`
 
 Interpretation: the richer sidecar path is currently beating the richer multi-slot path on the real bottleneck, but only by a narrow margin.
 
@@ -66,7 +63,7 @@ Cluster C is currently more encouraging than plain richer-path scaling.
 
 The best content-only supervision branch is `18052`. It won the confirm hard slice over `18011`, reduced late wrong-content cases, cleared the exact rerun gate, and slightly improved locked confirm content over both the old phase-14 ceiling and the richer-path baselines.
 
-Interpretation: once the path is richer, content-only supervision still helps, but the lift remains modest.
+Interpretation: once the path is richer, content-only supervision still helps, and `18052` is now the best fully paneled content-only richer-path branch, but the lift remains modest.
 
 ## Cluster D Read
 
@@ -104,3 +101,8 @@ The phase-15 map is already sharper than phase 14:
 - the current lifts are modest, not ceiling-breaking
 
 If the remaining panel roots and Cluster F do not change this, the most likely interpretation is that the next ceiling is no longer simple readout width. It is probably content writing / retrieval quality inside the isolated content path.
+
+The campaign is still filling the comparison panel roots that matter most for that read:
+
+- `18026` multislot panel has two completed seeds (`18226`, `18227`) and a third live seed (`18228`)
+- `18060` stronger sidecar dual-anchor panel has started with live seed `18260`

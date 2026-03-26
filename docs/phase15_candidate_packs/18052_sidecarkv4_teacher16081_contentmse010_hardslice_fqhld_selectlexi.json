@@ -1,6 +1,6 @@
 {
   "candidate_name": "18052_sidecarkv4_teacher16081_contentmse010_hardslice_fqhld_selectlexi",
-  "status": "promoted",
+  "status": "panel_complete",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_teacher16081_contentmse010_fqonly_seed18059_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_hardslice_fqhld_selectlexi_seed18052_p1",
@@ -77,8 +77,27 @@
     }
   },
   "seed_panel": {
-    "panel_dir": "",
-    "headline_metrics": {}
+    "panel_dir": "results/phase15_panel/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_hardslice_fqhld_selectlexi_panel18052",
+    "headline_metrics": {
+      "full_locked": {
+        "overall_accuracy": 0.99853515625,
+        "fq_acc": 0.9985060637404605,
+        "fq_route": 0.9396825461939715,
+        "fq_exit": 121.19365152453396
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.99765625,
+        "fq_acc": 0.9970606113531366,
+        "fq_route": 0.9425596961563376,
+        "fq_exit": 121.50765368244944
+      },
+      "longdistance": {
+        "overall_accuracy": 0.99794921875,
+        "fq_acc": 0.9970893958667377,
+        "fq_route": 0.9480249447865529,
+        "fq_exit": 152.9315311275913
+      }
+    }
   },
   "summary_eval": {
     "best_val": {
@@ -115,7 +134,7 @@
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": true,
     "verify_passed": true,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
-  "final_decision": "promoted_for_panel"
+  "final_decision": "panel_complete_locked_confirmed"
 }
