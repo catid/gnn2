@@ -22,7 +22,7 @@ But locked confirm still fell back to the old ceiling:
 - `18026` locked confirm `full_locked overall / fq_acc / fq_route / fq_exit = 0.6527 / 0.2874 / 0.8850 / 116.22`
 - `18026` locked confirm `finalquery_heavy = 0.4427 / 0.2972 / 0.8789 / 115.56`
 
-The strongest sidecar baselines closed the same way. `18035`, `18036`, `18059`, and `18060` all cleared rerun and locked confirm without route collapse, but each landed on the same confirm regime as `18026`. Interpretation: richer readout capacity alone is not sufficient; the ceiling is not broken just by replacing the single-slot path with a wider isolated content path.
+The strongest sidecar baselines closed the same way. `18035`, `18036`, `18059`, and now the fully paneled `18060` all cleared rerun and locked confirm without route collapse, but each landed on the same confirm regime as `18026`. `18060` five-seed selected `full_locked overall / fq_acc / fq_route / fq_exit = 0.9978 / 0.9968 / 0.9386 / 121.18`, then locked confirm fell back to `0.6527 / 0.2874 / 0.8850 / 116.22`. Interpretation: richer readout capacity alone is not sufficient; the ceiling is not broken just by replacing the single-slot path with a wider isolated content path.
 
 Second, the best phase-15 gains so far come from richer sidecar paths paired with stronger training contracts, not from multi-slot channels. The current best dual-anchor recipe is `18057`, the `sidecarkv4 + dual-anchor + payloadaux040` branch. It is the first fully paneled headline branch in phase 15:
 
@@ -58,7 +58,7 @@ The other multi-slot families (`18021`, `18023`, `18027`, `18028`, `18029`, `180
 Cluster B is the current phase-15 winner family.
 
 - early sidecar baselines (`18031`, `18033`, `18034`, `18035`, `18036`, `18037`) showed that a route-isolated sidecar can improve the confirm hard slice without destabilizing routing
-- stronger-path sidecar follow-ups (`18059`, `18060`) proved that better hard-slice behavior alone still is not enough; both landed on the old confirm ceiling
+- stronger-path sidecar follow-ups (`18059`, `18060`) proved that better hard-slice behavior alone still is not enough; both landed on the old confirm ceiling, and `18060` now confirms that at five-seed panel depth
 - the current best headline branches are `18052` and `18057`
 
 Interpretation: sidecar memory beats multi-slot channels as the better isolated content-path direction, and that comparison is now locked in at panel depth for the multi-slot side.
@@ -90,9 +90,9 @@ The full compute-quality frontier should compare `16045`, `18026`, `18052`, and 
 
 ## Cluster F Read
 
-Staged, not executed yet in this report slice.
+Live, but not complete yet in this report slice.
 
-Queued sanity branches:
+Current bounded sanity branches:
 
 - `18221`, `18222` on `1821`
 - `18291`, `18292` on `1879`
@@ -108,7 +108,8 @@ The phase-15 map is already sharper than phase 14:
 
 If the remaining panel roots and Cluster F do not change this, the most likely interpretation is that the next ceiling is no longer simple readout width. It is probably content writing / retrieval quality inside the isolated content path.
 
-The campaign is still filling the comparison panel roots that matter most for that read:
+The campaign is still filling the portability and sanity roots that matter most for the final closeout:
 
 - `18026` multislot panel is complete through all five seeds
-- `18060` stronger sidecar dual-anchor panel has two completed seeds (`18260`, `18261`) and two live seeds (`18262`, `18263`)
+- `18060` stronger sidecar dual-anchor panel is complete through all five seeds
+- `18221` and `18222` are live as the bounded `1821` portability sanity pair

@@ -72,6 +72,7 @@ Live and currently the cleanest fully verified headline lane.
 - Rerun: pass
 - Five-seed panel: complete
 - Locked confirm: modest lift over phase-14 ceiling
+- Stronger baseline comparison: `18060` is now fully paneled and still confirm-ceiling limited
 
 Headline metrics for `18057`:
 
@@ -97,9 +98,9 @@ Current partial read:
 
 ## Cluster F
 
-Staged, not yet executed in this draft slice.
+Live, not yet complete in this draft slice.
 
-Queued bounded sanity runs:
+Current bounded sanity runs:
 
 - `18221`, `18222` on `1821`
 - `18291`, `18292` on `1879`
