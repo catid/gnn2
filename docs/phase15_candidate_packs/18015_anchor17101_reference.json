@@ -1,0 +1,51 @@
+{
+  "candidate_name": "18015_anchor17101_reference",
+  "status": "running_reference_anchor",
+  "baseline_run": "hard_st_b_v2_teacher1821_base_hardslice_fqhld_selectlexi_seed17101_p1",
+  "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1821_anchor17101_selectlexi_hardslice.yaml",
+  "run_dir": "results/phase15_anchor/hard_st_b_v2_teacher1821_anchor17101_selectlexi_hardslice_seed18015_p1",
+  "checkpoint": "results/phase15_anchor/hard_st_b_v2_teacher1821_anchor17101_selectlexi_hardslice_seed18015_p1/hard_st_best.pt",
+  "route_anchor": "17101",
+  "content_teacher": "none",
+  "content_path_family": "reference_single_slot_hardslice_selector_portability",
+  "route_isolation_contract": {
+    "frozen_routing_control": true,
+    "post_routing_only": true,
+    "unit_test_passed": true
+  },
+  "content_failure_hard_slice": {
+    "artifact_json": "",
+    "artifact_rows_csv": "",
+    "headline_metrics": {}
+  },
+  "rerun": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "locked_confirm": {
+    "run_dir": "",
+    "headline_metrics": {}
+  },
+  "seed_panel": {
+    "panel_dir": "",
+    "headline_metrics": {}
+  },
+  "summary_eval": {
+    "best_val": {},
+    "full_locked": {},
+    "finalquery_heavy": {},
+    "longdistance": {}
+  },
+  "verify": {
+    "artifact_json": "",
+    "checksum": ""
+  },
+  "gate": {
+    "rerun_preserves_late_route": false,
+    "hard_slice_improves_or_holds": false,
+    "locked_confirm_preserves_route_exit": false,
+    "verify_passed": false,
+    "candidate_pack_complete": false
+  },
+  "final_decision": "pending_anchor_reproduction"
+}
