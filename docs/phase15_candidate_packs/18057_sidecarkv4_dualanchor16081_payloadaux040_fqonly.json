@@ -1,6 +1,6 @@
 {
   "candidate_name": "18057_sidecarkv4_dualanchor16081_payloadaux040_fqonly",
-  "status": "candidate",
+  "status": "promoted",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_trajectorybank_dualanchor16081_base_seed18060_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_seed18057_p1",
@@ -25,12 +25,56 @@
     }
   },
   "rerun": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_seed18057_rerun1_p1",
+    "headline_metrics": {
+      "best_val": {
+        "overall_accuracy": 0.998046875,
+        "fq_acc": 0.998046875,
+        "fq_route": 0.9638671875,
+        "fq_exit": 67.28466796875
+      },
+      "full_locked": {
+        "overall_accuracy": 0.99951171875,
+        "fq_acc": 0.99951171875,
+        "fq_route": 0.9677734375,
+        "fq_exit": 70.923828125
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.99853515625,
+        "fq_acc": 0.99853515625,
+        "fq_route": 0.9609375,
+        "fq_exit": 100.607421875
+      },
+      "longdistance": {
+        "overall_accuracy": 0.998046875,
+        "fq_acc": 0.998046875,
+        "fq_route": 0.9619140625,
+        "fq_exit": 113.56396484375
+      }
+    }
   },
   "locked_confirm": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_seed18057_rerun1_p1",
+    "headline_metrics": {
+      "full_locked": {
+        "overall_accuracy": 0.6588541865348816,
+        "fq_acc": 0.2994652466778768,
+        "fq_route": 0.8796791406796578,
+        "fq_exit": 116.14037486703639
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.451171875,
+        "fq_acc": 0.30788177332561006,
+        "fq_route": 0.878489327376895,
+        "fq_exit": 115.96962196212293
+      },
+      "longdistance": {
+        "overall_accuracy": 0.5315755009651184,
+        "fq_acc": 0.3380864763627276,
+        "fq_route": 0.8799447980405216,
+        "fq_exit": 145.0657745894754
+      }
+    }
   },
   "seed_panel": {
     "panel_dir": "",
@@ -63,15 +107,15 @@
     }
   },
   "verify": {
-    "artifact_json": "",
-    "checksum": ""
+    "artifact_json": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_dualanchor16081_payloadaux040_fqonly_seed18057_rerun1_p1/artifacts/phase15_verify/verification.json",
+    "checksum": "8900d050aad37f2746ce974037ec820238e87d0ba34756a2909e51a289d110d8"
   },
   "gate": {
-    "rerun_preserves_late_route": false,
+    "rerun_preserves_late_route": true,
     "hard_slice_improves_or_holds": true,
-    "locked_confirm_preserves_route_exit": false,
-    "verify_passed": false,
+    "locked_confirm_preserves_route_exit": true,
+    "verify_passed": true,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending_rerun"
+  "final_decision": "promoted_for_panel"
 }
