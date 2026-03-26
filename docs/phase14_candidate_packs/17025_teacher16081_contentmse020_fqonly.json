@@ -91,22 +91,22 @@
   "seed_panel": {
     "panel_dir": "results/phase14_panel/hard_st_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_fqonly_panel",
     "headline_metrics": {
-      "mean_best_val_dqf": {
+      "best_val_dqf_mean": {
         "accuracy": 0.9975,
         "route_match": 0.9726,
         "exit_time": 68.01
       },
-      "mean_full_locked_dqf": {
+      "selected_full_locked_dqf_mean": {
         "accuracy": 0.9981,
         "route_match": 0.9427,
         "exit_time": 121.54
       },
-      "mean_finalquery_heavy_dqf": {
+      "selected_finalquery_heavy_dqf_mean": {
         "accuracy": 0.9968,
         "route_match": 0.9345,
         "exit_time": 120.77
       },
-      "mean_longdistance_dqf": {
+      "selected_longdistance_dqf_mean": {
         "accuracy": 0.9963,
         "route_match": 0.9428,
         "exit_time": 152.23
