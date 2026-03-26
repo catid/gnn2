@@ -2,7 +2,7 @@
 
 ## Status
 
-Active. Strong-mapping read is already forming, but panel depth and Cluster F are still in progress.
+Complete. Phase 15 closes as a strong mapping exit, not a ceiling-breaking win.
 
 ## Main Question
 
@@ -81,39 +81,32 @@ Interpretation: dual-anchor training matters more once the content path is actua
 
 ## Cluster E Read
 
-Characterization is not fully written yet, but one read is already clear:
+Cluster E closes with a narrow characterization answer rather than a new frontier branch.
 
-- the best fully paneled phase-15 branch `18057` keeps selected full-locked exit in the same late-route band as the strong phase-14 branches
-- the modest held-confirm lift therefore does not come from collapsing compute or exiting earlier under confirm
+- the best fully paneled phase-15 branches `18052` and `18057` keep selected full-locked exit in the same late-route band as the strong phase-14 branches
+- the modest confirm lift therefore does not come from collapsing compute or exiting earlier under confirm
+- `18026` shows that extra readout width alone can preserve late-route compute while still landing on the old confirm ceiling
 
-The full compute-quality frontier should compare `16045`, `18026`, `18052`, and `18057`.
+Interpretation: the useful variable-thinking-time behavior survives the richer sidecar path. The small phase-15 gains come from better content handling inside that path, not from compute collapse.
 
 ## Cluster F Read
 
-Live, but not complete yet in this report slice.
+Cluster F is complete.
 
-Current bounded sanity branches:
+- `18221` was the weaker summary-time `1821` sanity run and was retired behind `18222`
+- `18222` was the strongest summary-time `1821` sanity run, and `18222_rerun1` matched it exactly with `max_diff = 0.0`
+- bounded confirm on `18222` still fell to `full_locked overall / fq_acc / fq_route / fq_exit = 0.6149 / 0.2560 / 0.8329 / 116.34`
+- `18291` and `18292` both stayed clean `1879` negatives
 
-- `18221` complete on `1821`
-- `18222` complete on `1821`
-- `18222_rerun1` live on `1821`
-- `18291` complete on `1879`
-- `18292` complete on `1879`
+Interpretation: the richer sidecar recipe does not meaningfully transfer under locked confirm, even when the secondary-source summary signal is rerun-exact. `1879` remains a proper negative control.
 
-## Provisional Conclusion
+## Final Conclusion
 
-The phase-15 map is already sharper than phase 14:
+The phase-15 map is sharper than phase 14:
 
 - richer content paths do help, but only the sidecar family has produced any confirm lift worth keeping
 - multi-slot channels have not matched the sidecar family on the real bottleneck
 - content-only supervision and dual-anchor training both help on top of the richer sidecar path
 - the current lifts are modest, not ceiling-breaking
 
-If the remaining panel roots and Cluster F do not change this, the most likely interpretation is that the next ceiling is no longer simple readout width. It is probably content writing / retrieval quality inside the isolated content path.
-
-The campaign is still filling the portability and sanity roots that matter most for the final closeout:
-
-- `18026` multislot panel is complete through all five seeds
-- `18060` stronger sidecar dual-anchor panel is complete through all five seeds
-- `18222` is now the stronger summary-time `1821` portability read and `18222_rerun1` is live to decide whether it deserves any confirm budget
-- `18291` and `18292` are now both closed as clean bounded `1879` negatives
+The final interpretation is that the next ceiling is no longer simple readout width. Sidecar memory is the better richer-path direction, but the remaining bottleneck now looks more like content writing / retrieval quality inside the isolated path than readout width or route-side instability.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Active draft.
+Complete.
 
 ## Cluster A
 
@@ -44,7 +44,7 @@ Scorecard:
 
 ## Cluster C
 
-Live and currently competitive.
+Closed as a modest positive, not a breakthrough.
 
 - Best branch: `18052` sidecarkv4 + teacher16081 + hard-slice selector
 - Rerun: pass
@@ -66,7 +66,7 @@ Scorecard:
 
 ## Cluster D
 
-Live and currently the cleanest fully verified headline lane.
+Closed as a modest positive and the cleanest fully verified dual-anchor lane.
 
 - Best branch: `18057` sidecarkv4 dual-anchor payloadaux040
 - Rerun: pass
@@ -88,22 +88,20 @@ Scorecard:
 
 ## Cluster E
 
-Pending final writeup.
-
-Current partial read:
+Closed as a characterization answer.
 
 - `18057` keeps selected exit in the same useful late-route compute band as the phase-14 winners
 - `18052` does the same while slightly edging `18057` on locked-confirm content
 - current confirm lift is not caused by an obvious compute collapse
 
+Current answer: the sidecar gains preserve the stable late-route compute regime, so the small content lift is not a byproduct of earlier exits.
+
 ## Cluster F
 
-Live, not yet complete in this draft slice.
+Closed as a weak-portability / clean-negative answer.
 
-Current bounded sanity runs:
+- `18222` was the stronger `1821` summary-time result and `18222_rerun1` matched it exactly
+- bounded confirm still fell to `full_locked overall / fq_acc / fq_route / fq_exit = 0.6149 / 0.2560 / 0.8329 / 116.34`
+- `18291` and `18292` both stayed clean `1879` negatives
 
-- `18221` complete on `1821`
-- `18222` complete on `1821`
-- `18222_rerun1` live on `1821`
-- `18291` complete on `1879`
-- `18292` complete on `1879`
+Current answer: no meaningful portability transfer, and the richer path does not create a false-positive negative-control story.

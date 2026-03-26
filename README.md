@@ -121,6 +121,26 @@ The test suite covers:
 
 ## Current Scientific Summary
 
+Phase 15 closed as a strong mapping exit. On the fixed `16045` route anchor,
+the best richer-content-path family is the route-isolated sidecar path rather
+than the multi-slot channel family. The best fully confirmed branches are
+`18052` and `18057`, which preserve the stable late-route regime and produce
+only modest locked-confirm content lifts:
+
+- `18052` locked confirm `full_locked overall / fq_acc / fq_route / fq_exit = 0.6592 / 0.3001 / 0.8797 / 116.14`
+- `18057` locked confirm `full_locked overall / fq_acc / fq_route / fq_exit = 0.6589 / 0.2995 / 0.8797 / 116.14`
+
+The best multi-slot branch `18026` stayed stable but still fell to the old
+confirm ceiling at `0.6527 / 0.2874 / 0.8850 / 116.22`. Bounded `1821`
+portability remained weak even after an exact rerun (`18222` confirmed at
+`0.6149 / 0.2560 / 0.8329 / 116.34`), and `1879` remained cleanly negative.
+
+The current scientific interpretation is that the next bottleneck is not route
+stability or simple readout width. It is more likely content writing /
+retrieval quality inside the isolated sidecar path.
+
+## Current Scientific Summary
+
 The current long-horizon writeups are:
 
 - [docs/phase7_report.md](docs/phase7_report.md)
