@@ -62,7 +62,11 @@ Pending final scorecard.
 
 ## Cluster E
 
-Pending final scorecard.
+Early read already available.
+
+- `17011`, `17024`, and `17031` all occupy a very similar summary-time late-route compute band around `full_locked exit ~= 121-123`
+- quality differences on that summary-time band are small relative to the confirm collapse
+- current interpretation: compute alone is not the main missing ingredient on the stabilized family
 
 ## Cluster F
 

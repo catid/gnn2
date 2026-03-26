@@ -37,3 +37,13 @@ But its independently confirmed held-confirm result is still stuck at the old re
 - `17024` selected `finalquery_heavy` confirm DQF: `0.3083 / 0.8785 / 115.97`
 
 Interpretation: content-only teacher supervision on top of the fixed `16045` route anchor clearly preserves the late-route summary regime and improves the content-failure hard slice, but the first fully paneled teacher-first candidate still does not convert that summary-time gain into held-confirm content recovery. The remaining active question is therefore whether the heavier teacher-first branch (`17025`) or the teacher-backed hard-slice lane (`17041`, `17042`) can change that confirm outcome rather than merely reproduce the same split more stably.
+
+## Cluster E Early Read
+
+The first compute-quality frontier check is already informative even before the remaining panel roots complete. On summary-time slices, the stable baseline `17011`, the first teacher-first branch `17024`, and the first dual-anchor branch `17031` all sit on nearly the same late-route compute band:
+
+- `17011` selected `full_locked` DQF: `0.9972 / 0.9402 / 121.33`
+- `17024` selected `full_locked` DQF: `0.9981 / 0.9346 / 120.62`
+- `17031` selected `full_locked` DQF: `0.9972 / 0.9570 / 123.08`
+
+Interpretation: variable thinking time is not the missing axis by itself on the current stable family. The current branches already buy roughly the same late-route compute, and the main separation remains whether any branch can turn that stable compute regime into held-confirm content recovery rather than just producing another summary/confirm split.
