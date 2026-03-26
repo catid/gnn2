@@ -36,13 +36,20 @@ if [[ -n "$results_root" ]]; then
   mkdir -p "$results_root"
 fi
 
-gpu=0
-for seed in "${seeds[@]}"; do
-  extra_args=(--seed "$seed")
-  if [[ -n "$results_root" ]]; then
-    extra_args+=(--results-dir "${results_root}/seed${seed}")
-  fi
-  "$(dirname "$0")/run_phase14_content_branch.sh" "$gpu" "$config" "${extra_args[@]}" &
-  gpu=$((1 - gpu))
+for ((batch_start=0; batch_start<${#seeds[@]}; batch_start+=2)); do
+  pids=()
+  for gpu in 0 1; do
+    idx=$((batch_start + gpu))
+    if [[ $idx -ge ${#seeds[@]} ]]; then
+      continue
+    fi
+    seed="${seeds[$idx]}"
+    extra_args=(--seed "$seed")
+    if [[ -n "$results_root" ]]; then
+      extra_args+=(--results-dir "${results_root}/seed${seed}")
+    fi
+    "$(dirname "$0")/run_phase14_content_branch.sh" "$gpu" "$config" "${extra_args[@]}" &
+    pids+=("$!")
+  done
+  wait "${pids[@]}"
 done
-wait
