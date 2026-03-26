@@ -1,0 +1,5 @@
+_base_: ../../phase13/dev/hard_st_benchmark_b_v2_teacher1879_anchor_queryreadout_selectlexi_lockedroute_lockedfqacc.yaml
+
+experiment:
+  seed: 17015
+  results_root: results/phase14_anchor

@@ -1,0 +1,5 @@
+_base_: ../../phase13/dev/hard_st_benchmark_b_v2_teacher1874_factorized_temporalbank_query_bilinear_bridge_blend85_15051readout_15057extras_selectlocked.yaml
+
+experiment:
+  seed: 17011
+  results_root: results/phase14_anchor

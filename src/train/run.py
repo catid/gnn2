@@ -56,6 +56,8 @@ class TeacherDistillation:
     wait_prob_weight: float
     control_state_weight: float
     memory_read_weight: float
+    factorized_content_weight: float
+    factorized_query_weight: float
     start_step: int
     stop_step: int
     scale_start: float
@@ -1939,6 +1941,8 @@ def load_teacher_distillation(
         "wait_prob_weight": float(teacher_cfg.get("wait_prob_weight", 0.0)),
         "control_state_weight": float(teacher_cfg.get("control_state_weight", 0.0)),
         "memory_read_weight": float(teacher_cfg.get("memory_read_weight", 0.0)),
+        "factorized_content_weight": float(teacher_cfg.get("factorized_content_weight", 0.0)),
+        "factorized_query_weight": float(teacher_cfg.get("factorized_query_weight", 0.0)),
     }
     if max(weights.values(), default=0.0) <= 0.0:
         return None
@@ -1986,6 +1990,8 @@ def load_teacher_distillation(
         wait_prob_weight=weights["wait_prob_weight"],
         control_state_weight=weights["control_state_weight"],
         memory_read_weight=weights["memory_read_weight"],
+        factorized_content_weight=weights["factorized_content_weight"],
+        factorized_query_weight=weights["factorized_query_weight"],
         start_step=int(teacher_cfg.get("start_step", 0)),
         stop_step=int(teacher_cfg.get("stop_step", -1)),
         scale_start=float(teacher_cfg.get("scale_start", 1.0)),
@@ -2260,6 +2266,18 @@ def compute_teacher_distillation_loss(
         ("wait_prob", teacher.wait_prob_weight, "teacher_wait_prob_loss", _weighted_mse),
         ("control_state", teacher.control_state_weight, "teacher_control_state_loss", _weighted_mse),
         ("memory_read_state", teacher.memory_read_weight, "teacher_memory_read_loss", _weighted_mse),
+        (
+            "factorized_content_hidden",
+            teacher.factorized_content_weight,
+            "teacher_factorized_content_loss",
+            _weighted_mse,
+        ),
+        (
+            "factorized_query_hidden",
+            teacher.factorized_query_weight,
+            "teacher_factorized_query_loss",
+            _weighted_mse,
+        ),
     ]
     for key, weight, metric_name, loss_fn in trace_specs:
         if weight <= 0.0:

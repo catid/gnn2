@@ -1,0 +1,1 @@
+run_name,cluster,budget_bucket,hypothesis,source_family,seed,split_ids,status,commit,parent_checkpoint,route_anchor,content_teacher,memory_router_control_frozen,trainable_components,aux_or_distill_targets,result_summary,verification_status,retirement_reason,trainable_params,train_steps,wallclock_hours,gpu_count
