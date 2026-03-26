@@ -1,6 +1,6 @@
 {
   "candidate_name": "18035_sidecarkv4_finalsink_base",
-  "status": "completed_pending_hardslice",
+  "status": "candidate",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_base_seed18031_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_finalsink_base_seed18035_p1",
@@ -14,9 +14,15 @@
     "unit_test_passed": true
   },
   "content_failure_hard_slice": {
-    "artifact_json": "",
-    "artifact_rows_csv": "",
-    "headline_metrics": {}
+    "artifact_json": "artifacts/phase15_hardslice/18011_vs_18035_confirm32b.json",
+    "artifact_rows_csv": "artifacts/phase15_hardslice/18011_vs_18035_confirm32b.rows.csv",
+    "headline_metrics": {
+      "baseline_late_wrong_content": 3,
+      "candidate_late_wrong_content": 1,
+      "late_relaxed_disagreements": 4,
+      "candidate_beats_baseline_on_late_disagreements": 3,
+      "baseline_beats_candidate_on_late_disagreements": 1
+    }
   },
   "rerun": {
     "run_dir": "",
@@ -62,10 +68,10 @@
   },
   "gate": {
     "rerun_preserves_late_route": false,
-    "hard_slice_improves_or_holds": false,
+    "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": false,
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending_hardslice"
+  "final_decision": "pending_rerun"
 }

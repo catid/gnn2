@@ -25,8 +25,33 @@
     }
   },
   "rerun": {
-    "run_dir": "",
-    "headline_metrics": {}
+    "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_contenthidden_base_seed18034_rerun1_p1",
+    "headline_metrics": {
+      "best_val": {
+        "overall_accuracy": 0.998046875,
+        "fq_acc": 0.9980138994257642,
+        "fq_route": 0.9374379372407332,
+        "fq_exit": 120.83813285638227
+      },
+      "full_locked": {
+        "overall_accuracy": 0.99951171875,
+        "fq_acc": 0.9990662844463779,
+        "fq_route": 0.9365079376766551,
+        "fq_exit": 121.09897316470534
+      },
+      "finalquery_heavy": {
+        "overall_accuracy": 0.9970703125,
+        "fq_acc": 0.9963257733620681,
+        "fq_route": 0.9375382701604554,
+        "fq_exit": 121.15921444259241
+      },
+      "longdistance": {
+        "overall_accuracy": 0.99755859375,
+        "fq_acc": 0.9965349969893632,
+        "fq_route": 0.9521829500350371,
+        "fq_exit": 153.3083852026418
+      }
+    }
   },
   "locked_confirm": {
     "run_dir": "",
@@ -67,11 +92,11 @@
     "checksum": ""
   },
   "gate": {
-    "rerun_preserves_late_route": false,
+    "rerun_preserves_late_route": true,
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": false,
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending_rerun"
+  "final_decision": "pending_locked_confirm"
 }
