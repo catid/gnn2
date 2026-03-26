@@ -1,0 +1,24 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1879_anchor17103_selectlexi_hardslice.yaml
+
+experiment:
+  seed: 18290
+  results_root: results/phase15_dev
+
+resume:
+  checkpoint: results/phase15_anchor/hard_st_b_v2_teacher1879_anchor17103_selectlexi_hardslice_seed18016_p1/hard_st_best.pt
+  strict: false
+
+model:
+  factorized_content_sidecar_mode: kv_memory
+  factorized_content_sidecar_source: factorized_content_base
+  factorized_content_sidecar_slots: 4
+  factorized_content_sidecar_scale: 1.0
+  factorized_content_sidecar_zero_init: true
+
+training:
+  lr: 0.00002
+  trainable_prefixes:
+    - factorized_content_proj
+    - factorized_content_sidecar
+    - factorized_bilinear
+    - readout
