@@ -1,6 +1,6 @@
 {
   "candidate_name": "18027_multislot2_independent_mean_base",
-  "status": "running",
+  "status": "retired",
   "baseline_run": "results/phase15_anchor/hard_st_b_v2_teacher1874_anchor16045_selectlocked_seed18011_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_mean_base.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_mean_base_seed18027_p1",
@@ -14,9 +14,15 @@
     "unit_test_passed": true
   },
   "content_failure_hard_slice": {
-    "artifact_json": "",
-    "artifact_rows_csv": "",
-    "headline_metrics": {}
+    "artifact_json": "artifacts/phase15_hardslice/18011_vs_18027_confirm32b.json",
+    "artifact_rows_csv": "artifacts/phase15_hardslice/18011_vs_18027_confirm32b.rows.csv",
+    "headline_metrics": {
+      "baseline_late_wrong_content": 1,
+      "candidate_late_wrong_content": 3,
+      "late_relaxed_disagreements": 4,
+      "candidate_beats_baseline_on_late_disagreements": 1,
+      "baseline_beats_candidate_on_late_disagreements": 3
+    }
   },
   "rerun": {
     "run_dir": "",
@@ -31,10 +37,30 @@
     "headline_metrics": {}
   },
   "summary_eval": {
-    "best_val": {},
-    "full_locked": {},
-    "finalquery_heavy": {},
-    "longdistance": {}
+    "best_val": {
+      "overall_accuracy": 0.99951171875,
+      "fq_acc": 0.9999999928379721,
+      "fq_route": 0.9354518397443936,
+      "fq_exit": 120.58987233560632
+    },
+    "full_locked": {
+      "overall_accuracy": 0.9990234375,
+      "fq_acc": 0.9981325734006702,
+      "fq_route": 0.9505135411419232,
+      "fq_exit": 122.08963595407238
+    },
+    "finalquery_heavy": {
+      "overall_accuracy": 0.9970703125,
+      "fq_acc": 0.9963257716465639,
+      "fq_route": 0.9497856677345023,
+      "fq_exit": 122.51928766534435
+    },
+    "longdistance": {
+      "overall_accuracy": 0.99560546875,
+      "fq_acc": 0.9937629857909241,
+      "fq_route": 0.9445599391488507,
+      "fq_exit": 152.56618308888818
+    }
   },
   "verify": {
     "artifact_json": "",
@@ -47,5 +73,5 @@
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending"
+  "final_decision": "retired_hardslice_negative"
 }
