@@ -1,6 +1,6 @@
 {
   "candidate_name": "18024_multislot2_independent_teacher16081_contentmse010_fqonly",
-  "status": "running",
+  "status": "retired",
   "baseline_run": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_base_seed18021_p1",
   "config_path": "configs/phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_teacher16081_contentmse010_fqonly.yaml",
   "run_dir": "results/phase15_dev/hard_st_b_v2_teacher1874_contentpath_resume16045_multislot2_independent_teacher16081_contentmse010_fqonly_seed18024_p1",
@@ -14,9 +14,15 @@
     "unit_test_passed": true
   },
   "content_failure_hard_slice": {
-    "artifact_json": "",
-    "artifact_rows_csv": "",
-    "headline_metrics": {}
+    "artifact_json": "artifacts/phase15_hardslice/18011_vs_18024_confirm32b.json",
+    "artifact_rows_csv": "artifacts/phase15_hardslice/18011_vs_18024_confirm32b.rows.csv",
+    "headline_metrics": {
+      "baseline_late_wrong_content": 1,
+      "candidate_late_wrong_content": 3,
+      "late_relaxed_disagreements": 4,
+      "candidate_beats_baseline_on_late_disagreements": 1,
+      "baseline_beats_candidate_on_late_disagreements": 3
+    }
   },
   "rerun": {
     "run_dir": "",
@@ -31,10 +37,30 @@
     "headline_metrics": {}
   },
   "summary_eval": {
-    "best_val": {},
-    "full_locked": {},
-    "finalquery_heavy": {},
-    "longdistance": {}
+    "best_val": {
+      "overall_accuracy": 0.99755859375,
+      "fq_acc": 0.9960278076116946,
+      "fq_route": 0.9433962384307278,
+      "fq_exit": 121.59880902348114
+    },
+    "full_locked": {
+      "overall_accuracy": 0.9990234375,
+      "fq_acc": 0.9981325808025542,
+      "fq_route": 0.9383753483591516,
+      "fq_exit": 121.24836651884875
+    },
+    "finalquery_heavy": {
+      "overall_accuracy": 0.99853515625,
+      "fq_acc": 0.9981628733037515,
+      "fq_route": 0.9461114381400633,
+      "fq_exit": 121.85731646507996
+    },
+    "longdistance": {
+      "overall_accuracy": 0.99755859375,
+      "fq_acc": 0.996534996163242,
+      "fq_route": 0.9473319455557867,
+      "fq_exit": 152.68815063984133
+    }
   },
   "verify": {
     "artifact_json": "",
@@ -47,5 +73,5 @@
     "verify_passed": false,
     "candidate_pack_complete": false
   },
-  "final_decision": "pending"
+  "final_decision": "retired_hardslice_negative"
 }
