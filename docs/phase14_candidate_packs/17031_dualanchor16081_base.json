@@ -89,8 +89,29 @@
     }
   },
   "seed_panel": {
-    "panel_dir": "",
-    "headline_metrics": {}
+    "panel_dir": "results/phase14_panel/hard_st_b_v2_teacher1874_contentbranch_resume16045_dualanchor16081_base_panel",
+    "headline_metrics": {
+      "best_val_dqf_mean": {
+        "accuracy": 0.9982,
+        "route_match": 0.9703,
+        "exit_time": 67.82
+      },
+      "selected_full_locked_dqf_mean": {
+        "accuracy": 0.9974,
+        "route_match": 0.9432,
+        "exit_time": 121.55
+      },
+      "selected_finalquery_heavy_dqf_mean": {
+        "accuracy": 0.9955,
+        "route_match": 0.9424,
+        "exit_time": 121.63
+      },
+      "selected_longdistance_dqf_mean": {
+        "accuracy": 0.9971,
+        "route_match": 0.9508,
+        "exit_time": 153.24
+      }
+    }
   },
   "verify": {
     "artifact_json": "artifacts/phase14_verify/17031_verify.json",
