@@ -46,7 +46,12 @@ for ((batch_start=0; batch_start<${#seeds[@]}; batch_start+=2)); do
     seed="${seeds[$idx]}"
     extra_args=(--seed "$seed")
     if [[ -n "$results_root" ]]; then
-      extra_args+=(--results-dir "${results_root}/seed${seed}")
+      seed_results_dir="${results_root}/seed${seed}"
+      if [[ -e "$seed_results_dir" ]]; then
+        echo "skipping seed ${seed}: existing results dir ${seed_results_dir}" >&2
+        continue
+      fi
+      extra_args+=(--results-dir "$seed_results_dir")
     fi
     "$(dirname "$0")/run_phase14_content_branch.sh" "$gpu" "$config" "${extra_args[@]}" &
     pids+=("$!")
