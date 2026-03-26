@@ -60,3 +60,17 @@ The first compute-quality frontier check is already informative even before the 
 - `17031` selected `full_locked` DQF: `0.9972 / 0.9570 / 123.08`
 
 Interpretation: variable thinking time is not the missing axis by itself on the current stable family. The current branches already buy roughly the same late-route compute, and the main separation remains whether any branch can turn that stable compute regime into held-confirm content recovery rather than just producing another summary/confirm split.
+
+## Cluster D Read
+
+The gated content-only sidecar branch is already mapped enough to narrow the next step. The best sidecar candidate was `17063`, which stayed in the same summary-time late-route regime:
+
+- `17063` selected `full_locked` summary DQF: `0.9991 / 0.9533 / 122.61`
+- `17063` selected `finalquery_heavy` summary DQF: `0.9988 / 0.9363 / 120.90`
+
+It also cleared the hard-slice gate and exact rerun. But its locked confirm still fell back to the same held-confirm regime:
+
+- `17063` selected `full_locked` confirm DQF: `0.2874 / 0.8850 / 116.22`
+- `17063` selected `finalquery_heavy` confirm DQF: `0.2976 / 0.8789 / 115.56`
+
+Interpretation: a small content-only sidecar path can preserve the stabilized late-route regime, but the first credible sidecar branch still looks like another summary-time improvement that does not survive held-confirm verification.

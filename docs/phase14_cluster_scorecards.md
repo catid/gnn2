@@ -65,7 +65,26 @@ Still active. Current strongest no-teacher hard-slice branch `17043` is rerun-cl
 
 ## Cluster D
 
-Pending final scorecard.
+Mapped enough to score as a gated stable negative.
+
+- Best branch: `17063` content-only sidecar with payload auxiliary
+- Hard-slice gate: pass
+- Exact rerun: pass
+- Locked confirm: fail on held-confirm content
+
+Headline metrics for `17063`:
+
+- selected `full_locked` summary DQF: `0.9991 / 0.9533 / 122.61`
+- selected `finalquery_heavy` summary DQF: `0.9988 / 0.9363 / 120.90`
+- selected `full_locked` confirm DQF: `0.2874 / 0.8850 / 116.22`
+- selected `finalquery_heavy` confirm DQF: `0.2976 / 0.8789 / 115.56`
+
+Scorecard:
+
+- Stability: strong
+- Content-failure hard-slice targeting: real
+- Held-confirm lift: no
+- Retirement reason: the smallest safe content-only sidecar path still reproduces the same held-confirm ceiling after rerun and locked confirm
 
 ## Cluster E
 
