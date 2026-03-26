@@ -93,8 +93,8 @@
     "headline_metrics": {}
   },
   "verify": {
-    "artifact_json": "artifacts/phase14_verify/17041_verify.json",
-    "checksum": "pending_manual_review"
+    "artifact_json": "artifacts/phase14_verify/17041_confirm_verify.json",
+    "checksum": "manual_review_fail_max_abs_diff_exit0.5321_acc0.00401_route0.00468"
   },
   "gate": {
     "rerun_preserves_late_route": true,

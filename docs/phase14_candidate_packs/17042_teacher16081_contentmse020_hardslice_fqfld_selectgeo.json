@@ -94,7 +94,7 @@
   },
   "verify": {
     "artifact_json": "results/phase14_dev/20260326_025434_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_hardslice_fqfld_selectgeo_seed17042_p1/artifacts/phase14_verify/verification.json",
-    "checksum": "pending_manual_review"
+    "checksum": "manual_review_fail_max_abs_diff_exit1.6063_acc0.00127_route0.01471"
   },
   "gate": {
     "rerun_preserves_late_route": true,
