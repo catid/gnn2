@@ -36,7 +36,20 @@ But its independently confirmed held-confirm result is still stuck at the old re
 - `17024` selected `full_locked` confirm DQF: `0.2995 / 0.8797 / 116.14`
 - `17024` selected `finalquery_heavy` confirm DQF: `0.3083 / 0.8785 / 115.97`
 
-Interpretation: content-only teacher supervision on top of the fixed `16045` route anchor clearly preserves the late-route summary regime and improves the content-failure hard slice, but the first fully paneled teacher-first candidate still does not convert that summary-time gain into held-confirm content recovery. The remaining active question is therefore whether the heavier teacher-first branch (`17025`) or the teacher-backed hard-slice lane (`17041`, `17042`) can change that confirm outcome rather than merely reproduce the same split more stably.
+Interpretation: content-only teacher supervision on top of the fixed `16045` route anchor clearly preserves the late-route summary regime and improves the content-failure hard slice, but the first fully paneled teacher-first candidate still does not convert that summary-time gain into held-confirm content recovery.
+
+That same conclusion now holds for the stronger teacher-first follow-up `17025`. Its five-seed panel stayed in the same stable late-route band:
+
+- `17025` five-seed mean `full_locked` DQF: `0.9981 / 0.9427 / 121.54`
+- `17025` five-seed mean `finalquery_heavy` DQF: `0.9968 / 0.9345 / 120.77`
+- `17025` five-seed mean `longdistance` DQF: `0.9963 / 0.9428 / 152.23`
+
+But its locked confirm still fell back to the familiar ceiling:
+
+- `17025` selected `full_locked` confirm DQF: `0.2874 / 0.8850 / 116.22`
+- `17025` selected `finalquery_heavy` confirm DQF: `0.2968 / 0.8789 / 115.56`
+
+Interpretation: simply scaling teacher-first content-branch supervision does not create a new confirmed regime. The remaining live frontier is therefore the teacher-backed hard-slice lane (`17041`, `17042`), not more plain teacher-first repetition.
 
 ## Cluster E Early Read
 

@@ -6,9 +6,9 @@ Draft in progress.
 
 ## Cluster A
 
-Mapped enough to score as a stable but still ceiling-limited lane.
+Mapped enough to score as a stable negative.
 
-- Best fully paneled branch so far: `17024` teacher-first content-hidden distillation
+- Best fully paneled branches: `17024` and `17025` teacher-first content-hidden distillation
 - Hard-slice gate: pass
 - Exact rerun: pass
 - Locked confirm: fail on held-confirm content
@@ -21,12 +21,19 @@ Headline metrics for `17024`:
 - five-seed mean `full_locked` summary DQF: `0.9953 / 0.9406 / 121.29`
 - five-seed mean `finalquery_heavy` summary DQF: `0.9960 / 0.9429 / 121.51`
 
+Headline metrics for `17025`:
+
+- selected `full_locked` confirm DQF: `0.2874 / 0.8850 / 116.22`
+- selected `finalquery_heavy` confirm DQF: `0.2968 / 0.8789 / 115.56`
+- five-seed mean `full_locked` summary DQF: `0.9981 / 0.9427 / 121.54`
+- five-seed mean `finalquery_heavy` summary DQF: `0.9968 / 0.9345 / 120.77`
+
 Scorecard:
 
 - Stability: strong
 - Content-failure hard-slice targeting: real
 - Held-confirm lift: no
-- Retirement state: still active only through stronger teacher-first and hard-slice variants, not because `17024` itself remains a live headline winner
+- Retirement reason: even the stronger teacher-first follow-up `17025` reproduces the same locked-confirm ceiling, so this lane is now active only as background context for the hard-slice branches
 
 ## Cluster B
 
@@ -54,7 +61,7 @@ Scorecard:
 
 ## Cluster C
 
-Still active. Current strongest no-teacher hard-slice branch `17043` is rerun-clean but confirm-ceiling-limited; teacher-backed hard-slice branches `17041` and `17042` remain stronger candidates than the no-teacher controls.
+Still active. Current strongest no-teacher hard-slice branch `17043` is rerun-clean but confirm-ceiling-limited; teacher-backed hard-slice branches `17041` and `17042` remain the live frontier, and the first `17041` five-seed panel root is now running.
 
 ## Cluster D
 

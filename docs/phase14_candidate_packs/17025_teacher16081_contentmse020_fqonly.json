@@ -89,8 +89,29 @@
     }
   },
   "seed_panel": {
-    "panel_dir": "",
-    "headline_metrics": {}
+    "panel_dir": "results/phase14_panel/hard_st_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse020_fqonly_panel",
+    "headline_metrics": {
+      "mean_best_val_dqf": {
+        "accuracy": 0.9975,
+        "route_match": 0.9726,
+        "exit_time": 68.01
+      },
+      "mean_full_locked_dqf": {
+        "accuracy": 0.9981,
+        "route_match": 0.9427,
+        "exit_time": 121.54
+      },
+      "mean_finalquery_heavy_dqf": {
+        "accuracy": 0.9968,
+        "route_match": 0.9345,
+        "exit_time": 120.77
+      },
+      "mean_longdistance_dqf": {
+        "accuracy": 0.9963,
+        "route_match": 0.9428,
+        "exit_time": 152.23
+      }
+    }
   },
   "verify": {
     "artifact_json": "artifacts/phase14_verify/17025_confirm_verify.json",
@@ -101,7 +122,7 @@
     "hard_slice_improves_or_holds": true,
     "locked_confirm_preserves_route_exit": true,
     "verify_passed": false,
-    "candidate_pack_complete": false
+    "candidate_pack_complete": true
   },
   "final_decision": "retire_locked_confirm_content_ceiling"
 }
