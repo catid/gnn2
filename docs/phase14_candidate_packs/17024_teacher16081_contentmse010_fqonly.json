@@ -44,7 +44,7 @@
     }
   },
   "rerun": {
-    "run_dir": "",
+    "run_dir": "results/phase14_dev/20260326_014505_hard_st_benchmark_b_v2_teacher1874_contentbranch_resume16045_teacher16081_contentmse010_fqonly_seed17024_rerun1",
     "headline_metrics": {}
   },
   "locked_confirm": {
