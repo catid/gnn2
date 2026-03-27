@@ -1,0 +1,60 @@
+{
+  "batch_size": 256,
+  "eval_config": "configs/phase8/confirm/hard_st_benchmark_b_v2_confirm_full_locked.yaml",
+  "late_slack": 8.0,
+  "num_batches": 32,
+  "pairwise": {
+    "20260327_002025_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi__vs__20260327_012826_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultihead_teacher16081_contentmse010_hardslice_fqhld_selectlexi": {
+      "first_beats_second_on_late_disagreements": 1,
+      "late_relaxed_disagreement_sample_ids": [
+        "confirm:21:203",
+        "confirm:6:213"
+      ],
+      "late_relaxed_disagreements": 2,
+      "second_beats_first_on_late_disagreements": 1,
+      "shared_examples": 8192
+    }
+  },
+  "rows_csv": "/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_multihead_confirm32b.rows.csv",
+  "runs": {
+    "20260327_002025_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi": {
+      "accuracy": {
+        "all": 0.99853515625,
+        "delay_to_final_query": 0.9976190476190476,
+        "late_hard_distance": 1.0,
+        "late_relaxed": 0.9997481108312343,
+        "late_strict": 1.0
+      },
+      "counts": {
+        "all": 8192,
+        "delay_to_final_query": 4200,
+        "late_hard_distance": 974,
+        "late_relaxed": 3970,
+        "late_strict": 3966,
+        "late_wrong_content": 1,
+        "late_wrong_content_strict": 0
+      },
+      "retrieval_distance_q3": 111
+    },
+    "20260327_012826_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultihead_teacher16081_contentmse010_hardslice_fqhld_selectlexi": {
+      "accuracy": {
+        "all": 0.998291015625,
+        "delay_to_final_query": 0.9980952380952381,
+        "late_hard_distance": 1.0,
+        "late_relaxed": 0.9997496871088861,
+        "late_strict": 1.0
+      },
+      "counts": {
+        "all": 8192,
+        "delay_to_final_query": 4200,
+        "late_hard_distance": 979,
+        "late_relaxed": 3995,
+        "late_strict": 3990,
+        "late_wrong_content": 1,
+        "late_wrong_content_strict": 0
+      },
+      "retrieval_distance_q3": 111
+    }
+  },
+  "split": "confirm"
+}

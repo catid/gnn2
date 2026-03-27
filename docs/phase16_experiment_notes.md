@@ -231,3 +231,70 @@ Conclusion:
   ingredient; the next justified move is still rerun/confirm ranking of the
   leading write-gated variants, or a more structural write mechanism such as
   multi-head sparse writing.
+
+## 2026-03-27: Multi-Head Sparse Trajectory Writer
+
+Question:
+If scalar content/write gating is no longer enough to separate the leading
+phase-16 sidecar variants, does a structurally richer writer help? The bounded
+test here was a small multi-head sparse writer over trajectory-bank states,
+still isolated from routing and used only by the content readout path.
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_write_gated_kv_memory`.
+- This mode forms a small set of head-specific memory slots by running multiple
+  sparse write heads over trajectory-bank states, then lets the final sidecar
+  read select over those head summaries.
+- Added `factorized_content_sidecar_write_heads` to control the number of write
+  heads while preserving the existing top-k sparse write contract.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new multi-head writer only affects the final content readout path
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`13 passed, 25 deselected`).
+- `uv run pytest -q` passed (`90 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultihead_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultihead_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_012826_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultihead_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_012826_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultihead_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9971 / 0.9960 / 0.9275 / 120.15`
+  - `full_locked`: `1.0000 / 1.0000 / 0.9468 / 121.74`
+  - `finalquery_heavy`: `0.9980 / 0.9976 / 0.9388 / 120.88`
+  - `longdistance`: `0.9980 / 0.9972 / 0.9453 / 152.51`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.693 / 0.502`
+  - write entropy/top1: `0.679 / 0.562`
+
+Hard-slice comparisons:
+- Versus phase-16 content-write baseline:
+  [phase16_contentwrite_vs_phase16_multihead_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwrite_vs_phase16_multihead_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 plain write-gated baseline:
+  [phase16_writegate_vs_phase16_multihead_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_multihead_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus stronger phase-15 sidecar baseline `18052`:
+  [18052_vs_phase16_multihead_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/18052_vs_phase16_multihead_confirm32b.json)
+  - candidate beat baseline on late-route disagreements `2-1`
+  - baseline `late_wrong_content = 2`
+  - candidate `late_wrong_content = 1`
+
+Conclusion:
+- Multi-head sparse writing is safe and improves over the older phase-15
+  sidecar baseline.
+- It does not cleanly improve over the current phase-16 write-gated family.
+- The current map suggests that richer write structure alone is not enough; the
+  next justified architecture move is to combine multi-head sparse writing with
+  content-conditioned value preservation rather than treating those mechanisms
+  separately.
