@@ -539,6 +539,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_kv_memory",
                 "trajectory_write_gated_kv_memory",
                 "trajectory_content_write_gated_kv_memory",
+                "trajectory_content_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_source != "trajectory_bank"
         ):
@@ -551,6 +552,7 @@ class PacketRoutingModel(nn.Module):
             in {
                 "trajectory_write_gated_kv_memory",
                 "trajectory_content_write_gated_kv_memory",
+                "trajectory_content_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_write_topk <= 0
         ):
@@ -975,6 +977,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_kv_memory",
                 "trajectory_write_gated_kv_memory",
                 "trajectory_content_write_gated_kv_memory",
+                "trajectory_content_write_value_gated_kv_memory",
             }:
                 self.factorized_content_sidecar_key_proj = nn.Linear(
                     self.hidden_dim,
@@ -992,14 +995,24 @@ class PacketRoutingModel(nn.Module):
                 if self.factorized_content_sidecar_mode in {
                     "trajectory_write_gated_kv_memory",
                     "trajectory_content_write_gated_kv_memory",
+                    "trajectory_content_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
                         self.hidden_dim,
                         bias=False,
                     )
-                if self.factorized_content_sidecar_mode == "trajectory_content_write_gated_kv_memory":
+                if self.factorized_content_sidecar_mode in {
+                    "trajectory_content_write_gated_kv_memory",
+                    "trajectory_content_write_value_gated_kv_memory",
+                }:
                     self.factorized_content_sidecar_write_content_proj = nn.Linear(
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        bias=False,
+                    )
+                if self.factorized_content_sidecar_mode == "trajectory_content_write_value_gated_kv_memory":
+                    self.factorized_content_sidecar_value_gate_proj = nn.Linear(
                         self.hidden_dim,
                         self.hidden_dim,
                         bias=False,
@@ -1543,12 +1556,14 @@ class PacketRoutingModel(nn.Module):
         sidecar_slots = None
         sidecar_weights = None
         sidecar_write_weights = None
+        sidecar_value_gate = None
         if self.factorized_content_sidecar_mode != "none":
             sidecar_route_features = None
             if self.factorized_content_sidecar_mode in {
                 "trajectory_kv_memory",
                 "trajectory_write_gated_kv_memory",
                 "trajectory_content_write_gated_kv_memory",
+                "trajectory_content_write_value_gated_kv_memory",
             }:
                 if self.factorized_content_sidecar_source != "trajectory_bank":
                     raise ValueError(
@@ -1575,9 +1590,13 @@ class PacketRoutingModel(nn.Module):
                 if self.factorized_content_sidecar_mode in {
                     "trajectory_write_gated_kv_memory",
                     "trajectory_content_write_gated_kv_memory",
+                    "trajectory_content_write_value_gated_kv_memory",
                 }:
                     write_query = self.factorized_content_sidecar_write_query_proj(query_hidden)
-                    if self.factorized_content_sidecar_mode == "trajectory_content_write_gated_kv_memory":
+                    if self.factorized_content_sidecar_mode in {
+                        "trajectory_content_write_gated_kv_memory",
+                        "trajectory_content_write_value_gated_kv_memory",
+                    }:
                         write_query = write_query + self.factorized_content_sidecar_write_content_proj(content)
                     if sidecar_route_features is not None and self.trajectory_bank_route_proj is not None:
                         write_query = write_query + self.trajectory_bank_route_proj(sidecar_route_features)
@@ -1593,6 +1612,9 @@ class PacketRoutingModel(nn.Module):
                     else:
                         masked_write_scores = write_scores
                     sidecar_write_weights = torch.softmax(masked_write_scores, dim=-1)
+                    if self.factorized_content_sidecar_mode == "trajectory_content_write_value_gated_kv_memory":
+                        sidecar_value_gate = torch.sigmoid(self.factorized_content_sidecar_value_gate_proj(content))
+                        value_slots = value_slots * sidecar_value_gate.unsqueeze(1)
                     value_slots = value_slots * sidecar_write_weights.unsqueeze(-1)
                 sidecar_weights = torch.softmax(sidecar_scores, dim=-1)
                 sidecar_hidden = (sidecar_weights.unsqueeze(-1) * value_slots).sum(dim=1)
@@ -1660,6 +1682,7 @@ class PacketRoutingModel(nn.Module):
             "factorized_content_sidecar_slots": sidecar_slots,
             "factorized_content_sidecar_weights": sidecar_weights,
             "factorized_content_sidecar_write_weights": sidecar_write_weights,
+            "factorized_content_sidecar_value_gate": sidecar_value_gate,
         }
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
@@ -2515,6 +2538,7 @@ class PacketRoutingModel(nn.Module):
         factorized_content_sidecar_slots = None
         factorized_content_sidecar_weights = None
         factorized_content_sidecar_write_weights = None
+        factorized_content_sidecar_value_gate = None
         if self.readout_mode == "probe_query_views":
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -2629,6 +2653,9 @@ class PacketRoutingModel(nn.Module):
             factorized_content_sidecar_write_weights = factorized_trace.get(
                 "factorized_content_sidecar_write_weights"
             )
+            factorized_content_sidecar_value_gate = factorized_trace.get(
+                "factorized_content_sidecar_value_gate"
+            )
             readout_input = self._apply_readout_adapter(readout_input)
         else:
             baseline_view = self._baseline_readout_input(
@@ -2664,6 +2691,8 @@ class PacketRoutingModel(nn.Module):
                 trace["factorized_content_sidecar_weights"] = factorized_content_sidecar_weights
             if factorized_content_sidecar_write_weights is not None:
                 trace["factorized_content_sidecar_write_weights"] = factorized_content_sidecar_write_weights
+            if factorized_content_sidecar_value_gate is not None:
+                trace["factorized_content_sidecar_value_gate"] = factorized_content_sidecar_value_gate
             trace["final_readout_input"] = readout_input
         if self.readout_head_mode == "mixture":
             logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
@@ -2728,6 +2757,11 @@ class PacketRoutingModel(nn.Module):
             )
             factorized_content_sidecar_write_top1_weight = (
                 factorized_content_sidecar_write_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
+            )
+        factorized_content_sidecar_value_gate_mean = torch.zeros((), device=device, dtype=dtype)
+        if factorized_content_sidecar_value_gate is not None:
+            factorized_content_sidecar_value_gate_mean = (
+                factorized_content_sidecar_value_gate.mean().to(device=device, dtype=dtype)
             )
         factorized_payload_aux_loss = torch.zeros((), device=device, dtype=dtype)
         if (
@@ -2874,6 +2908,9 @@ class PacketRoutingModel(nn.Module):
             ),
             "factorized_content_sidecar_write_top1_weight": torch.full_like(
                 accuracy, float(factorized_content_sidecar_write_top1_weight.detach().item())
+            ),
+            "factorized_content_sidecar_value_gate_mean": torch.full_like(
+                accuracy, float(factorized_content_sidecar_value_gate_mean.detach().item())
             ),
             "mixture_balance_loss": torch.full_like(accuracy, float(mixture_balance_loss.detach().item())),
             "mixture_gate_entropy": torch.full_like(accuracy, float(mixture_gate_entropy.detach().item())),

@@ -801,6 +801,27 @@ def test_factorized_trajectory_content_write_gated_sidecar_requires_trajectory_s
         )
 
 
+def test_factorized_trajectory_content_write_value_gated_sidecar_requires_trajectory_source() -> None:
+    with pytest.raises(ValueError, match="trajectory sidecar modes require factorized_content_sidecar_source='trajectory_bank'"):
+        PacketRoutingModel(
+            {
+                "num_nodes": 2,
+                "obs_dim": 8,
+                "hidden_dim": 4,
+                "num_classes": 3,
+                "max_internal_steps": 1,
+                "max_total_steps": 8,
+                "adapter_rank": 0,
+                "readout_mode": "factorized_content_query",
+                "factorized_content_source": "final_sink_state",
+                "factorized_combiner_mode": "bilinear",
+                "factorized_content_sidecar_mode": "trajectory_content_write_value_gated_kv_memory",
+                "factorized_content_sidecar_source": "final_sink_state",
+                "factorized_content_sidecar_write_topk": 2,
+            }
+        )
+
+
 def test_factorized_trajectory_write_gated_sidecar_zero_init_preserves_route_and_readout() -> None:
     base_model = PacketRoutingModel(
         {
@@ -865,6 +886,94 @@ def test_factorized_trajectory_write_gated_sidecar_zero_init_preserves_route_and
     assert sidecar_output.trace["factorized_content_sidecar_slots"].shape == (2, 3, 4)
     assert sidecar_output.trace["factorized_content_sidecar_weights"].shape == (2, 3)
     assert sidecar_output.trace["factorized_content_sidecar_write_weights"].shape == (2, 3)
+    assert sidecar_output.trace["factorized_content_sidecar_hidden"].shape == (2, 4)
+    assert torch.allclose(
+        sidecar_output.trace["factorized_content_sidecar_hidden"],
+        torch.zeros_like(sidecar_output.trace["factorized_content_sidecar_hidden"]),
+        atol=1e-7,
+    )
+    assert torch.equal(
+        (sidecar_output.trace["factorized_content_sidecar_write_weights"] > 0.0).sum(dim=-1),
+        torch.full((2,), 2, dtype=torch.long),
+    )
+    assert torch.allclose(base_output.trace["router_probs"], sidecar_output.trace["router_probs"], atol=1e-7)
+    assert torch.allclose(base_output.trace["final_sink_state"], sidecar_output.trace["final_sink_state"], atol=1e-7)
+    assert torch.allclose(
+        base_output.trace["final_readout_input"],
+        sidecar_output.trace["final_readout_input"],
+        atol=1e-7,
+    )
+    assert torch.allclose(base_output.logits, sidecar_output.logits, atol=1e-7)
+    assert torch.allclose(base_output.stats["exit_time"], sidecar_output.stats["exit_time"], atol=1e-7)
+    assert torch.allclose(base_output.stats["hops"], sidecar_output.stats["hops"], atol=1e-7)
+    assert torch.allclose(base_output.stats["delays"], sidecar_output.stats["delays"], atol=1e-7)
+
+
+def test_factorized_trajectory_content_write_value_gated_sidecar_zero_init_preserves_route_and_readout() -> None:
+    base_model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+        }
+    )
+    sidecar_model = PacketRoutingModel(
+        {
+            "num_nodes": 2,
+            "obs_dim": 8,
+            "hidden_dim": 4,
+            "num_classes": 3,
+            "max_internal_steps": 1,
+            "max_total_steps": 8,
+            "adapter_rank": 0,
+            "readout_mode": "factorized_content_query",
+            "factorized_content_source": "final_sink_state",
+            "factorized_combiner_mode": "bilinear",
+            "factorized_content_sidecar_mode": "trajectory_content_write_value_gated_kv_memory",
+            "factorized_content_sidecar_source": "trajectory_bank",
+            "factorized_content_sidecar_zero_init": True,
+            "factorized_content_sidecar_write_topk": 2,
+            "trajectory_bank_views": ["sink_state"],
+            "trajectory_bank_window": 3,
+            "trajectory_bank_stride": 1,
+            "trajectory_bank_anchor": "final_query",
+            "trajectory_bank_use_positional_features": False,
+        }
+    )
+    _copy_shared_state(base_model, sidecar_model)
+
+    observations = torch.zeros(2, 4, 2, 8)
+    observations[:, -1, 0, 2] = 1.0
+    labels = torch.zeros(2, dtype=torch.long)
+
+    base_output = base_model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+    sidecar_output = sidecar_model(
+        observations=observations,
+        labels=labels,
+        route_mode="hard",
+        compute_penalties={},
+        return_trace=True,
+    )
+
+    assert base_output.trace is not None
+    assert sidecar_output.trace is not None
+    assert sidecar_output.trace["factorized_content_sidecar_slots"].shape == (2, 3, 4)
+    assert sidecar_output.trace["factorized_content_sidecar_weights"].shape == (2, 3)
+    assert sidecar_output.trace["factorized_content_sidecar_write_weights"].shape == (2, 3)
+    assert sidecar_output.trace["factorized_content_sidecar_value_gate"].shape == (2, 4)
     assert sidecar_output.trace["factorized_content_sidecar_hidden"].shape == (2, 4)
     assert torch.allclose(
         sidecar_output.trace["factorized_content_sidecar_hidden"],

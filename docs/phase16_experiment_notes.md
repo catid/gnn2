@@ -167,3 +167,67 @@ Conclusion:
 - It does not yet cleanly separate from the simpler phase-16 write-gated
   variant, so the justified next step is a rerun plus locked-confirm head-to-head
   between the two write-gated variants, not immediate promotion.
+
+## 2026-03-27: Content-Conditioned Write-Value Gated Trajectory Sidecar
+
+Question:
+If write addressing is already content-conditioned, does adding a
+content-conditioned value gate improve what gets preserved from each selected
+trajectory state?
+
+Implementation:
+- Added `factorized_content_sidecar_mode: trajectory_content_write_value_gated_kv_memory`.
+- This extends the content-conditioned write-gated trajectory sidecar by adding
+  a content-conditioned gate over the projected value slots before readout.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new value gate affects only the final content readout path
+- Added `factorized_content_sidecar_value_gate_mean` for bounded usage tracing.
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`11 passed, 25 deselected`).
+- `uv run pytest -q` passed (`88 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_010602_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_010602_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9990 / 1.0000 / 0.9553 / 122.51`
+  - `full_locked`: `0.9985 / 0.9981 / 0.9356 / 120.82`
+  - `finalquery_heavy`: `0.9980 / 0.9976 / 0.9412 / 121.31`
+  - `longdistance`: `0.9971 / 0.9958 / 0.9515 / 153.70`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.688 / 0.535`
+  - write entropy/top1: `0.679 / 0.560`
+  - value gate mean: `0.504`
+
+Hard-slice comparisons:
+- Versus phase-16 content-write baseline:
+  [phase16_contentwrite_vs_phase16_contentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwrite_vs_phase16_contentwritevalue_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 plain write-gated baseline:
+  [phase16_writegate_vs_phase16_contentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_contentwritevalue_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus stronger phase-15 sidecar baseline `18052`:
+  [18052_vs_phase16_contentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/18052_vs_phase16_contentwritevalue_confirm32b.json)
+  - candidate beat baseline on late-route disagreements `2-1`
+  - baseline `late_wrong_content = 2`
+  - candidate `late_wrong_content = 1`
+
+Conclusion:
+- Content-conditioned value gating is safe and weakly positive over the older
+  phase-15 sidecar baseline.
+- It does not cleanly improve over the current phase-16 write-gated family.
+- The current map suggests that simple value gating alone is not the missing
+  ingredient; the next justified move is still rerun/confirm ranking of the
+  leading write-gated variants, or a more structural write mechanism such as
+  multi-head sparse writing.
