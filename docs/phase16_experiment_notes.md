@@ -367,3 +367,68 @@ Conclusion:
   safe mechanisms. The next justified architecture move is to force more
   diversity or specialization across write heads, rather than letting the heads
   behave as near-interchangeable sparse selectors.
+
+## 2026-03-27: Head-Diverse Multi-Head Trajectory Writer
+
+Question:
+If the multi-head content-write-value branch still ties the simpler phase-16
+leaders, can we force real head specialization by giving each head its own
+projected source view of trajectory-bank states before sparse writing?
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_headwise_write_value_gated_kv_memory`.
+- This keeps the route-isolated multi-head content-write-value branch, but each
+  write head now scores trajectory-bank states through its own projected source
+  view before top-k sparse selection.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new head-specific source projection only affects the final content
+    readout path
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`17 passed, 25 deselected`).
+- `uv run pytest -q` passed (`94 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadheadwisewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadheadwisewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_021302_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadheadwisewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_021302_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadheadwisewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9961 / 0.9930 / 0.9424 / 121.91`
+  - `full_locked`: `0.9951 / 0.9925 / 0.9281 / 120.27`
+  - `finalquery_heavy`: `0.9985 / 0.9982 / 0.9492 / 122.01`
+  - `longdistance`: `0.9961 / 0.9945 / 0.9390 / 152.15`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.693 / 0.506`
+  - write entropy/top1: `0.687 / 0.532`
+  - value gate mean: `0.504`
+
+Hard-slice comparisons:
+- Versus current phase-16 multi-head content-write-value branch:
+  [phase16_multiheadcontentwritevalue_vs_phase16_headdiverse_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_headdiverse_confirm32b.json)
+  - baseline beat candidate `3-1` on late-route disagreements
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus phase-16 plain write-gated baseline:
+  [phase16_writegate_vs_phase16_headdiverse_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_headdiverse_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus phase-16 content-write baseline:
+  [phase16_contentwrite_vs_phase16_headdiverse_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwrite_vs_phase16_headdiverse_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+
+Conclusion:
+- Learned head-specific source views are route-safe, but they are a real
+  quality regression.
+- Simply parameterizing the heads separately is not enough; it softens the
+  selected slices and worsens confirm-time wrong-content behavior.
+- The next justified move, if we continue in this family, is explicit disjoint
+  or budgeted write allocation across heads rather than another learned
+  reparameterization of the same dense source bank.

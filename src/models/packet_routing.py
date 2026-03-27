@@ -545,6 +545,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_write_value_gated_kv_memory",
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
+                "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_source != "trajectory_bank"
         ):
@@ -560,6 +561,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_write_value_gated_kv_memory",
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
+                "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_write_topk <= 0
         ):
@@ -570,6 +572,7 @@ class PacketRoutingModel(nn.Module):
         if self.factorized_content_sidecar_mode in {
             "trajectory_content_multihead_write_gated_kv_memory",
             "trajectory_content_multihead_write_value_gated_kv_memory",
+            "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
         } and self.factorized_content_sidecar_write_heads <= 0:
             raise ValueError(
                 f"factorized_content_sidecar_mode='{self.factorized_content_sidecar_mode}' requires "
@@ -995,6 +998,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_write_value_gated_kv_memory",
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
+                "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
             }:
                 self.factorized_content_sidecar_key_proj = nn.Linear(
                     self.hidden_dim,
@@ -1014,6 +1018,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_write_gated_kv_memory",
                     "trajectory_content_write_value_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
@@ -1024,6 +1029,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_write_gated_kv_memory",
                     "trajectory_content_write_value_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_content_proj = nn.Linear(
                         self.hidden_dim,
@@ -1033,6 +1039,7 @@ class PacketRoutingModel(nn.Module):
                 if self.factorized_content_sidecar_mode in {
                     "trajectory_content_write_value_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_value_gate_proj = nn.Linear(
                         self.hidden_dim,
@@ -1042,6 +1049,7 @@ class PacketRoutingModel(nn.Module):
                 if self.factorized_content_sidecar_mode in {
                     "trajectory_content_multihead_write_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
@@ -1049,6 +1057,15 @@ class PacketRoutingModel(nn.Module):
                         bias=False,
                     )
                     self.factorized_content_sidecar_write_content_proj = nn.Linear(
+                        self.hidden_dim,
+                        self.hidden_dim * self.factorized_content_sidecar_write_heads,
+                        bias=False,
+                    )
+                if (
+                    self.factorized_content_sidecar_mode
+                    == "trajectory_content_multihead_headwise_write_value_gated_kv_memory"
+                ):
+                    self.factorized_content_sidecar_write_source_proj = nn.Linear(
                         self.hidden_dim,
                         self.hidden_dim * self.factorized_content_sidecar_write_heads,
                         bias=False,
@@ -1602,6 +1619,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_write_value_gated_kv_memory",
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
+                "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
             }:
                 if self.factorized_content_sidecar_source != "trajectory_bank":
                     raise ValueError(
@@ -1628,6 +1646,7 @@ class PacketRoutingModel(nn.Module):
                 if self.factorized_content_sidecar_mode in {
                     "trajectory_content_multihead_write_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
                 }:
                     write_query = self.factorized_content_sidecar_write_query_proj(query_hidden).view(
                         query_hidden.shape[0],
@@ -1641,9 +1660,23 @@ class PacketRoutingModel(nn.Module):
                     )
                     if sidecar_route_features is not None and self.trajectory_bank_route_proj is not None:
                         write_query = write_query + self.trajectory_bank_route_proj(sidecar_route_features).unsqueeze(1)
-                    write_scores = torch.einsum("bsd,bhd->bhs", sidecar_slots, write_query) / math.sqrt(
-                        self.hidden_dim
-                    )
+                    if (
+                        self.factorized_content_sidecar_mode
+                        == "trajectory_content_multihead_headwise_write_value_gated_kv_memory"
+                    ):
+                        write_source_slots = self.factorized_content_sidecar_write_source_proj(sidecar_slots).view(
+                            sidecar_slots.shape[0],
+                            sidecar_slots.shape[1],
+                            self.factorized_content_sidecar_write_heads,
+                            self.hidden_dim,
+                        )
+                        write_scores = torch.einsum("bshd,bhd->bhs", write_source_slots, write_query) / math.sqrt(
+                            self.hidden_dim
+                        )
+                    else:
+                        write_scores = torch.einsum("bsd,bhd->bhs", sidecar_slots, write_query) / math.sqrt(
+                            self.hidden_dim
+                        )
                     topk = min(max(1, self.factorized_content_sidecar_write_topk), sidecar_slots.shape[1])
                     if topk < sidecar_slots.shape[1]:
                         topk_values, topk_idx = torch.topk(write_scores, k=topk, dim=-1)
@@ -1656,7 +1689,10 @@ class PacketRoutingModel(nn.Module):
                     sidecar_slots = torch.einsum("bhs,bsd->bhd", sidecar_write_weights, value_slots)
                     if (
                         self.factorized_content_sidecar_mode
-                        == "trajectory_content_multihead_write_value_gated_kv_memory"
+                        in {
+                            "trajectory_content_multihead_write_value_gated_kv_memory",
+                            "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                        }
                     ):
                         sidecar_value_gate = torch.sigmoid(self.factorized_content_sidecar_value_gate_proj(content))
                         sidecar_slots = sidecar_slots * sidecar_value_gate.unsqueeze(1)
