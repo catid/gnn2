@@ -527,16 +527,28 @@ class PacketRoutingModel(nn.Module):
         self.factorized_content_sidecar_slots = int(config.get("factorized_content_sidecar_slots", 4))
         if self.factorized_content_sidecar_slots <= 0:
             raise ValueError("factorized_content_sidecar_slots must be positive.")
+        self.factorized_content_sidecar_write_topk = int(
+            config.get("factorized_content_sidecar_write_topk", 2)
+        )
         self.factorized_content_sidecar_zero_init = bool(
             config.get("factorized_content_sidecar_zero_init", False)
         )
         if (
-            self.factorized_content_sidecar_mode == "trajectory_kv_memory"
+            self.factorized_content_sidecar_mode
+            in {"trajectory_kv_memory", "trajectory_write_gated_kv_memory"}
             and self.factorized_content_sidecar_source != "trajectory_bank"
         ):
             raise ValueError(
-                "factorized_content_sidecar_mode='trajectory_kv_memory' requires "
+                "trajectory sidecar modes require "
                 "factorized_content_sidecar_source='trajectory_bank'."
+            )
+        if (
+            self.factorized_content_sidecar_mode == "trajectory_write_gated_kv_memory"
+            and self.factorized_content_sidecar_write_topk <= 0
+        ):
+            raise ValueError(
+                "factorized_content_sidecar_mode='trajectory_write_gated_kv_memory' requires "
+                "factorized_content_sidecar_write_topk > 0."
             )
         payload_cardinality = config.get("payload_cardinality")
         self.payload_cardinality = int(self.num_classes if payload_cardinality is None else payload_cardinality)
@@ -951,7 +963,10 @@ class PacketRoutingModel(nn.Module):
                 if self.factorized_content_sidecar_zero_init:
                     nn.init.zeros_(self.factorized_content_sidecar_value_proj.weight)
                     nn.init.zeros_(self.factorized_content_sidecar_value_proj.bias)
-            elif self.factorized_content_sidecar_mode == "trajectory_kv_memory":
+            elif self.factorized_content_sidecar_mode in {
+                "trajectory_kv_memory",
+                "trajectory_write_gated_kv_memory",
+            }:
                 self.factorized_content_sidecar_key_proj = nn.Linear(
                     self.hidden_dim,
                     self.hidden_dim,
@@ -965,6 +980,12 @@ class PacketRoutingModel(nn.Module):
                     self.hidden_dim,
                     bias=False,
                 )
+                if self.factorized_content_sidecar_mode == "trajectory_write_gated_kv_memory":
+                    self.factorized_content_sidecar_write_query_proj = nn.Linear(
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        bias=False,
+                    )
                 if self.factorized_content_sidecar_zero_init:
                     nn.init.zeros_(self.factorized_content_sidecar_value_proj.weight)
                     nn.init.zeros_(self.factorized_content_sidecar_value_proj.bias)
@@ -1503,12 +1524,16 @@ class PacketRoutingModel(nn.Module):
         sidecar_hidden = None
         sidecar_slots = None
         sidecar_weights = None
+        sidecar_write_weights = None
         if self.factorized_content_sidecar_mode != "none":
             sidecar_route_features = None
-            if self.factorized_content_sidecar_mode == "trajectory_kv_memory":
+            if self.factorized_content_sidecar_mode in {
+                "trajectory_kv_memory",
+                "trajectory_write_gated_kv_memory",
+            }:
                 if self.factorized_content_sidecar_source != "trajectory_bank":
                     raise ValueError(
-                        "factorized_content_sidecar_mode='trajectory_kv_memory' requires "
+                        "trajectory sidecar modes require "
                         "factorized_content_sidecar_source='trajectory_bank'."
                     )
                 sidecar_slots, sidecar_route_features = self._select_temporal_bank(
@@ -1528,6 +1553,23 @@ class PacketRoutingModel(nn.Module):
                 key_slots = self.factorized_content_sidecar_key_proj(sidecar_slots)
                 value_slots = self.factorized_content_sidecar_value_proj(sidecar_slots)
                 sidecar_scores = (key_slots * sidecar_query.unsqueeze(1)).sum(dim=-1) / math.sqrt(self.hidden_dim)
+                if self.factorized_content_sidecar_mode == "trajectory_write_gated_kv_memory":
+                    write_query = self.factorized_content_sidecar_write_query_proj(query_hidden)
+                    if sidecar_route_features is not None and self.trajectory_bank_route_proj is not None:
+                        write_query = write_query + self.trajectory_bank_route_proj(sidecar_route_features)
+                    write_scores = (sidecar_slots * write_query.unsqueeze(1)).sum(dim=-1) / math.sqrt(self.hidden_dim)
+                    topk = min(max(1, self.factorized_content_sidecar_write_topk), sidecar_slots.shape[1])
+                    if topk < sidecar_slots.shape[1]:
+                        topk_values, topk_idx = torch.topk(write_scores, k=topk, dim=-1)
+                        masked_write_scores = torch.full_like(write_scores, float("-inf"))
+                        masked_write_scores.scatter_(1, topk_idx, topk_values)
+                        masked_sidecar_scores = torch.full_like(sidecar_scores, float("-inf"))
+                        masked_sidecar_scores.scatter_(1, topk_idx, sidecar_scores.gather(1, topk_idx))
+                        sidecar_scores = masked_sidecar_scores
+                    else:
+                        masked_write_scores = write_scores
+                    sidecar_write_weights = torch.softmax(masked_write_scores, dim=-1)
+                    value_slots = value_slots * sidecar_write_weights.unsqueeze(-1)
                 sidecar_weights = torch.softmax(sidecar_scores, dim=-1)
                 sidecar_hidden = (sidecar_weights.unsqueeze(-1) * value_slots).sum(dim=1)
             else:
@@ -1593,6 +1635,7 @@ class PacketRoutingModel(nn.Module):
             "factorized_content_sidecar_hidden": sidecar_hidden,
             "factorized_content_sidecar_slots": sidecar_slots,
             "factorized_content_sidecar_weights": sidecar_weights,
+            "factorized_content_sidecar_write_weights": sidecar_write_weights,
         }
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
@@ -2447,6 +2490,7 @@ class PacketRoutingModel(nn.Module):
         factorized_content_sidecar_hidden = None
         factorized_content_sidecar_slots = None
         factorized_content_sidecar_weights = None
+        factorized_content_sidecar_write_weights = None
         if self.readout_mode == "probe_query_views":
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -2558,6 +2602,9 @@ class PacketRoutingModel(nn.Module):
             factorized_content_sidecar_hidden = factorized_trace.get("factorized_content_sidecar_hidden")
             factorized_content_sidecar_slots = factorized_trace.get("factorized_content_sidecar_slots")
             factorized_content_sidecar_weights = factorized_trace.get("factorized_content_sidecar_weights")
+            factorized_content_sidecar_write_weights = factorized_trace.get(
+                "factorized_content_sidecar_write_weights"
+            )
             readout_input = self._apply_readout_adapter(readout_input)
         else:
             baseline_view = self._baseline_readout_input(
@@ -2591,6 +2638,8 @@ class PacketRoutingModel(nn.Module):
                 trace["factorized_content_sidecar_slots"] = factorized_content_sidecar_slots
             if factorized_content_sidecar_weights is not None:
                 trace["factorized_content_sidecar_weights"] = factorized_content_sidecar_weights
+            if factorized_content_sidecar_write_weights is not None:
+                trace["factorized_content_sidecar_write_weights"] = factorized_content_sidecar_write_weights
             trace["final_readout_input"] = readout_input
         if self.readout_head_mode == "mixture":
             logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
@@ -2645,6 +2694,16 @@ class PacketRoutingModel(nn.Module):
             )
             factorized_content_sidecar_top1_weight = (
                 factorized_content_sidecar_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
+            )
+        factorized_content_sidecar_write_entropy = torch.zeros((), device=device, dtype=dtype)
+        factorized_content_sidecar_write_top1_weight = torch.zeros((), device=device, dtype=dtype)
+        if factorized_content_sidecar_write_weights is not None:
+            sidecar_write_weights = factorized_content_sidecar_write_weights.clamp_min(1e-8)
+            factorized_content_sidecar_write_entropy = (
+                -(sidecar_write_weights * sidecar_write_weights.log()).sum(dim=-1).mean().to(device=device, dtype=dtype)
+            )
+            factorized_content_sidecar_write_top1_weight = (
+                factorized_content_sidecar_write_weights.max(dim=-1).values.mean().to(device=device, dtype=dtype)
             )
         factorized_payload_aux_loss = torch.zeros((), device=device, dtype=dtype)
         if (
@@ -2785,6 +2844,12 @@ class PacketRoutingModel(nn.Module):
             ),
             "factorized_content_sidecar_top1_weight": torch.full_like(
                 accuracy, float(factorized_content_sidecar_top1_weight.detach().item())
+            ),
+            "factorized_content_sidecar_write_entropy": torch.full_like(
+                accuracy, float(factorized_content_sidecar_write_entropy.detach().item())
+            ),
+            "factorized_content_sidecar_write_top1_weight": torch.full_like(
+                accuracy, float(factorized_content_sidecar_write_top1_weight.detach().item())
             ),
             "mixture_balance_loss": torch.full_like(accuracy, float(mixture_balance_loss.detach().item())),
             "mixture_gate_entropy": torch.full_like(accuracy, float(mixture_gate_entropy.detach().item())),

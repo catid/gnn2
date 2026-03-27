@@ -55,3 +55,58 @@ Next architectural direction:
 - Focus on sidecar writing/addressing quality rather than slot exposure alone.
 - The next justified follow-up is a learned sparse write-address or write-gated
   sidecar that decides which trajectory states enter sidecar memory.
+
+## 2026-03-27: Write-Gated Trajectory Sidecar
+
+Question:
+Does explicit sparse write selection over trajectory-bank states help more than
+ exposing all trajectory tokens directly to sidecar retrieval?
+
+Implementation:
+- Added `factorized_content_sidecar_mode: trajectory_write_gated_kv_memory`.
+- The new mode stays route-isolated:
+  - routing, control, and exit behavior remain frozen
+  - sidecar source must be `trajectory_bank`
+  - a learned write-query selects a sparse top-k subset of trajectory-bank
+    states before the normal sidecar retrieval step
+- Added write-gate trace/metric exposure:
+  - `factorized_content_sidecar_write_weights`
+  - `factorized_content_sidecar_write_entropy`
+  - `factorized_content_sidecar_write_top1_weight`
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`7 passed, 25 deselected`).
+- `uv run pytest -q` passed (`84 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_002025_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_002025_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9980 / 0.9970 / 0.9424 / 121.63`
+  - `full_locked`: `0.9985 / 0.9972 / 0.9393 / 121.17`
+  - `finalquery_heavy`: `0.9980 / 0.9976 / 0.9430 / 121.60`
+  - `longdistance`: `0.9990 / 0.9986 / 0.9466 / 152.99`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.661 / 0.593`
+  - write entropy/top1: `0.680 / 0.560`
+
+Hard-slice comparison versus stronger phase-15 sidecar baseline `18052`:
+- Artifact:
+  [18052_vs_phase16_writegate_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/18052_vs_phase16_writegate_confirm32b.json)
+- Result:
+  - candidate beat baseline on late-route disagreements `2-1`
+  - baseline `late_wrong_content = 2`
+  - candidate `late_wrong_content = 1`
+
+Conclusion:
+- This is the first bounded positive in the phase-16 sidecar-writing line.
+- Explicit sparse write selection looks more useful than exposing raw
+  trajectory-bank tokens directly.
+- The next justified step is to rerun and run locked confirm on this write-gated
+  branch before making a stronger claim.
