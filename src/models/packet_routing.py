@@ -546,6 +546,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
                 "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_source != "trajectory_bank"
         ):
@@ -562,6 +563,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
                 "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_write_topk <= 0
         ):
@@ -573,6 +575,7 @@ class PacketRoutingModel(nn.Module):
             "trajectory_content_multihead_write_gated_kv_memory",
             "trajectory_content_multihead_write_value_gated_kv_memory",
             "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+            "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
         } and self.factorized_content_sidecar_write_heads <= 0:
             raise ValueError(
                 f"factorized_content_sidecar_mode='{self.factorized_content_sidecar_mode}' requires "
@@ -999,6 +1002,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
                 "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
             }:
                 self.factorized_content_sidecar_key_proj = nn.Linear(
                     self.hidden_dim,
@@ -1019,6 +1023,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_write_value_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
                     "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
@@ -1030,6 +1035,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_write_value_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
                     "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_content_proj = nn.Linear(
                         self.hidden_dim,
@@ -1040,6 +1046,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_write_value_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
                     "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_value_gate_proj = nn.Linear(
                         self.hidden_dim,
@@ -1050,6 +1057,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_write_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
                     "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
@@ -1620,6 +1628,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_write_gated_kv_memory",
                 "trajectory_content_multihead_write_value_gated_kv_memory",
                 "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
             }:
                 if self.factorized_content_sidecar_source != "trajectory_bank":
                     raise ValueError(
@@ -1647,6 +1656,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_write_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
                     "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
                 }:
                     write_query = self.factorized_content_sidecar_write_query_proj(query_hidden).view(
                         query_hidden.shape[0],
@@ -1660,10 +1670,7 @@ class PacketRoutingModel(nn.Module):
                     )
                     if sidecar_route_features is not None and self.trajectory_bank_route_proj is not None:
                         write_query = write_query + self.trajectory_bank_route_proj(sidecar_route_features).unsqueeze(1)
-                    if (
-                        self.factorized_content_sidecar_mode
-                        == "trajectory_content_multihead_headwise_write_value_gated_kv_memory"
-                    ):
+                    if self.factorized_content_sidecar_mode == "trajectory_content_multihead_headwise_write_value_gated_kv_memory":
                         write_source_slots = self.factorized_content_sidecar_write_source_proj(sidecar_slots).view(
                             sidecar_slots.shape[0],
                             sidecar_slots.shape[1],
@@ -1678,7 +1685,65 @@ class PacketRoutingModel(nn.Module):
                             self.hidden_dim
                         )
                     topk = min(max(1, self.factorized_content_sidecar_write_topk), sidecar_slots.shape[1])
-                    if topk < sidecar_slots.shape[1]:
+                    if self.factorized_content_sidecar_mode == "trajectory_content_multihead_disjoint_write_value_gated_kv_memory":
+                        assignment_mask = torch.zeros_like(write_scores, dtype=torch.bool)
+                        assignment_values = torch.zeros_like(write_scores)
+                        global_taken = torch.zeros(
+                            write_scores.shape[0],
+                            write_scores.shape[-1],
+                            device=write_scores.device,
+                            dtype=torch.bool,
+                        )
+                        head_assigned = torch.zeros(
+                            write_scores.shape[0],
+                            write_scores.shape[1],
+                            device=write_scores.device,
+                            dtype=torch.bool,
+                        )
+                        for _ in range(topk):
+                            for head_idx in range(write_scores.shape[1]):
+                                available = ~global_taken
+                                head_scores = write_scores[:, head_idx, :].masked_fill(~available, float("-inf"))
+                                has_available = available.any(dim=-1)
+                                if not bool(has_available.any().item()):
+                                    continue
+                                chosen_idx = head_scores.argmax(dim=-1, keepdim=True)
+                                chosen_scores = write_scores[:, head_idx, :].gather(1, chosen_idx)
+                                valid_choice = has_available.unsqueeze(-1).to(dtype=write_scores.dtype)
+                                head_hot = torch.zeros_like(write_scores[:, head_idx, :])
+                                head_hot.scatter_(1, chosen_idx, valid_choice)
+                                assignment_mask[:, head_idx, :] |= head_hot > 0.0
+                                assignment_values[:, head_idx, :] = (
+                                    assignment_values[:, head_idx, :] + (head_hot * write_scores[:, head_idx, :])
+                                )
+                                global_taken = global_taken | (head_hot > 0.0)
+                                head_assigned[:, head_idx] |= has_available
+                        unassigned = ~head_assigned
+                        if bool(unassigned.any().item()):
+                            fallback_idx = write_scores.argmax(dim=-1, keepdim=True)
+                            fallback_scores = write_scores.gather(-1, fallback_idx).squeeze(-1)
+                            for head_idx in range(write_scores.shape[1]):
+                                needs_fallback = unassigned[:, head_idx]
+                                if not bool(needs_fallback.any().item()):
+                                    continue
+                                chosen_idx = fallback_idx[:, head_idx, :]
+                                fallback_hot = torch.zeros_like(write_scores[:, head_idx, :])
+                                fallback_hot.scatter_(
+                                    1,
+                                    chosen_idx,
+                                    needs_fallback.unsqueeze(-1).to(dtype=write_scores.dtype),
+                                )
+                                assignment_mask[:, head_idx, :] |= fallback_hot > 0.0
+                                assignment_values[:, head_idx, :] = (
+                                    assignment_values[:, head_idx, :]
+                                    + (fallback_hot * write_scores[:, head_idx, :])
+                                )
+                        masked_write_scores = torch.where(
+                            assignment_mask,
+                            assignment_values,
+                            torch.full_like(write_scores, float("-inf")),
+                        )
+                    elif topk < sidecar_slots.shape[1]:
                         topk_values, topk_idx = torch.topk(write_scores, k=topk, dim=-1)
                         masked_write_scores = torch.full_like(write_scores, float("-inf"))
                         masked_write_scores.scatter_(2, topk_idx, topk_values)
@@ -1692,6 +1757,7 @@ class PacketRoutingModel(nn.Module):
                         in {
                             "trajectory_content_multihead_write_value_gated_kv_memory",
                             "trajectory_content_multihead_headwise_write_value_gated_kv_memory",
+                            "trajectory_content_multihead_disjoint_write_value_gated_kv_memory",
                         }
                     ):
                         sidecar_value_gate = torch.sigmoid(self.factorized_content_sidecar_value_gate_proj(content))

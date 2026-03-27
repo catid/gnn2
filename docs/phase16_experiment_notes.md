@@ -432,3 +432,73 @@ Conclusion:
 - The next justified move, if we continue in this family, is explicit disjoint
   or budgeted write allocation across heads rather than another learned
   reparameterization of the same dense source bank.
+
+## 2026-03-27: Disjoint-Write Multi-Head Trajectory Sidecar
+
+Question:
+If learned head-specific source views made the multi-head writer worse, can we
+recover useful specialization by assigning heads to disjoint trajectory-bank
+slots directly while keeping the content-conditioned value gate and route
+isolation contract intact?
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_disjoint_write_value_gated_kv_memory`.
+- This reuses the stable multi-head content-write-value sidecar, but replaces
+  independent per-head top-k writes with explicit greedy disjoint assignment
+  across heads, plus a fallback assignment for heads that would otherwise get no
+  slot.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic only changes how the content-only sidecar selects write slots
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`19 passed, 25 deselected`).
+- `uv run pytest -q` passed (`96 passed`).
+- The first training attempt exposed an autograd error from in-place assignment
+  in the disjoint writer path; that was fixed by rebuilding the assignment mask
+  and assignment values without mutating views needed for backward.
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheaddisjointwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheaddisjointwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_023655_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheaddisjointwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_023655_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheaddisjointwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9985 / 0.9980 / 0.9454 / 121.80`
+  - `full_locked`: `0.9990 / 0.9991 / 0.9496 / 122.27`
+  - `finalquery_heavy`: `0.9980 / 0.9976 / 0.9388 / 121.08`
+  - `longdistance`: `0.9956 / 0.9938 / 0.9293 / 150.56`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.689 / 0.531`
+  - write entropy/top1: `0.682 / 0.542`
+  - value gate mean: `0.510`
+
+Hard-slice comparisons:
+- Versus current phase-16 multi-head content-write-value branch:
+  [phase16_multiheadcontentwritevalue_vs_phase16_disjoint_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_disjoint_confirm32b.json)
+  - baseline beat candidate `3-1` on late-route disagreements
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus phase-16 plain write-gated baseline:
+  [phase16_writegate_vs_phase16_disjoint_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_disjoint_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus phase-16 content-write baseline:
+  [phase16_contentwrite_vs_phase16_disjoint_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwrite_vs_phase16_disjoint_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+
+Conclusion:
+- Explicit disjoint write allocation is route-safe, but it is a confirm-time
+  regression despite strong summary slices.
+- Forcing hard disjointness appears to starve the writer of the shared fallback
+  behavior that the better phase-16 sidecars still exploit on the decisive
+  held-confirm content failures.
+- The next justified architecture move is a hybrid writer that preserves head
+  diversity without enforcing full slot disjointness, such as reserved
+  per-head budgets plus a shared fallback slot pool.
