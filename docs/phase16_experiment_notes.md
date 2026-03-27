@@ -569,3 +569,136 @@ Conclusion:
   write-gated and content-write variants.
 - The next justified step is not another bounded architecture scout. This
   branch is promising enough to merit exact rerun plus locked confirm.
+
+## 2026-03-27: Reserved-Mix Trajectory Sidecar
+
+Question:
+Can the reserved-fallback writer improve if each head learns an explicit
+reserved-versus-shared mix, rather than relying on a single softmax over the
+reserved slot plus shared fallback slots?
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory`.
+- This keeps the reserved-fallback slot allocation, then computes separate
+  reserved and shared write distributions and mixes them with a learned
+  per-head content-conditioned gate.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic changes only content-sidecar write weighting
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`25 passed, 25 deselected` after the follow-on additions in this file).
+- `uv run pytest -q` passed (`102 passed` after the follow-on additions in this file).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmixwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmixwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_032021_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmixwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_032021_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmixwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9985 / 0.9990 / 0.9355 / 120.46`
+  - `full_locked`: `0.9976 / 0.9963 / 0.9449 / 121.77`
+  - `finalquery_heavy`: `0.9976 / 0.9969 / 0.9430 / 121.76`
+  - `longdistance`: `0.9985 / 0.9979 / 0.9439 / 152.38`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.692 / 0.511`
+  - write entropy/top1: `0.688 / 0.543`
+  - value gate mean: `0.505`
+
+Hard-slice comparisons:
+- Versus reserved-fallback:
+  [phase16_reservedfallback_vs_phase16_reservedmix_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_reservedfallback_vs_phase16_reservedmix_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus multi-head content-write-value:
+  [phase16_multiheadcontentwritevalue_vs_phase16_reservedmix_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_reservedmix_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus plain write-gated:
+  [phase16_writegate_vs_phase16_reservedmix_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_reservedmix_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+
+Conclusion:
+- The learned reserved-versus-shared mix is a confirm-time regression.
+- The mixture gate makes the writer more flexible in principle, but on the
+  decisive confirm slice it softens the stronger reserved-fallback behavior and
+  reintroduces wrong-content errors.
+- The next justified architecture move is to leave reserved and shared paths
+  separate and only calibrate the reserved competition itself.
+
+## 2026-03-27: Reserved-Temperature Trajectory Sidecar
+
+Question:
+If reserved-fallback is the current hybrid leader, can it be improved by
+leaving the shared fallback pool untouched and only sharpening or flattening the
+reserved-slot competition with a learned per-head content-conditioned
+temperature?
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory`.
+- This keeps the reserved-fallback writer structure, but applies a learned
+  per-head reserved temperature before the final write softmax. Shared fallback
+  logits are left unchanged.
+- Added `factorized_content_sidecar_reserved_temperature_mean` for bounded
+  instrumentation.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic changes only the content-sidecar write scores
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`25 passed, 25 deselected`).
+- `uv run pytest -q` passed (`102 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedtemperaturewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedtemperaturewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_034212_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedtemperaturewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_034212_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedtemperaturewritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9971 / 0.9950 / 0.9345 / 120.80`
+  - `full_locked`: `0.9995 / 0.9991 / 0.9477 / 121.90`
+  - `finalquery_heavy`: `0.9980 / 0.9976 / 0.9424 / 121.40`
+  - `longdistance`: `0.9961 / 0.9945 / 0.9446 / 152.23`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - write entropy/top1: `0.692 / 0.516`
+  - value gate mean: `0.500`
+  - reserved temperature mean: `1.190`
+
+Hard-slice comparisons:
+- Versus reserved-fallback:
+  [phase16_reservedfallback_vs_phase16_reservedtemperature_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_reservedfallback_vs_phase16_reservedtemperature_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus multi-head content-write-value:
+  [phase16_multiheadcontentwritevalue_vs_phase16_reservedtemperature_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_reservedtemperature_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus plain write-gated:
+  [phase16_writegate_vs_phase16_reservedtemperature_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_reservedtemperature_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+
+Conclusion:
+- Calibrating reserved-slot sharpness alone is not enough. This branch looks
+  excellent on selected summary slices but is another confirm-time false
+  positive.
+- The negative result is informative: the remaining bottleneck is not simple
+  reserved-path softness. The stronger reserved-fallback baseline is already in
+  the right regime, and changing reserved calibration without improving shared
+  fallback selection makes confirm-time content worse.
+- The next justified architecture direction is to keep the reserved-fallback
+  scaffold fixed and instead change shared fallback pressure or admission, not
+  reserved-slot temperature.
