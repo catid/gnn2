@@ -702,3 +702,71 @@ Conclusion:
 - The next justified architecture direction is to keep the reserved-fallback
   scaffold fixed and instead change shared fallback pressure or admission, not
   reserved-slot temperature.
+
+## 2026-03-27: Shared-Penalty Reserved-Fallback Trajectory Sidecar
+
+Question:
+If the reserved-fallback scaffold is the current hybrid leader, can it be
+improved by making shared fallback admission more selective without touching the
+reserved path? The bounded test here applies a learned per-head penalty only to
+slots that are already reserved by another head before shared fallback top-k
+selection.
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory`.
+- This keeps the reserved-fallback writer structure:
+  - one reserved slot per head from a greedy non-overlapping budget
+  - shared fallback slots selected afterward
+- The only change is a content-conditioned per-head penalty applied to slots
+  already reserved by another head during the shared fallback stage.
+- Added `factorized_content_sidecar_shared_penalty_mean` for bounded tracing.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic changes only content-sidecar write selection
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`27 passed, 25 deselected`).
+- `uv run pytest -q` passed (`104 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_040414_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_040414_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9976 / 0.9960 / 0.9434 / 121.25`
+  - `full_locked`: `0.9980 / 0.9981 / 0.9468 / 121.75`
+  - `finalquery_heavy`: `0.9985 / 0.9982 / 0.9461 / 121.91`
+  - `longdistance`: `0.9966 / 0.9951 / 0.9446 / 152.89`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - write entropy/top1: `0.687 / 0.530`
+  - value gate mean: `0.504`
+  - shared penalty mean: `0.962`
+
+Hard-slice comparisons:
+- Versus reserved-fallback:
+  [phase16_reservedfallback_vs_phase16_reservedsharedpenalty_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_reservedfallback_vs_phase16_reservedsharedpenalty_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus multi-head content-write-value:
+  [phase16_multiheadcontentwritevalue_vs_phase16_reservedsharedpenalty_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_reservedsharedpenalty_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus plain write-gated:
+  [phase16_writegate_vs_phase16_reservedsharedpenalty_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_reservedsharedpenalty_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+
+Conclusion:
+- This is a bounded positive, not a breakthrough.
+- Unlike reserved-mix and reserved-temperature, changing shared fallback
+  admission does not regress the decisive confirm slice.
+- The branch now matches the current phase-16 leaders on the hard-slice gate
+  while preserving `late_wrong_content = 1`, so the justified next step is
+  exact rerun plus locked confirm rather than another immediate bounded scout.

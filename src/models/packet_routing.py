@@ -550,6 +550,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_source != "trajectory_bank"
         ):
@@ -570,6 +571,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
             }
             and self.factorized_content_sidecar_write_topk <= 0
         ):
@@ -585,6 +587,7 @@ class PacketRoutingModel(nn.Module):
             "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
             "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
             "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+            "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
         } and self.factorized_content_sidecar_write_heads <= 0:
             raise ValueError(
                 f"factorized_content_sidecar_mode='{self.factorized_content_sidecar_mode}' requires "
@@ -1015,6 +1018,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
             }:
                 self.factorized_content_sidecar_key_proj = nn.Linear(
                     self.hidden_dim,
@@ -1039,6 +1043,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
@@ -1054,6 +1059,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_content_proj = nn.Linear(
                         self.hidden_dim,
@@ -1068,6 +1074,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_value_gate_proj = nn.Linear(
                         self.hidden_dim,
@@ -1086,6 +1093,12 @@ class PacketRoutingModel(nn.Module):
                         self.factorized_content_sidecar_write_heads,
                         bias=False,
                     )
+                if self.factorized_content_sidecar_mode == "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory":
+                    self.factorized_content_sidecar_write_shared_penalty_proj = nn.Linear(
+                        self.hidden_dim,
+                        self.factorized_content_sidecar_write_heads,
+                        bias=False,
+                    )
                 if self.factorized_content_sidecar_mode in {
                     "trajectory_content_multihead_write_gated_kv_memory",
                     "trajectory_content_multihead_write_value_gated_kv_memory",
@@ -1094,6 +1107,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
                 }:
                     self.factorized_content_sidecar_write_query_proj = nn.Linear(
                         self.hidden_dim,
@@ -1655,6 +1669,7 @@ class PacketRoutingModel(nn.Module):
         sidecar_write_weights = None
         sidecar_value_gate = None
         sidecar_reserved_temperature = None
+        sidecar_shared_penalty = None
         if self.factorized_content_sidecar_mode != "none":
             sidecar_route_features = None
             if self.factorized_content_sidecar_mode in {
@@ -1669,6 +1684,7 @@ class PacketRoutingModel(nn.Module):
                 "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                 "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
             }:
                 if self.factorized_content_sidecar_source != "trajectory_bank":
                     raise ValueError(
@@ -1700,6 +1716,7 @@ class PacketRoutingModel(nn.Module):
                     "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                     "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                    "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
                 }:
                     write_query = self.factorized_content_sidecar_write_query_proj(query_hidden).view(
                         query_hidden.shape[0],
@@ -1989,6 +2006,76 @@ class PacketRoutingModel(nn.Module):
                             fallback_scores = write_scores.masked_fill(reserved_mask, float("-inf"))
                             shared_values, shared_idx = torch.topk(fallback_scores, k=shared_k, dim=-1)
                             masked_write_scores.scatter_(2, shared_idx, shared_values)
+                    elif (
+                        self.factorized_content_sidecar_mode
+                        == "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory"
+                    ):
+                        reserved_mask = torch.zeros_like(write_scores, dtype=torch.bool)
+                        reserved_values = torch.zeros_like(write_scores)
+                        global_taken = torch.zeros(
+                            write_scores.shape[0],
+                            write_scores.shape[-1],
+                            device=write_scores.device,
+                            dtype=torch.bool,
+                        )
+                        head_assigned = torch.zeros(
+                            write_scores.shape[0],
+                            write_scores.shape[1],
+                            device=write_scores.device,
+                            dtype=torch.bool,
+                        )
+                        for head_idx in range(write_scores.shape[1]):
+                            available = ~global_taken
+                            head_scores = write_scores[:, head_idx, :].masked_fill(~available, float("-inf"))
+                            has_available = available.any(dim=-1)
+                            if not bool(has_available.any().item()):
+                                continue
+                            chosen_idx = head_scores.argmax(dim=-1, keepdim=True)
+                            head_hot = torch.zeros_like(write_scores[:, head_idx, :])
+                            head_hot.scatter_(
+                                1,
+                                chosen_idx,
+                                has_available.unsqueeze(-1).to(dtype=write_scores.dtype),
+                            )
+                            reserved_mask[:, head_idx, :] = head_hot > 0.0
+                            reserved_values[:, head_idx, :] = head_hot * write_scores[:, head_idx, :]
+                            global_taken = global_taken | (head_hot > 0.0)
+                            head_assigned[:, head_idx] = has_available
+                        unassigned = ~head_assigned
+                        if bool(unassigned.any().item()):
+                            fallback_idx = write_scores.argmax(dim=-1, keepdim=True)
+                            for head_idx in range(write_scores.shape[1]):
+                                needs_fallback = unassigned[:, head_idx]
+                                if not bool(needs_fallback.any().item()):
+                                    continue
+                                chosen_idx = fallback_idx[:, head_idx, :]
+                                fallback_hot = torch.zeros_like(write_scores[:, head_idx, :])
+                                fallback_hot.scatter_(
+                                    1,
+                                    chosen_idx,
+                                    needs_fallback.unsqueeze(-1).to(dtype=write_scores.dtype),
+                                )
+                                reserved_mask[:, head_idx, :] = reserved_mask[:, head_idx, :] | (fallback_hot > 0.0)
+                                reserved_values[:, head_idx, :] = (
+                                    reserved_values[:, head_idx, :]
+                                    + (fallback_hot * write_scores[:, head_idx, :])
+                                )
+                        masked_write_scores = torch.where(
+                            reserved_mask,
+                            reserved_values,
+                            torch.full_like(write_scores, float("-inf")),
+                        )
+                        shared_k = min(max(0, topk - 1), sidecar_slots.shape[1] - 1)
+                        if shared_k > 0:
+                            reserved_by_any = reserved_mask.any(dim=1, keepdim=True)
+                            sidecar_shared_penalty = 2.0 * torch.sigmoid(
+                                self.factorized_content_sidecar_write_shared_penalty_proj(content)
+                            )
+                            penalty_mask = reserved_by_any.expand(-1, write_scores.shape[1], -1)
+                            penalty_values = penalty_mask.to(dtype=write_scores.dtype) * sidecar_shared_penalty.unsqueeze(-1)
+                            fallback_scores = write_scores.masked_fill(reserved_mask, float("-inf")) - penalty_values
+                            shared_values, shared_idx = torch.topk(fallback_scores, k=shared_k, dim=-1)
+                            masked_write_scores.scatter_(2, shared_idx, shared_values)
                     elif topk < sidecar_slots.shape[1]:
                         topk_values, topk_idx = torch.topk(write_scores, k=topk, dim=-1)
                         masked_write_scores = torch.full_like(write_scores, float("-inf"))
@@ -2008,6 +2095,7 @@ class PacketRoutingModel(nn.Module):
                             "trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory",
                             "trajectory_content_multihead_reserved_mixed_write_value_gated_kv_memory",
                             "trajectory_content_multihead_reserved_temperature_write_value_gated_kv_memory",
+                            "trajectory_content_multihead_reserved_shared_penalty_write_value_gated_kv_memory",
                         }
                     ):
                         sidecar_value_gate = torch.sigmoid(self.factorized_content_sidecar_value_gate_proj(content))
@@ -2113,6 +2201,7 @@ class PacketRoutingModel(nn.Module):
             "factorized_content_sidecar_write_weights": sidecar_write_weights,
             "factorized_content_sidecar_value_gate": sidecar_value_gate,
             "factorized_content_sidecar_reserved_temperature": sidecar_reserved_temperature,
+            "factorized_content_sidecar_shared_penalty": sidecar_shared_penalty,
         }
 
     def es_parameter_names(self, include_adapters: bool) -> list[str]:
@@ -2970,6 +3059,7 @@ class PacketRoutingModel(nn.Module):
         factorized_content_sidecar_write_weights = None
         factorized_content_sidecar_value_gate = None
         factorized_content_sidecar_reserved_temperature = None
+        factorized_content_sidecar_shared_penalty = None
         if self.readout_mode == "probe_query_views":
             baseline_view = self._baseline_readout_input(
                 sink_state,
@@ -3090,6 +3180,9 @@ class PacketRoutingModel(nn.Module):
             factorized_content_sidecar_reserved_temperature = factorized_trace.get(
                 "factorized_content_sidecar_reserved_temperature"
             )
+            factorized_content_sidecar_shared_penalty = factorized_trace.get(
+                "factorized_content_sidecar_shared_penalty"
+            )
             readout_input = self._apply_readout_adapter(readout_input)
         else:
             baseline_view = self._baseline_readout_input(
@@ -3131,6 +3224,8 @@ class PacketRoutingModel(nn.Module):
                 trace["factorized_content_sidecar_reserved_temperature"] = (
                     factorized_content_sidecar_reserved_temperature
                 )
+            if factorized_content_sidecar_shared_penalty is not None:
+                trace["factorized_content_sidecar_shared_penalty"] = factorized_content_sidecar_shared_penalty
             trace["final_readout_input"] = readout_input
         if self.readout_head_mode == "mixture":
             logits = self.readout(readout_input, query_obs=observations[:, -1, 0])
@@ -3205,6 +3300,11 @@ class PacketRoutingModel(nn.Module):
         if factorized_content_sidecar_reserved_temperature is not None:
             factorized_content_sidecar_reserved_temperature_mean = (
                 factorized_content_sidecar_reserved_temperature.mean().to(device=device, dtype=dtype)
+            )
+        factorized_content_sidecar_shared_penalty_mean = torch.zeros((), device=device, dtype=dtype)
+        if factorized_content_sidecar_shared_penalty is not None:
+            factorized_content_sidecar_shared_penalty_mean = (
+                factorized_content_sidecar_shared_penalty.mean().to(device=device, dtype=dtype)
             )
         factorized_payload_aux_loss = torch.zeros((), device=device, dtype=dtype)
         if (
@@ -3357,6 +3457,9 @@ class PacketRoutingModel(nn.Module):
             ),
             "factorized_content_sidecar_reserved_temperature_mean": torch.full_like(
                 accuracy, float(factorized_content_sidecar_reserved_temperature_mean.detach().item())
+            ),
+            "factorized_content_sidecar_shared_penalty_mean": torch.full_like(
+                accuracy, float(factorized_content_sidecar_shared_penalty_mean.detach().item())
             ),
             "mixture_balance_loss": torch.full_like(accuracy, float(mixture_balance_loss.detach().item())),
             "mixture_gate_entropy": torch.full_like(accuracy, float(mixture_gate_entropy.detach().item())),
