@@ -842,3 +842,78 @@ Conclusion:
 - The failure is informative because it narrows the next move:
   the shared fallback stage should reallocate or prioritize leftover capacity,
   not scale a stronger anti-sharing penalty from reserved strength.
+
+## 2026-03-27: Reservation-Margin Fallback Reallocation Sidecar
+
+Question:
+Can the reserved-fallback writer improve confirm-time late-route content by
+reallocating leftover shared fallback capacity toward heads with the largest
+reserved-versus-shared margin, instead of strengthening anti-sharing
+penalties? The intended benefit was to preserve the clean reserved path while
+giving extra shared capacity to heads whose reserved choice looked most
+decisive.
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_reserved_margin_reallocation_write_value_gated_kv_memory`.
+- This keeps the same route-isolated reserved-fallback scaffold:
+  - one greedy non-overlapping reserved slot per head
+  - shared fallback slots selected afterward
+- The architectural change is only in how shared fallback budget is allocated:
+  - compute a per-head margin between the best reserved slot and best shared
+    fallback slot
+  - allocate the fixed shared fallback budget across heads by that margin
+  - each head then spends only its assigned shared budget on top shared slots
+- Added
+  `factorized_content_sidecar_reserved_margin_mean`
+  for bounded tracing.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic changes only content-sidecar fallback write allocation
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`31 passed, 25 deselected`).
+- `uv run pytest -q` passed (`108 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_044911_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_044911_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9980 / 0.9970 / 0.9414 / 121.52`
+  - `full_locked`: `0.9980 / 0.9981 / 0.9384 / 121.28`
+  - `finalquery_heavy`: `0.9995 / 0.9994 / 0.9375 / 120.84`
+  - `longdistance`: `0.9980 / 0.9972 / 0.9439 / 152.51`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - write entropy/top1: `0.650 / 0.590`
+  - value gate mean: `0.504`
+  - reserved margin mean: `0.067`
+
+Hard-slice comparisons:
+- Versus reserved-fallback:
+  [phase16_reservedfallback_vs_phase16_reservedmarginreallocation_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_reservedfallback_vs_phase16_reservedmarginreallocation_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus reserved-shared-penalty:
+  [phase16_reservedsharedpenalty_vs_phase16_reservedmarginreallocation_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_reservedsharedpenalty_vs_phase16_reservedmarginreallocation_confirm32b.json)
+  - candidate beat baseline `2-1`
+  - candidate improved `late_wrong_content` `2 -> 1`
+- Versus plain write-gated:
+  [phase16_writegate_vs_phase16_reservedmarginreallocation_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_reservedmarginreallocation_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+
+Conclusion:
+- This is a bounded positive.
+- Reallocating shared fallback capacity by reserved margin avoids the brittleness
+  of the strength-penalty branch and stays competitive with the current
+  phase-16 leaders on the decisive confirm slice.
+- The branch is good enough to justify exact rerun plus locked confirm, but it
+  is not yet a promoted result because it only ties the strongest comparators
+  instead of beating them cleanly.

@@ -1,0 +1,8 @@
+_base_: ./hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml
+
+experiment:
+  seed: 19015
+  results_root: results/phase16_dev
+
+model:
+  factorized_content_sidecar_mode: trajectory_content_multihead_reserved_margin_reallocation_write_value_gated_kv_memory
