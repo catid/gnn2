@@ -567,8 +567,27 @@ Conclusion:
   hard-slice gate, but it is the first hybrid writer in this branch to match
   them there while also improving aggregate confirm accuracy over the simpler
   write-gated and content-write variants.
-- The next justified step is not another bounded architecture scout. This
-  branch is promising enough to merit exact rerun plus locked confirm.
+- The bounded result was strong enough to justify exact rerun plus locked
+  confirm.
+
+Rerun/confirm follow-up:
+- Exact same-seed rerun:
+  [20260327_051727_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_051727_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+  matched the original summary exactly across `best_val`, `full_locked`,
+  `finalquery_heavy`, and `longdistance`.
+- Locked confirm from
+  [verification.json](/home/catid/gnn2/results/phase16_dev/20260327_051727_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi/artifacts/phase15_verify/verification.json)
+  fell back to the established stable ceiling:
+  - `full_locked`: `0.6527 / 0.2874 / 0.8850 / 116.22`
+  - `finalquery_heavy`: `0.4430 / 0.2976 / 0.8789 / 115.56`
+  - `longdistance`: `0.5260 / 0.3303 / 0.8868 / 145.62`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Final read:
+  - the branch is rerun-stable and route-safe
+  - the bounded hard-slice tie did not survive locked confirm as a true
+    ceiling break
+  - so this closes as another stable-ceiling family rather than a promoted
+    confirmed improvement
 
 ## 2026-03-27: Reserved-Mix Trajectory Sidecar
 
@@ -768,8 +787,27 @@ Conclusion:
 - Unlike reserved-mix and reserved-temperature, changing shared fallback
   admission does not regress the decisive confirm slice.
 - The branch now matches the current phase-16 leaders on the hard-slice gate
-  while preserving `late_wrong_content = 1`, so the justified next step is
-  exact rerun plus locked confirm rather than another immediate bounded scout.
+  while preserving `late_wrong_content = 1`, so the bounded result was strong
+  enough to justify exact rerun plus locked confirm.
+
+Rerun/confirm follow-up:
+- Exact same-seed rerun:
+  [20260327_053234_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_053234_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+  matched the original summary exactly across `best_val`, `full_locked`,
+  `finalquery_heavy`, and `longdistance`.
+- Locked confirm from
+  [verification.json](/home/catid/gnn2/results/phase16_dev/20260327_053234_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedsharedpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi/artifacts/phase15_verify/verification.json)
+  fell back to the established stable ceiling:
+  - `full_locked`: `0.6527 / 0.2874 / 0.8850 / 116.22`
+  - `finalquery_heavy`: `0.4424 / 0.2968 / 0.8789 / 115.56`
+  - `longdistance`: `0.5260 / 0.3303 / 0.8868 / 145.62`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Final read:
+  - the branch is rerun-stable and route-safe
+  - the bounded hard-slice tie did not survive locked confirm as a true
+    ceiling break
+  - so this closes as another stable-ceiling family rather than a promoted
+    confirmed improvement
 
 ## 2026-03-27: Reservation-Strength Shared-Penalty Sidecar
 
@@ -917,3 +955,22 @@ Conclusion:
 - The branch is good enough to justify exact rerun plus locked confirm, but it
   is not yet a promoted result because it only ties the strongest comparators
   instead of beating them cleanly.
+
+Rerun/confirm follow-up:
+- Exact same-seed rerun:
+  [20260327_051010_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_051010_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+  matched the original summary exactly across `best_val`, `full_locked`,
+  `finalquery_heavy`, and `longdistance`.
+- Locked confirm from
+  [verification.json](/home/catid/gnn2/results/phase16_dev/20260327_051010_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedmarginreallocationwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi/artifacts/phase15_verify/verification.json)
+  fell back to the established stable ceiling:
+  - `full_locked`: `0.6527 / 0.2874 / 0.8850 / 116.22`
+  - `finalquery_heavy`: `0.4427 / 0.2972 / 0.8789 / 115.56`
+  - `longdistance`: `0.5260 / 0.3303 / 0.8868 / 145.62`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Final read:
+  - the branch is rerun-stable and route-safe
+  - the bounded confirm hard-slice tie did not survive locked confirm as a true
+    ceiling break
+  - so this closes as another stable-ceiling family rather than a promoted
+    confirmed improvement
