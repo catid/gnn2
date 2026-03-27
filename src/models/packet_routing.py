@@ -530,6 +530,14 @@ class PacketRoutingModel(nn.Module):
         self.factorized_content_sidecar_zero_init = bool(
             config.get("factorized_content_sidecar_zero_init", False)
         )
+        if (
+            self.factorized_content_sidecar_mode == "trajectory_kv_memory"
+            and self.factorized_content_sidecar_source != "trajectory_bank"
+        ):
+            raise ValueError(
+                "factorized_content_sidecar_mode='trajectory_kv_memory' requires "
+                "factorized_content_sidecar_source='trajectory_bank'."
+            )
         payload_cardinality = config.get("payload_cardinality")
         self.payload_cardinality = int(self.num_classes if payload_cardinality is None else payload_cardinality)
         self.factorized_payload_aux_weight = float(config.get("factorized_payload_aux_weight", 0.0))
@@ -846,7 +854,10 @@ class PacketRoutingModel(nn.Module):
                 )
             elif effective_base_mode != "plain":
                 raise ValueError(f"Unknown readout_base_mode: {effective_base_mode}")
-            if self.factorized_content_source == "trajectory_bank":
+            if (
+                self.factorized_content_source == "trajectory_bank"
+                or self.factorized_content_sidecar_source == "trajectory_bank"
+            ):
                 bank_input_dim = (self.hidden_dim * len(self.trajectory_bank_views)) + (
                     2 if self.trajectory_bank_use_positional_features else 0
                 )
@@ -931,6 +942,23 @@ class PacketRoutingModel(nn.Module):
                 self.factorized_content_sidecar_value_proj = nn.Linear(
                     self.hidden_dim,
                     self.hidden_dim * self.factorized_content_sidecar_slots,
+                )
+                self.factorized_content_sidecar_query_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim,
+                    bias=False,
+                )
+                if self.factorized_content_sidecar_zero_init:
+                    nn.init.zeros_(self.factorized_content_sidecar_value_proj.weight)
+                    nn.init.zeros_(self.factorized_content_sidecar_value_proj.bias)
+            elif self.factorized_content_sidecar_mode == "trajectory_kv_memory":
+                self.factorized_content_sidecar_key_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim,
+                )
+                self.factorized_content_sidecar_value_proj = nn.Linear(
+                    self.hidden_dim,
+                    self.hidden_dim,
                 )
                 self.factorized_content_sidecar_query_proj = nn.Linear(
                     self.hidden_dim,
@@ -1476,16 +1504,16 @@ class PacketRoutingModel(nn.Module):
         sidecar_slots = None
         sidecar_weights = None
         if self.factorized_content_sidecar_mode != "none":
-            if self.factorized_content_sidecar_source in {"factorized_content_base", "factorized_content_hidden"}:
-                sidecar_source = base_content
-            elif self.factorized_content_sidecar_source == self.factorized_content_source:
-                sidecar_source = raw_content
-            else:
-                sidecar_source = self._factorized_content_source_hidden(
-                    source=self.factorized_content_sidecar_source,
-                    sink_state=sink_state,
-                    observations=observations,
+            sidecar_route_features = None
+            if self.factorized_content_sidecar_mode == "trajectory_kv_memory":
+                if self.factorized_content_sidecar_source != "trajectory_bank":
+                    raise ValueError(
+                        "factorized_content_sidecar_mode='trajectory_kv_memory' requires "
+                        "factorized_content_sidecar_source='trajectory_bank'."
+                    )
+                sidecar_slots, sidecar_route_features = self._select_temporal_bank(
                     trace=trace,
+                    observations=observations,
                     first_exit_time=first_exit_time,
                     delays=delays,
                     action_totals=action_totals,
@@ -1494,27 +1522,54 @@ class PacketRoutingModel(nn.Module):
                     route_weight_total=route_weight_total,
                     eps=eps,
                 )
-            if self.factorized_content_sidecar_mode == "residual_mlp":
-                sidecar_hidden = self.factorized_content_sidecar(sidecar_source)
-            elif self.factorized_content_sidecar_mode == "kv_memory":
-                key_slots = self.factorized_content_sidecar_key_proj(sidecar_source).view(
-                    sidecar_source.shape[0],
-                    self.factorized_content_sidecar_slots,
-                    self.hidden_dim,
-                )
-                sidecar_slots = self.factorized_content_sidecar_value_proj(sidecar_source).view(
-                    sidecar_source.shape[0],
-                    self.factorized_content_sidecar_slots,
-                    self.hidden_dim,
-                )
                 sidecar_query = self.factorized_content_sidecar_query_proj(query_hidden)
+                if sidecar_route_features is not None and self.trajectory_bank_route_proj is not None:
+                    sidecar_query = sidecar_query + self.trajectory_bank_route_proj(sidecar_route_features)
+                key_slots = self.factorized_content_sidecar_key_proj(sidecar_slots)
+                value_slots = self.factorized_content_sidecar_value_proj(sidecar_slots)
                 sidecar_scores = (key_slots * sidecar_query.unsqueeze(1)).sum(dim=-1) / math.sqrt(self.hidden_dim)
                 sidecar_weights = torch.softmax(sidecar_scores, dim=-1)
-                sidecar_hidden = (sidecar_weights.unsqueeze(-1) * sidecar_slots).sum(dim=1)
+                sidecar_hidden = (sidecar_weights.unsqueeze(-1) * value_slots).sum(dim=1)
             else:
-                raise ValueError(
-                    f"Unknown factorized_content_sidecar_mode: {self.factorized_content_sidecar_mode}"
-                )
+                if self.factorized_content_sidecar_source in {"factorized_content_base", "factorized_content_hidden"}:
+                    sidecar_source = base_content
+                elif self.factorized_content_sidecar_source == self.factorized_content_source:
+                    sidecar_source = raw_content
+                else:
+                    sidecar_source = self._factorized_content_source_hidden(
+                        source=self.factorized_content_sidecar_source,
+                        sink_state=sink_state,
+                        observations=observations,
+                        trace=trace,
+                        first_exit_time=first_exit_time,
+                        delays=delays,
+                        action_totals=action_totals,
+                        route_entropy_sum=route_entropy_sum,
+                        route_conf_sum=route_conf_sum,
+                        route_weight_total=route_weight_total,
+                        eps=eps,
+                    )
+                if self.factorized_content_sidecar_mode == "residual_mlp":
+                    sidecar_hidden = self.factorized_content_sidecar(sidecar_source)
+                elif self.factorized_content_sidecar_mode == "kv_memory":
+                    key_slots = self.factorized_content_sidecar_key_proj(sidecar_source).view(
+                        sidecar_source.shape[0],
+                        self.factorized_content_sidecar_slots,
+                        self.hidden_dim,
+                    )
+                    sidecar_slots = self.factorized_content_sidecar_value_proj(sidecar_source).view(
+                        sidecar_source.shape[0],
+                        self.factorized_content_sidecar_slots,
+                        self.hidden_dim,
+                    )
+                    sidecar_query = self.factorized_content_sidecar_query_proj(query_hidden)
+                    sidecar_scores = (key_slots * sidecar_query.unsqueeze(1)).sum(dim=-1) / math.sqrt(self.hidden_dim)
+                    sidecar_weights = torch.softmax(sidecar_scores, dim=-1)
+                    sidecar_hidden = (sidecar_weights.unsqueeze(-1) * sidecar_slots).sum(dim=1)
+                else:
+                    raise ValueError(
+                        f"Unknown factorized_content_sidecar_mode: {self.factorized_content_sidecar_mode}"
+                    )
             content = content + (self.factorized_content_sidecar_scale * sidecar_hidden)
         if self.factorized_combiner_mode == "concat":
             readout_input = self.factorized_combiner(torch.cat([content, query_hidden], dim=-1))

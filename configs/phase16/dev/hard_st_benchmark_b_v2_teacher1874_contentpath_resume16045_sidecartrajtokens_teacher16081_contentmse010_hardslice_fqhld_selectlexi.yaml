@@ -1,0 +1,11 @@
+_base_: ../../phase15/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecarkv4_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml
+
+experiment:
+  seed: 19001
+  results_root: results/phase16_dev
+
+model:
+  factorized_content_sidecar_mode: trajectory_kv_memory
+  factorized_content_sidecar_source: trajectory_bank
+  factorized_content_sidecar_scale: 1.0
+  factorized_content_sidecar_zero_init: true
