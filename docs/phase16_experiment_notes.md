@@ -108,8 +108,27 @@ Conclusion:
 - This is the first bounded positive in the phase-16 sidecar-writing line.
 - Explicit sparse write selection looks more useful than exposing raw
   trajectory-bank tokens directly.
-- The next justified step is to rerun and run locked confirm on this write-gated
-  branch before making a stronger claim.
+- The bounded result was strong enough to justify exact rerun plus locked
+  confirm.
+
+Rerun/confirm follow-up:
+- Exact same-seed rerun:
+  [20260327_055207_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_055207_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+  matched the original summary exactly across `best_val`, `full_locked`,
+  `finalquery_heavy`, and `longdistance`.
+- Locked confirm from
+  [verification.json](/home/catid/gnn2/results/phase16_dev/20260327_055207_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajwritegate_teacher16081_contentmse010_hardslice_fqhld_selectlexi/artifacts/phase15_verify/verification.json)
+  fell back to the established stable ceiling:
+  - `full_locked`: `0.6527 / 0.2874 / 0.8850 / 116.22`
+  - `finalquery_heavy`: `0.4430 / 0.2976 / 0.8789 / 115.56`
+  - `longdistance`: `0.5260 / 0.3303 / 0.8868 / 145.62`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Final read:
+  - the branch is rerun-stable and route-safe
+  - the bounded positive over the older phase-15 sidecar baseline did not
+    survive locked confirm as a ceiling break
+  - so this closes as another stable-ceiling family rather than a promoted
+    confirmed improvement
 
 ## 2026-03-27: Content-Conditioned Write-Gated Trajectory Sidecar
 
@@ -165,8 +184,27 @@ Conclusion:
   late-route regime.
 - It improves over the older phase-15 sidecar baseline.
 - It does not yet cleanly separate from the simpler phase-16 write-gated
-  variant, so the justified next step is a rerun plus locked-confirm head-to-head
-  between the two write-gated variants, not immediate promotion.
+  variant, so the bounded result was strong enough to justify a rerun plus
+  locked-confirm head-to-head rather than immediate promotion.
+
+Rerun/confirm follow-up:
+- Exact same-seed rerun:
+  [20260327_055207_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_055207_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+  matched the original summary exactly across `best_val`, `full_locked`,
+  `finalquery_heavy`, and `longdistance`.
+- Locked confirm from
+  [verification.json](/home/catid/gnn2/results/phase16_dev/20260327_055207_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi/artifacts/phase15_verify/verification.json)
+  fell back to the established stable ceiling:
+  - `full_locked`: `0.6527 / 0.2874 / 0.8850 / 116.22`
+  - `finalquery_heavy`: `0.4427 / 0.2972 / 0.8789 / 115.56`
+  - `longdistance`: `0.5260 / 0.3303 / 0.8868 / 145.62`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Final read:
+  - the branch is rerun-stable and route-safe
+  - it still does not separate from the simpler write-gated branch under
+    locked confirm
+  - so the head-to-head closes as a stable-ceiling tie rather than a promoted
+    confirmed improvement
 
 ## 2026-03-27: Content-Conditioned Write-Value Gated Trajectory Sidecar
 
