@@ -502,3 +502,70 @@ Conclusion:
 - The next justified architecture move is a hybrid writer that preserves head
   diversity without enforcing full slot disjointness, such as reserved
   per-head budgets plus a shared fallback slot pool.
+
+## 2026-03-27: Reserved-Fallback Multi-Head Trajectory Sidecar
+
+Question:
+If hard disjoint write allocation is too restrictive, can a hybrid writer keep
+one reserved per-head slot for diversity while letting the remaining write
+budget come from a shared fallback pool and recover the confirm-time losses?
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_reserved_fallback_write_value_gated_kv_memory`.
+- Each write head first claims one reserved slot from a greedy non-overlapping
+  budget. The remaining write budget is then drawn from a shared fallback pool
+  that excludes only the head's own reserved slot, so heads can still overlap on
+  useful high-value states without collapsing back to fully shared behavior.
+- The content-conditioned value gate is preserved.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic only changes content-sidecar write selection
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`21 passed, 25 deselected`).
+- `uv run pytest -q` passed (`98 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_025917_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_025917_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedfallbackwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9985 / 0.9980 / 0.9325 / 120.42`
+  - `full_locked`: `0.9985 / 0.9981 / 0.9402 / 121.52`
+  - `finalquery_heavy`: `0.9990 / 0.9994 / 0.9430 / 121.61`
+  - `longdistance`: `0.9990 / 0.9986 / 0.9543 / 153.54`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.693 / 0.502`
+  - write entropy/top1: `0.659 / 0.598`
+  - value gate mean: `0.510`
+
+Hard-slice comparisons:
+- Versus current phase-16 multi-head content-write-value branch:
+  [phase16_multiheadcontentwritevalue_vs_phase16_reservedfallback_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_reservedfallback_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 plain write-gated baseline:
+  [phase16_writegate_vs_phase16_reservedfallback_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_reservedfallback_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 content-write baseline:
+  [phase16_contentwrite_vs_phase16_reservedfallback_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwrite_vs_phase16_reservedfallback_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+
+Conclusion:
+- The reserved-fallback hybrid fixes the confirm-time regression from the
+  disjoint writer without reopening routing.
+- It does not clearly beat the current phase-16 leaders on the decisive
+  hard-slice gate, but it is the first hybrid writer in this branch to match
+  them there while also improving aggregate confirm accuracy over the simpler
+  write-gated and content-write variants.
+- The next justified step is not another bounded architecture scout. This
+  branch is promising enough to merit exact rerun plus locked confirm.
