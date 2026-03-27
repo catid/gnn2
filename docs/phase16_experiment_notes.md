@@ -298,3 +298,72 @@ Conclusion:
   next justified architecture move is to combine multi-head sparse writing with
   content-conditioned value preservation rather than treating those mechanisms
   separately.
+
+## 2026-03-27: Multi-Head Content-Write-Value Trajectory Sidecar
+
+Question:
+If multi-head sparse writing and content-conditioned value preservation both
+look safe but only tie the phase-16 write-gated leaders on the confirm
+hard-slice, does combining them produce a real separation?
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_write_value_gated_kv_memory`.
+- This mode keeps the route-isolated multi-head sparse trajectory writer, then
+  applies the same content-conditioned value gate used by the simpler
+  content-write-value sidecar before final readout.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new branch only affects the final content readout path
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`15 passed, 25 deselected`).
+- `uv run pytest -q` passed (`92 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_015203_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_015203_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadcontentwritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9995 / 1.0000 / 0.9305 / 120.16`
+  - `full_locked`: `1.0000 / 1.0000 / 0.9542 / 122.66`
+  - `finalquery_heavy`: `0.9990 / 0.9994 / 0.9467 / 121.75`
+  - `longdistance`: `0.9980 / 0.9972 / 0.9473 / 152.72`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.693 / 0.502`
+  - write entropy/top1: `0.659 / 0.591`
+  - value gate mean: `0.508`
+
+Hard-slice comparisons:
+- Versus phase-16 plain write-gated baseline:
+  [phase16_writegate_vs_phase16_multiheadcontentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_multiheadcontentwritevalue_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 content-write baseline:
+  [phase16_contentwrite_vs_phase16_multiheadcontentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwrite_vs_phase16_multiheadcontentwritevalue_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 multi-head baseline:
+  [phase16_multihead_vs_phase16_multiheadcontentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multihead_vs_phase16_multiheadcontentwritevalue_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus phase-16 content-write-value baseline:
+  [phase16_contentwritevalue_vs_phase16_multiheadcontentwritevalue_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_contentwritevalue_vs_phase16_multiheadcontentwritevalue_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+
+Conclusion:
+- The combined multi-head content-write-value branch is safe and improves
+  aggregate confirm accuracy over the earlier phase-16 variants.
+- It does not cleanly separate on the actual confirm hard-slice gate; it ties
+  all serious phase-16 comparators `1-1` on late-route disagreements.
+- The current map suggests the missing ingredient is not just combining existing
+  safe mechanisms. The next justified architecture move is to force more
+  diversity or specialization across write heads, rather than letting the heads
+  behave as near-interchangeable sparse selectors.
