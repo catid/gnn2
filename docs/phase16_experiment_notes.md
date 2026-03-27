@@ -770,3 +770,75 @@ Conclusion:
 - The branch now matches the current phase-16 leaders on the hard-slice gate
   while preserving `late_wrong_content = 1`, so the justified next step is
   exact rerun plus locked confirm rather than another immediate bounded scout.
+
+## 2026-03-27: Reservation-Strength Shared-Penalty Sidecar
+
+Question:
+Can the shared-penalty reserved-fallback writer be improved by scaling the
+shared fallback penalty by how strongly another head reserved a slot, instead
+of using a flat per-head penalty? The intended benefit was to keep strongly
+claimed reserved slots cleaner while still allowing fallback access to weaker
+claims.
+
+Implementation:
+- Added
+  `factorized_content_sidecar_mode: trajectory_content_multihead_reserved_strength_penalty_write_value_gated_kv_memory`.
+- This keeps the same route-isolated reserved-fallback scaffold:
+  - one greedy non-overlapping reserved slot per head
+  - shared fallback slots selected afterward
+- The only architectural change is in the shared fallback stage:
+  - compute a per-slot reservation strength from the strongest reserved score
+  - multiply that by a learned per-head penalty
+  - subtract the product before fallback top-k selection
+- Added
+  `factorized_content_sidecar_reserved_strength_penalty_mean`
+  for bounded tracing.
+- The route-isolation contract still holds:
+  - routing, control, and exit remain frozen
+  - sidecar source must be `trajectory_bank`
+  - the new logic changes only content-sidecar fallback write selection
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`29 passed, 25 deselected`).
+- `uv run pytest -q` passed (`106 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedstrengthpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedstrengthpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_042722_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedstrengthpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_042722_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajmultiheadreservedstrengthpenaltywritevalue_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9980 / 0.9970 / 0.9404 / 121.46`
+  - `full_locked`: `0.9980 / 0.9981 / 0.9393 / 121.26`
+  - `finalquery_heavy`: `0.9985 / 0.9982 / 0.9357 / 121.01`
+  - `longdistance`: `0.9971 / 0.9958 / 0.9480 / 153.18`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - write entropy/top1: `0.689 / 0.524`
+  - value gate mean: `0.500`
+  - reserved strength penalty mean: `1.008`
+
+Hard-slice comparisons:
+- Versus reserved-fallback:
+  [phase16_reservedfallback_vs_phase16_reservedstrengthpenalty_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_reservedfallback_vs_phase16_reservedstrengthpenalty_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus multi-head content-write-value:
+  [phase16_multiheadcontentwritevalue_vs_phase16_reservedstrengthpenalty_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_multiheadcontentwritevalue_vs_phase16_reservedstrengthpenalty_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+- Versus plain write-gated:
+  [phase16_writegate_vs_phase16_reservedstrengthpenalty_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_reservedstrengthpenalty_confirm32b.json)
+  - baseline beat candidate `3-1`
+  - candidate `late_wrong_content` worsened `1 -> 3`
+
+Conclusion:
+- This is a verified negative.
+- Strength-weighting the fallback penalty makes the shared stage too brittle:
+  summary slices stay strong, but confirm-time late-route content gets worse.
+- The failure is informative because it narrows the next move:
+  the shared fallback stage should reallocate or prioritize leftover capacity,
+  not scale a stronger anti-sharing penalty from reserved strength.
