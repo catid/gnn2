@@ -110,3 +110,60 @@ Conclusion:
   trajectory-bank tokens directly.
 - The next justified step is to rerun and run locked confirm on this write-gated
   branch before making a stronger claim.
+
+## 2026-03-27: Content-Conditioned Write-Gated Trajectory Sidecar
+
+Question:
+Does sparse write selection improve further if the write address can also see
+the current factorized content representation, not just query and route
+features?
+
+Implementation:
+- Added `factorized_content_sidecar_mode: trajectory_content_write_gated_kv_memory`.
+- This keeps the same route-isolated trajectory sidecar as the write-gated
+  branch, but the write query now includes:
+  - projected query hidden state
+  - projected route features from the trajectory-bank anchor path
+  - projected current factorized content hidden state
+- The sidecar still only affects final content readout.
+
+Validation:
+- Added config-guard and zero-init route-isolation tests in
+  [tests/test_routing_semantics.py](/home/catid/gnn2/tests/test_routing_semantics.py).
+- `uv run pytest -q tests/test_routing_semantics.py -k 'trajectory or sidecar or slot'`
+  passed (`9 passed, 25 deselected`).
+- `uv run pytest -q` passed (`86 passed`).
+
+Bounded dev run:
+- Config:
+  [hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml](/home/catid/gnn2/configs/phase16/dev/hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi.yaml)
+- Result dir:
+  [20260327_004142_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi](/home/catid/gnn2/results/phase16_dev/20260327_004142_hard_st_benchmark_b_v2_teacher1874_contentpath_resume16045_sidecartrajcontentwrite_teacher16081_contentmse010_hardslice_fqhld_selectlexi)
+- Summary slices:
+  - `best_val`: `0.9990 / 0.9990 / 0.9374 / 120.79`
+  - `full_locked`: `0.9980 / 0.9981 / 0.9412 / 121.58`
+  - `finalquery_heavy`: `0.9980 / 0.9976 / 0.9437 / 121.67`
+  - `longdistance`: `0.9995 / 0.9993 / 0.9487 / 153.03`
+  in `overall / fq_acc / fq_route / fq_exit` order.
+- Sidecar usage on selected `full_locked` slice:
+  - read entropy/top1: `0.686 / 0.543`
+  - write entropy/top1: `0.677 / 0.557`
+
+Hard-slice comparisons:
+- Versus current phase-16 write-gated baseline:
+  [phase16_writegate_vs_phase16_contentwrite_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/phase16_writegate_vs_phase16_contentwrite_confirm32b.json)
+  - late-route disagreements split `1-1`
+  - both runs kept `late_wrong_content = 1`
+- Versus stronger phase-15 sidecar baseline `18052`:
+  [18052_vs_phase16_contentwrite_confirm32b.json](/home/catid/gnn2/artifacts/phase15_hardslice/18052_vs_phase16_contentwrite_confirm32b.json)
+  - candidate beat baseline on late-route disagreements `2-1`
+  - baseline `late_wrong_content = 2`
+  - candidate `late_wrong_content = 1`
+
+Conclusion:
+- Content-conditioned write addressing is safe and remains in the stable
+  late-route regime.
+- It improves over the older phase-15 sidecar baseline.
+- It does not yet cleanly separate from the simpler phase-16 write-gated
+  variant, so the justified next step is a rerun plus locked-confirm head-to-head
+  between the two write-gated variants, not immediate promotion.
