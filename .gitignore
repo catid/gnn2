@@ -11,4 +11,8 @@ build/
 dist/
 *.egg-info/
 results/**/*.pt
+results/**/*.json
+results/**/*.csv
+artifacts/**/*.json
+artifacts/**/*.csv
 logs/
